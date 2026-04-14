@@ -1,0 +1,44 @@
+{
+  "themes": {
+    "Cricket": [
+      ["Virat Kohli", "Rohit Sharma", "MS Dhoni", "Sachin Tendulkar", "Jasprit Bumrah", "Hardik Pandya", "Ravindra Jadeja", "Suryakumar Yadav", "Rishabh Pant", "KL Rahul"],
+      ["Steve Smith", "Kane Williamson", "Joe Root", "Babar Azam", "David Warner", "Glenn Maxwell", "AB de Villiers", "Chris Gayle", "Kieron Pollard", "Ben Stokes"],
+      ["Mitchell Starc", "Trent Boult", "Pat Cummins", "Rashid Khan", "Lasith Malinga", "Shane Warne", "Muttiah Muralitharan", "Brett Lee", "Shoaib Akhtar", "Wasim Akram", "Jofra Archer"],
+      ["Brian Lara", "Ricky Ponting", "Sourav Ganguly", "Virender Sehwag", "Yuvraj Singh", "Rahul Dravid", "Jacques Kallis", "Adam Gilchrist", "Sanath Jayasuriya", "Kapil Dev"],
+      ["Fast Bowler", "Spin Bowler", "Wicketkeeper", "Opening Batsman", "All-Rounder", "Captain", "Pinch Hitter", "Tailender"],
+      ["Bouncer", "Yorker", "Googly", "Inswinger", "Outswinger", "Slower Ball", "Doosra", "Full Toss", "Spin", "Pace"],
+      ["Cover Drive", "Pull Shot", "Helicopter Shot", "Straight Drive", "Sweep Shot", "Reverse Sweep", "Switch Hit", "Hook Shot", "Upper Cut"],
+      ["Bowled", "LBW", "Caught", "Run Out", "Stumped", "Hit Wicket", "Caught Behind", "Mankad"],
+      ["Wankhede Stadium", "Eden Gardens", "Chinnaswamy Stadium", "MCG", "Lord's", "SCG", "Chepauk", "Narendra Modi Stadium", "Gabba"],
+      ["IPL", "ODI World Cup", "T20 World Cup", "The Ashes", "World Test Championship", "Asia Cup", "Champions Trophy", "BBL"],
+      ["Chennai Super Kings", "Mumbai Indians", "Royal Challengers Bangalore", "Kolkata Knight Riders", "Sunrisers Hyderabad", "Delhi Capitals", "Rajasthan Royals", "Punjab Kings"],
+      ["Bat", "Ball", "Stumps", "Helmet", "Pads", "Gloves", "Bails", "Pitch", "Boundary Rope"],
+      ["Umpire", "Third Umpire", "Powerplay", "Super Over", "DRS", "Hat-trick", "Century", "Duck", "Golden Duck", "Free Hit", "Maiden Over"],
+      ["Slip", "Point", "Cover", "Mid Off", "Mid On", "Fine Leg", "Third Man", "Square Leg", "Gully", "Boundary", "Cow Corner"],
+      ["Ravi Shastri", "Harsha Bhogle", "Ian Bishop", "BCCI", "ICC", "Commentator", "Match Referee", "Ian Chappell", "Sunil Gavaskar"]
+    ],
+    "Football": [
+      ["Lionel Messi", "Cristiano Ronaldo", "Neymar Jr", "Kylian Mbappe", "Erling Haaland", "Robert Lewandowski", "Kevin De Bruyne", "Mohamed Salah", "Vinicius Jr", "Harry Kane"],
+      ["Pele", "Diego Maradona", "Zinedine Zidane", "Ronaldinho", "Ronaldo Nazario", "Thierry Henry", "Paolo Maldini", "Johan Cruyff", "Andres Iniesta", "Xavi"],
+      ["Real Madrid", "Barcelona", "Manchester United", "Liverpool", "Bayern Munich", "Juventus", "Arsenal", "Chelsea", "Manchester City", "AC Milan", "PSG"],
+      ["Striker", "Midfielder", "Defender", "Goalkeeper", "Winger", "Center Back", "Fullback"],
+      ["FIFA World Cup", "UEFA Champions League", "Premier League", "La Liga", "Serie A", "Copa America", "Euros", "Ballon d'Or"],
+      ["Yellow Card", "Red Card", "Offside", "Penalty", "Free Kick", "Corner Kick", "Throw In", "VAR", "Header", "Tackle", "Bicycle Kick", "Hat-trick"]
+    ],
+    "Movies": [
+      ["Leonardo DiCaprio", "Brad Pitt", "Tom Cruise", "Denzel Washington", "Johnny Depp", "Will Smith", "Keanu Reeves", "Christian Bale", "Robert Downey Jr", "Matt Damon"],
+      ["Shah Rukh Khan", "Salman Khan", "Aamir Khan", "Amitabh Bachchan", "Rajinikanth", "Hrithik Roshan", "Prabhas", "Allu Prabhas", "Kamal Haasan", "Akshay Kumar"],
+      ["Christopher Nolan", "Steven Spielberg", "Quentin Tarantino", "Martin Scorsese", "James Cameron", "Peter Jackson", "David Fincher", "Ridley Scott"],
+      ["The Godfather", "The Dark Knight", "Inception", "Pulp Fiction", "Forrest Gump", "The Matrix", "Fight Club", "Goodfellas", "Interstellar"],
+      ["Avengers", "Spider-Man", "Iron Man", "Captain America", "Batman", "Superman", "Deadpool", "Wolverine", "Thor", "Hulk"],
+      ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller", "Romance", "Documentary", "Animation", "Fantasy"]
+    ],
+    "Food": [
+      ["Pizza", "Burger", "Pasta", "Tacos", "Sushi", "Steak", "Fried Chicken", "Sandwich", "Hot Dog", "Salad"],
+      ["Chocolate", "Vanilla", "Strawberry", "Ice Cream", "Cake", "Brownie", "Cookie", "Donut", "Pancake"],
+      ["Coffee", "Tea", "Soda", "Juice", "Water", "Milkshake", "Smoothie", "Lemonade"],
+      ["Apple", "Banana", "Orange", "Grapes", "Strawberry", "Watermelon", "Mango", "Pineapple", "Peach"],
+      ["Biryani", "Butter Chicken", "Paneer Tikka", "Dosa", "Samosa", "Naan", "Dal Makhani", "Chole Bhature", "Idli"]
+    ]
+  }
+}
