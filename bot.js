@@ -162,7 +162,7 @@ bot.on('message:text', async (ctx) => {
         const theirClue = lobby.cluesReceived[p.id];
         clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${theirClue}</b>\n`;
       });
-      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly 20 seconds to discuss who the Impostor is before voting locks!`;
+      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly 2 minutes to discuss who the Impostor is before voting locks!`;
       
       await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
       
@@ -171,7 +171,7 @@ bot.on('message:text', async (ctx) => {
          if (currentLobby && currentLobby.state === 'DISCUSSION') {
              await startVotingPhase(chatId);
          }
-      }, 20000);
+      }, 120000);
     }
   }
 });
@@ -294,12 +294,12 @@ async function startVotingPhase(chatId) {
     const keyboard = new InlineKeyboard();
     lobby.players.forEach(p => keyboard.text(`👉 Vote: ${p.first_name}`, `vote_${p.id}`).row());
     
-    await bot.api.sendMessage(chatId, `🗳️ <b>VOTING TIME!</b>\n\nYou have 30 seconds to lock in your vote below. One vote per player!`, { reply_markup: keyboard, parse_mode: 'HTML' });
+    await bot.api.sendMessage(chatId, `🗳️ <b>VOTING TIME!</b>\n\nYou have 1 minute to lock in your vote below. One vote per player!`, { reply_markup: keyboard, parse_mode: 'HTML' });
     
     setTimeout(async () => {
        const currentLobby = gameManager.getLobby(chatId);
        if (currentLobby && currentLobby.state === 'VOTING') await tallyVotes(chatId);
-    }, 30000);
+    }, 60000);
 }
 
 async function tallyVotes(chatId) {
