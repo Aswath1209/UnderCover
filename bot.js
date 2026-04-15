@@ -75,6 +75,10 @@ bot.command('cancel', async (ctx) => {
       return ctx.reply("Only the lobby host or group admins can cancel the game.");
   }
   
+  if (lobby.pinnedMessageId) {
+     try { await ctx.api.unpinChatMessage(ctx.chat.id, lobby.pinnedMessageId); } catch(e) {}
+  }
+  
   gameManager.deleteLobby(ctx.chat.id);
   await ctx.reply("🛑 The current game was cancelled.");
 });
@@ -128,10 +132,20 @@ bot.command('play', async (ctx) => {
     .row()
     .text("▶️ Start (Host only)", "start_game");
     
-  await ctx.reply(
+  const sentMsg = await ctx.reply(
     `🕵️‍♂️ <b>Undercover Lobby</b> 🕵️‍♂️\n\nHost: <a href="tg://user?id=${creator.id}">${creator.first_name}</a>\nPlayers joined: 1 (Minimum 3 required)\n\n1. <a href="tg://user?id=${creator.id}">${creator.first_name}</a>`, 
     { reply_markup: keyboard, parse_mode: 'HTML' }
   );
+  
+  const lobby = gameManager.getLobby(chatId);
+  if (lobby) {
+     try {
+        await ctx.api.pinChatMessage(chatId, sentMsg.message_id, { disable_notification: true });
+        lobby.pinnedMessageId = sentMsg.message_id;
+     } catch (e) {
+        // Ignored if bot is not an admin or lacks pin permissions
+     }
+  }
 });
 
 bot.on('message:text', async (ctx) => {
@@ -263,6 +277,9 @@ bot.on('callback_query:data', async (ctx) => {
     if (lobby.players.length < 3) return ctx.answerCallbackQuery({ text: "Minimum 3 players needed!", show_alert: true });
     
     gameManager.moveToThemeSelection(chatId);
+    if (lobby.pinnedMessageId) {
+        try { await bot.api.unpinChatMessage(chatId, lobby.pinnedMessageId); } catch(e) {}
+    }
     
     const themes = gameManager.getAvailableThemes();
     const keyboard = new InlineKeyboard();
