@@ -19,7 +19,8 @@ bot.api.setMyCommands([
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
   { command: 'profile', description: 'View your stats and win rate' },
   { command: 'leaderboard', description: 'View top players in this group or globally' },
-  { command: 'start', description: 'Start the bot (required to play)' }
+  { command: 'start', description: 'Start the bot (required to play)' },
+  { command: 'ping', description: 'Check bot status and global stats' }
 ]).catch(console.error);
 
 function processGameEnd(lobby, winners) {
@@ -41,6 +42,25 @@ bot.command('start', async (ctx) => {
   } else {
     await ctx.reply("🕵️‍♂️ <b>The Undercover Bot</b> is ready! Send /play to start a new lobby.", { parse_mode: 'HTML' });
   }
+});
+
+bot.command('ping', async (ctx) => {
+  const activeGames = gameManager.getActiveGamesCount();
+  let totalUsers = "Unknown";
+  let totalGroups = "Unknown";
+  
+  if (sb.supabase) {
+      const stats = await sb.getGlobalStats();
+      totalUsers = stats.totalUsers;
+      totalGroups = stats.totalGroups;
+  }
+
+  const uptimeSeconds = Math.floor(process.uptime());
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const upStr = `${hours}h ${minutes}m`;
+  
+  await ctx.reply(`🏓 <b>Bot Status</b>\n\n🟢 <b>Active Lobbies:</b> ${activeGames}\n👥 <b>Total Players (All Time):</b> ${totalUsers}\n🏠 <b>Total Groups Played In:</b> ${totalGroups}\n⏱️ <b>Uptime:</b> ${upStr}`, { parse_mode: 'HTML' });
 });
 
 bot.command('cancel', async (ctx) => {

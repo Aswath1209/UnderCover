@@ -11,6 +11,7 @@ const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf8'));
 class GameManager {
   hasLobby(chatId) { return lobbies.has(chatId); }
   getLobby(chatId) { return lobbies.get(chatId); }
+  getActiveGamesCount() { return lobbies.size; }
 
   getLobbyByUserId(userId) {
     for (const [chatId, lobby] of lobbies.entries()) {

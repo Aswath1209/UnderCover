@@ -65,11 +65,20 @@ async function getGroupLeaderboard(chatId) {
   return data;
 }
 
+async function getGlobalStats() {
+  if (!supabase) return { totalUsers: 0, totalGroups: 0 };
+  const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+  const { data: groupData } = await supabase.from('group_stats').select('chat_id');
+  const uniqueGroups = new Set((groupData || []).map(g => g.chat_id)).size;
+  return { totalUsers: userCount || 0, totalGroups: uniqueGroups };
+}
+
 module.exports = {
   supabase,
   recordWin,
   recordLoss,
   getProfile,
   getGlobalLeaderboard,
-  getGroupLeaderboard
+  getGroupLeaderboard,
+  getGlobalStats
 };
