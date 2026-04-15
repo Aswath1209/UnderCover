@@ -73,6 +73,61 @@ async function getGlobalStats() {
   return { totalUsers: userCount || 0, totalGroups: uniqueGroups };
 }
 
+// --- Group Settings ---
+
+const DEFAULT_SETTINGS = {
+  discussion_time: 90,
+  voting_time: 60,
+  impostor_guess_time: 30,
+  clue_words: 1,
+  anonymous_voting: false
+};
+
+const settingsCache = new Map();
+
+function getDefaults() {
+  return { ...DEFAULT_SETTINGS };
+}
+
+async function getGroupSettings(chatId) {
+  if (settingsCache.has(chatId)) return settingsCache.get(chatId);
+
+  if (!supabase) return getDefaults();
+
+  const { data } = await supabase.from('group_settings').select('*').eq('chat_id', chatId).single();
+  if (data) {
+    const settings = {
+      discussion_time: data.discussion_time ?? DEFAULT_SETTINGS.discussion_time,
+      voting_time: data.voting_time ?? DEFAULT_SETTINGS.voting_time,
+      impostor_guess_time: data.impostor_guess_time ?? DEFAULT_SETTINGS.impostor_guess_time,
+      clue_words: data.clue_words ?? DEFAULT_SETTINGS.clue_words,
+      anonymous_voting: data.anonymous_voting ?? DEFAULT_SETTINGS.anonymous_voting
+    };
+    settingsCache.set(chatId, settings);
+    return settings;
+  }
+  
+  const defaults = getDefaults();
+  settingsCache.set(chatId, defaults);
+  return defaults;
+}
+
+async function updateGroupSetting(chatId, key, value) {
+  const settings = await getGroupSettings(chatId);
+  settings[key] = value;
+  settingsCache.set(chatId, settings);
+
+  if (!supabase) return settings;
+
+  const { data: existing } = await supabase.from('group_settings').select('chat_id').eq('chat_id', chatId).single();
+  if (existing) {
+    await supabase.from('group_settings').update({ [key]: value }).eq('chat_id', chatId);
+  } else {
+    await supabase.from('group_settings').insert({ chat_id: chatId, ...settings });
+  }
+  return settings;
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -80,5 +135,9 @@ module.exports = {
   getProfile,
   getGlobalLeaderboard,
   getGroupLeaderboard,
-  getGlobalStats
+  getGlobalStats,
+  getGroupSettings,
+  updateGroupSetting,
+  getDefaults,
+  DEFAULT_SETTINGS
 };

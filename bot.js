@@ -17,6 +17,7 @@ bot.use(session({ initial: () => ({}) }));
 bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
+  { command: 'settings', description: 'Configure game settings (Admin only)' },
   { command: 'profile', description: 'View your stats and win rate' },
   { command: 'leaderboard', description: 'View top players in this group or globally' },
   { command: 'start', description: 'Start the bot (required to play)' },
@@ -110,6 +111,38 @@ bot.command('leaderboard', async (ctx) => {
   await ctx.reply("📊 <b>Leaderboards</b>\n\nSelect which leaderboard you want to view:", { reply_markup: keyboard, parse_mode: 'HTML' });
 });
 
+// --- Settings Command ---
+
+function buildSettingsKeyboard(settings) {
+  const kb = new InlineKeyboard();
+  kb.text(`⏱️ Discussion: ${settings.discussion_time}s`, 'set_discussion').row();
+  kb.text(`🗳️ Voting: ${settings.voting_time}s`, 'set_voting').row();
+  kb.text(`🕵️ Impostor Guess: ${settings.impostor_guess_time}s`, 'set_impostor_guess').row();
+  kb.text(`📝 Clue Words: ${settings.clue_words}`, 'set_clue_words').row();
+  kb.text(`${settings.anonymous_voting ? '🔒' : '🔓'} Voting: ${settings.anonymous_voting ? 'Anonymous' : 'Public'}`, 'set_anon_vote').row();
+  kb.text('🔄 Reset to Defaults', 'set_reset');
+  return kb;
+}
+
+function buildSettingsText(settings) {
+  return `⚙️ <b>Group Game Settings</b>\n\nThese settings apply to all games in this group.\n\n⏱️ <b>Discussion Time:</b> ${settings.discussion_time}s\n🗳️ <b>Voting Time:</b> ${settings.voting_time}s\n🕵️ <b>Impostor Guess Time:</b> ${settings.impostor_guess_time}s\n📝 <b>Clue Words Allowed:</b> ${settings.clue_words}\n${settings.anonymous_voting ? '🔒' : '🔓'} <b>Voting Mode:</b> ${settings.anonymous_voting ? 'Anonymous' : 'Public'}\n\n<i>Tap a button below to change a setting.</i>`;
+}
+
+bot.command('settings', async (ctx) => {
+  if (ctx.chat.type === 'private') return ctx.reply("Settings can only be changed in group chats.");
+
+  const member = await ctx.getChatMember(ctx.from.id);
+  if (member.status !== 'administrator' && member.status !== 'creator') {
+    return ctx.reply("⛔ Only group admins can change game settings.");
+  }
+
+  const settings = await sb.getGroupSettings(ctx.chat.id);
+  await ctx.reply(buildSettingsText(settings), {
+    reply_markup: buildSettingsKeyboard(settings),
+    parse_mode: 'HTML'
+  });
+});
+
 bot.command('play', async (ctx) => {
   if (ctx.chat.type === 'private') return ctx.reply("You can only play this game in a group chat.");
   
@@ -196,7 +229,8 @@ bot.on('message:text', async (ctx) => {
         const theirClue = lobby.cluesReceived[p.id];
         clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${theirClue}</b>\n`;
       });
-      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly 90 seconds to discuss who the Impostor is before voting locks!`;
+      const gSettings = await sb.getGroupSettings(chatId);
+      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly ${gSettings.discussion_time} seconds to discuss who the Impostor is before voting locks!`;
       
       await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
       
@@ -205,7 +239,7 @@ bot.on('message:text', async (ctx) => {
          if (currentLobby && currentLobby.state === 'DISCUSSION') {
              await startVotingPhase(chatId);
          }
-      }, 90000);
+      }, gSettings.discussion_time * 1000);
     }
   }
 });
@@ -215,6 +249,7 @@ bot.on('callback_query:data', async (ctx) => {
   const chatId = ctx.chat.id;
   const user = ctx.from;
   
+  // --- Leaderboard callbacks ---
   if (data === 'lb_global' || data === 'lb_group') {
      const isGlobal = data === 'lb_global';
      const records = isGlobal ? await sb.getGlobalLeaderboard() : await sb.getGroupLeaderboard(chatId);
@@ -238,7 +273,65 @@ bot.on('callback_query:data', async (ctx) => {
      } catch(e) {}
      return;
   }
+
+  // --- Settings callbacks ---
+  if (data.startsWith('set_')) {
+    const member = await ctx.getChatMember(user.id);
+    if (member.status !== 'administrator' && member.status !== 'creator') {
+      return ctx.answerCallbackQuery({ text: "⛔ Only group admins can change settings.", show_alert: true });
+    }
+
+    const DISCUSSION_OPTIONS = [30, 60, 90, 120, 180];
+    const VOTING_OPTIONS = [30, 45, 60, 90];
+    const GUESS_OPTIONS = [15, 30, 45, 60];
+    const CLUE_OPTIONS = [1, 2, 3];
+
+    function cycleOption(current, options) {
+      const idx = options.indexOf(current);
+      return options[(idx + 1) % options.length];
+    }
+
+    let settings = await sb.getGroupSettings(chatId);
+
+    if (data === 'set_discussion') {
+      const newVal = cycleOption(settings.discussion_time, DISCUSSION_OPTIONS);
+      settings = await sb.updateGroupSetting(chatId, 'discussion_time', newVal);
+      await ctx.answerCallbackQuery(`Discussion time → ${newVal}s`);
+    } else if (data === 'set_voting') {
+      const newVal = cycleOption(settings.voting_time, VOTING_OPTIONS);
+      settings = await sb.updateGroupSetting(chatId, 'voting_time', newVal);
+      await ctx.answerCallbackQuery(`Voting time → ${newVal}s`);
+    } else if (data === 'set_impostor_guess') {
+      const newVal = cycleOption(settings.impostor_guess_time, GUESS_OPTIONS);
+      settings = await sb.updateGroupSetting(chatId, 'impostor_guess_time', newVal);
+      await ctx.answerCallbackQuery(`Impostor guess time → ${newVal}s`);
+    } else if (data === 'set_clue_words') {
+      const newVal = cycleOption(settings.clue_words, CLUE_OPTIONS);
+      settings = await sb.updateGroupSetting(chatId, 'clue_words', newVal);
+      await ctx.answerCallbackQuery(`Clue words → ${newVal}`);
+    } else if (data === 'set_anon_vote') {
+      const newVal = !settings.anonymous_voting;
+      settings = await sb.updateGroupSetting(chatId, 'anonymous_voting', newVal);
+      await ctx.answerCallbackQuery(`Voting → ${newVal ? 'Anonymous' : 'Public'}`);
+    } else if (data === 'set_reset') {
+      const defaults = sb.getDefaults();
+      for (const key of Object.keys(defaults)) {
+        await sb.updateGroupSetting(chatId, key, defaults[key]);
+      }
+      settings = defaults;
+      await ctx.answerCallbackQuery('All settings reset to defaults!');
+    }
+
+    try {
+      await ctx.editMessageText(buildSettingsText(settings), {
+        reply_markup: buildSettingsKeyboard(settings),
+        parse_mode: 'HTML'
+      });
+    } catch(e) {}
+    return;
+  }
   
+  // --- Game callbacks ---
   const lobby = gameManager.getLobby(chatId);
   if (!lobby) return ctx.answerCallbackQuery({ text: "This game lobby has expired or does not exist.", show_alert: true });
   const isHost = lobby.host.id === user.id;
@@ -296,9 +389,10 @@ bot.on('callback_query:data', async (ctx) => {
     
     try { await bot.api.editMessageReplyMarkup(chatId, ctx.callbackQuery.message.message_id, { reply_markup: new InlineKeyboard() }); } catch(e) {}
     
-    await gameManager.startGame(chatId, themeName, bot);
+    const gSettings = await sb.getGroupSettings(chatId);
+    await gameManager.startGame(chatId, themeName, bot, gSettings);
     
-    let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your 1-word clue!\n\n<b>Status:</b>\n`;
+    let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your ${gSettings.clue_words === 1 ? '1-word' : `1-${gSettings.clue_words} word`} clue!\n\n<b>Status:</b>\n`;
     lobby.players.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
     
     try {
@@ -317,7 +411,11 @@ bot.on('callback_query:data', async (ctx) => {
     const voteResult = gameManager.vote(chatId, user.id, targetId);
     if (voteResult) {
       ctx.answerCallbackQuery("Your vote is recorded!");
-      await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${user.first_name}</a> publicly voted for <a href="tg://user?id=${targetPlayer.id}">${targetPlayer.first_name}</a>!`, { parse_mode: 'HTML' });
+      if (!lobby.anonymousVoting) {
+        await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${user.first_name}</a> publicly voted for <a href="tg://user?id=${targetPlayer.id}">${targetPlayer.first_name}</a>!`, { parse_mode: 'HTML' });
+      } else {
+        await bot.api.sendMessage(chatId, `🗳️ A vote has been cast! (${Object.keys(lobby.votes).length}/${lobby.players.length})`, { parse_mode: 'HTML' });
+      }
       if (voteResult.allVoted) await tallyVotes(chatId);
     }
   }
@@ -327,16 +425,19 @@ async function startVotingPhase(chatId) {
     const lobby = gameManager.getLobby(chatId);
     if (!lobby) return;
     
+    const gSettings = await sb.getGroupSettings(chatId);
     lobby.state = 'VOTING';
+    lobby.anonymousVoting = gSettings.anonymous_voting;
     const keyboard = new InlineKeyboard();
     lobby.players.forEach(p => keyboard.text(`👉 Vote: ${p.first_name}`, `vote_${p.id}`).row());
     
-    await bot.api.sendMessage(chatId, `🗳️ <b>VOTING TIME!</b>\n\nYou have 1 minute to lock in your vote below. One vote per player!`, { reply_markup: keyboard, parse_mode: 'HTML' });
+    const voteLabel = gSettings.anonymous_voting ? '(Anonymous Mode 🔒)' : '';
+    await bot.api.sendMessage(chatId, `🗳️ <b>VOTING TIME!</b> ${voteLabel}\n\nYou have ${gSettings.voting_time} seconds to lock in your vote below. One vote per player!`, { reply_markup: keyboard, parse_mode: 'HTML' });
     
     setTimeout(async () => {
        const currentLobby = gameManager.getLobby(chatId);
        if (currentLobby && currentLobby.state === 'VOTING') await tallyVotes(chatId);
-    }, 60000);
+    }, gSettings.voting_time * 1000);
 }
 
 async function tallyVotes(chatId) {
@@ -364,8 +465,9 @@ async function tallyVotes(chatId) {
        await bot.api.sendMessage(chatId, `❌ <b>WRONG VOTE!</b>\n\nThe group voted out <a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>, but they were innocent! Their word was <b>${lobby.wordA}</b> just like everyone else!\n\n<b>THE IMPOSTOR SURVIVES AND WINS!</b>\n(The Impostor was actually ${impostorName} with the word: <i>${lobby.wordB}</i>)`, { parse_mode: 'HTML' });
        gameManager.deleteLobby(chatId);
     } else {
+       const gSettings = await sb.getGroupSettings(chatId);
        lobby.state = 'IMPOSTOR_GUESS';
-       await bot.api.sendMessage(chatId, `🎯 <b>CORRECT VOTE!</b>\n\nBrilliant deduction! You caught the Impostor: <a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>! (Their unique word was <tg-spoiler>${lobby.wordB}</tg-spoiler>).\n\n🚨 <b>BUT WAIT...</b>\n<a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>, you have exactly ONE CHANCE. Type what you think the group's word was right down here in the chat to steal the win! (You have 30 seconds!)`, { parse_mode: 'HTML' });
+       await bot.api.sendMessage(chatId, `🎯 <b>CORRECT VOTE!</b>\n\nBrilliant deduction! You caught the Impostor: <a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>! (Their unique word was <tg-spoiler>${lobby.wordB}</tg-spoiler>).\n\n🚨 <b>BUT WAIT...</b>\n<a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>, you have exactly ONE CHANCE. Type what you think the group's word was right down here in the chat to steal the win! (You have ${gSettings.impostor_guess_time} seconds!)`, { parse_mode: 'HTML' });
        
        setTimeout(async () => {
           const currentLobby = gameManager.getLobby(chatId);
@@ -375,7 +477,7 @@ async function tallyVotes(chatId) {
              await bot.api.sendMessage(chatId, `⏳ <b>TIME IS UP!</b>\n\nThe Impostor failed to guess the word in time.\nThe real word was <b>${currentLobby.wordA}</b>.\n\n🎉 <b>THE MAJORITY WINS!</b>`, { parse_mode: 'HTML' });
              gameManager.deleteLobby(chatId);
           }
-       }, 30000);
+       }, gSettings.impostor_guess_time * 1000);
     }
 }
 

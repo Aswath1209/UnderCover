@@ -67,12 +67,13 @@ class GameManager {
     return Object.keys(themesData.themes);
   }
 
-  async startGame(chatId, themeName, botInstance) {
+  async startGame(chatId, themeName, botInstance, gSettings = {}) {
     const lobby = lobbies.get(chatId);
     if (!lobby) return;
     
     lobby.state = 'CLUE_PHASE';
     lobby.theme = themeName;
+    lobby.maxClueWords = gSettings.clue_words || 1;
     
     const themeClusters = themesData.themes[themeName];
     const cluster = themeClusters[Math.floor(Math.random() * themeClusters.length)];
@@ -93,19 +94,21 @@ class GameManager {
     const me = botInstance.botInfo || await botInstance.api.getMe();
     const dmKeyboard = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
     
+    const clueLabel = lobby.maxClueWords === 1 ? 'EXACTLY ONE word' : `up to ${lobby.maxClueWords} words`;
     await botInstance.api.sendMessage(chatId, 
-      `The game has started! Theme: <b>${themeName}</b>.\n\nPlease check your DMs from the bot. I will send you your secret word. Reply to my DM with EXACTLY ONE word as your clue!`, 
+      `The game has started! Theme: <b>${themeName}</b>.\n\nPlease check your DMs from the bot. I will send you your secret word. Reply to my DM with ${clueLabel} as your clue!`, 
       { parse_mode: 'HTML', reply_markup: dmKeyboard }
     );
     
     for (let player of lobby.players) {
       const isImpostor = player.id === lobby.impostorId;
       const secretWord = isImpostor ? lobby.wordB : lobby.wordA;
+      const wordInstr = lobby.maxClueWords === 1 ? 'exactly <b>ONE WORD</b>' : `<b>up to ${lobby.maxClueWords} words</b>`;
       
       try {
          await botInstance.api.sendMessage(
            player.id, 
-           `🕵️‍♂️ <b>Undercover Game</b>\n\nTheme: <b>${themeName}</b>\nYour Secret Word: <tg-spoiler>${secretWord}</tg-spoiler>\n\n<b>INSTRUCTIONS:</b>\n1. This word is your identity.\n2. Reply to this message with exactly <b>ONE WORD</b> to describe your secret word.\n3. Do not make your clue too obvious, or the Impostor will guess it and win!`, 
+           `🕵️‍♂️ <b>Undercover Game</b>\n\nTheme: <b>${themeName}</b>\nYour Secret Word: <tg-spoiler>${secretWord}</tg-spoiler>\n\n<b>INSTRUCTIONS:</b>\n1. This word is your identity.\n2. Reply to this message with ${wordInstr} to describe your secret word.\n3. Do not make your clue too obvious, or the Impostor will guess it and win!`, 
            { parse_mode: 'HTML' }
          );
       } catch (err) {
@@ -126,8 +129,11 @@ class GameManager {
     if (lobby.state !== 'CLUE_PHASE') return { error: "It's not time to submit clues right now." };
     if (lobby.cluesReceived[userId]) return { error: "You already submitted your clue!" };
     
-    if (word.trim().split(/\s+/).length > 1) {
-      return { error: "Please send EXACTLY ONE word! Try again." };
+    const maxWords = lobby.maxClueWords || 1;
+    const wordCount = word.trim().split(/\s+/).length;
+    if (wordCount > maxWords) {
+      if (maxWords === 1) return { error: "Please send EXACTLY ONE word! Try again." };
+      return { error: `Please send up to ${maxWords} words only! You sent ${wordCount}. Try again.` };
     }
     
     lobby.cluesReceived[userId] = word.trim();
