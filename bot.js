@@ -162,7 +162,7 @@ bot.on('message:text', async (ctx) => {
         const theirClue = lobby.cluesReceived[p.id];
         clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${theirClue}</b>\n`;
       });
-      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly 2 minutes to discuss who the Impostor is before voting locks!`;
+      clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly 90 seconds to discuss who the Impostor is before voting locks!`;
       
       await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
       
@@ -171,7 +171,7 @@ bot.on('message:text', async (ctx) => {
          if (currentLobby && currentLobby.state === 'DISCUSSION') {
              await startVotingPhase(chatId);
          }
-      }, 120000);
+      }, 90000);
     }
   }
 });
