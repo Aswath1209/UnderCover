@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { InlineKeyboard } = require('grammy');
 
 // In-memory lobby storage 
 const lobbies = new Map();
@@ -88,9 +89,12 @@ class GameManager {
     const impostorIndex = Math.floor(Math.random() * lobby.players.length);
     lobby.impostorId = lobby.players[impostorIndex].id;
     
+    const me = botInstance.botInfo || await botInstance.api.getMe();
+    const dmKeyboard = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
+    
     await botInstance.api.sendMessage(chatId, 
       `The game has started! Theme: <b>${themeName}</b>.\n\nPlease check your DMs from the bot. I will send you your secret word. Reply to my DM with EXACTLY ONE word as your clue!`, 
-      { parse_mode: 'HTML' }
+      { parse_mode: 'HTML', reply_markup: dmKeyboard }
     );
     
     for (let player of lobby.players) {
