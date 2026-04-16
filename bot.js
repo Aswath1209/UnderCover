@@ -202,7 +202,7 @@ bot.command('mafia', async (ctx) => {
     .text("▶️ Start (Host only)", "maf_start");
 
   const sentMsg = await ctx.reply(
-    `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\nPlayers: 1 (Minimum 4 required)\nRoles: ${dist.impostors} Impostor | ${dist.joker} Joker\n\n👤 Civilians don't know who the Impostors are\n🔫 Impostors don't know they're Impostors!\n🃏 Joker wins by getting voted out\n\n1. <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`,
+    `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\nPlayers: 1 (Minimum 3 required)\nRoles: ${dist.impostors} Impostor | ${dist.joker} Joker\n\n👤 Civilians don't know who the Impostors are\n🔫 Impostors don't know they're Impostors!\n🃏 Joker wins by getting voted out — game ends!\n\n1. <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`,
     { reply_markup: keyboard, parse_mode: 'HTML' }
   );
 
@@ -383,7 +383,7 @@ bot.on('callback_query:data', async (ctx) => {
     }
     else if (data === 'maf_start') {
       if (!mIsHost) return ctx.answerCallbackQuery({ text: "Only the host can start!", show_alert: true });
-      if (mLobby.players.length < 4) return ctx.answerCallbackQuery({ text: "Minimum 4 players needed for Mafia!", show_alert: true });
+      if (mLobby.players.length < 3) return ctx.answerCallbackQuery({ text: "Minimum 3 players needed for Mafia!", show_alert: true });
       mafiaManager.moveToThemeSelection(chatId);
       if (mLobby.pinnedMessageId) { try { await bot.api.unpinChatMessage(chatId, mLobby.pinnedMessageId); } catch(e) {} }
       const themes = mafiaManager.getAvailableThemes();
@@ -602,7 +602,7 @@ async function updateMafiaLobbyMessage(chatId, lobby, messageId) {
   const keyboard = new InlineKeyboard()
     .text("✅ Join Game", "maf_join").text("❌ Leave", "maf_leave").row()
     .text("▶️ Start (Host only)", "maf_start");
-  let text = `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${lobby.host.id}">${lobby.host.first_name}</a>\nPlayers: ${lobby.players.length} (Minimum 4 required)\nRoles: ${dist.impostors} Impostor${dist.impostors > 1 ? 's' : ''} | ${dist.joker} Joker\n\n`;
+  let text = `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${lobby.host.id}">${lobby.host.first_name}</a>\nPlayers: ${lobby.players.length} (Minimum 3 required)\nRoles: ${dist.impostors} Impostor${dist.impostors > 1 ? 's' : ''} | ${dist.joker} Joker\n\n`;
   lobby.players.forEach((p, idx) => { text += `${idx + 1}. <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
   try { await bot.api.editMessageText(chatId, messageId, text, { reply_markup: keyboard, parse_mode: 'HTML' }); }
   catch (error) { if (!error.message.includes("is not modified")) console.error(error); }
@@ -644,9 +644,11 @@ async function tallyMafiaVotes(chatId) {
 
   if (role === 'JOKER') {
     lobby.jokerWon = true;
-    elimText = `🃏 <b>THE JOKER WINS!</b> 🃏\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was the <b>Joker</b>! They WANTED to get voted out!\n\n🎭 The game continues for everyone else!`;
+    elimText = `🃏 <b>THE JOKER WINS!</b> 🃏\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was the <b>Joker</b>! They WANTED to get voted out and pulled it off!\n\n🎭 The Joker takes the victory — game over!`;
+    await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
+    return endMafiaGame(chatId, 'JOKER_WIN');
   } else if (role === 'IMPOSTOR') {
-    elimText = `✅ <b>IMPOSTOR CAUGHT!</b>\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was an <b>Impostor</b>! ${RE[role]}`;
+    elimText = `✅ <b>IMPOSTOR CAUGHT!</b>\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was an <b>Impostor</b>! ${RE[role]}\n🔑 Their word was: <tg-spoiler>${lobby.wordB}</tg-spoiler>`;
   } else {
     elimText = `❌ <b>WRONG TARGET!</b>\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was a <b>Civilian</b>! ${RE[role]}\nThe impostors are still among you...`;
   }
@@ -675,20 +677,43 @@ async function endMafiaGame(chatId, result) {
   const lobby = mafiaManager.getLobby(chatId);
   if (!lobby) return;
   lobby.state = 'END';
-  let header = result === 'CIVILIAN_WIN'
-    ? '🎉 <b>CIVILIANS WIN!</b> 🎉\n\nAll impostors have been eliminated!'
-    : '🔫 <b>IMPOSTORS WIN!</b> 🔫\n\nThe impostors have taken over!';
+
   const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
-  let roleText = '\n\n📋 <b>ROLE REVEAL:</b>\n';
+  let header = '';
+
+  if (result === 'JOKER_WIN') {
+    header = '🃏 <b>GAME OVER — JOKER WINS!</b> 🃏\n\nThe Joker got voted out and stole the game!';
+  } else if (result === 'CIVILIAN_WIN') {
+    header = '🎉 <b>GAME OVER — CIVILIANS WIN!</b> 🎉\n\nAll impostors have been found and eliminated!';
+  } else {
+    header = '🔫 <b>GAME OVER — IMPOSTORS WIN!</b> 🔫\n\nThe impostors outnumbered the civilians!';
+  }
+
+  // Determine winners and losers
+  const winners = [];
+  const losers = [];
   lobby.players.forEach(p => {
     const r = lobby.roles[p.id];
     const alive = lobby.alivePlayers.some(ap => ap.id === p.id);
-    const jw = r === 'JOKER' && lobby.jokerWon ? ' 🏆' : '';
-    roleText += `${RE[r]} <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${r.charAt(0) + r.slice(1).toLowerCase()} (${alive ? 'Survived' : 'Eliminated'})${jw}\n`;
+    let isWinner = false;
+    if (result === 'JOKER_WIN') isWinner = r === 'JOKER';
+    else if (result === 'CIVILIAN_WIN') isWinner = r === 'CIVILIAN';
+    else isWinner = r === 'IMPOSTOR';
+
+    const status = alive ? 'Survived' : 'Eliminated';
+    const entry = `${RE[r]} <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${r.charAt(0) + r.slice(1).toLowerCase()} (${status})`;
+    if (isWinner) winners.push(entry);
+    else losers.push(entry);
   });
-  roleText += `\n🔄 <b>Rounds Played:</b> ${lobby.round}`;
-  if (lobby.jokerWon) roleText += '\n🃏 <b>Joker also won independently!</b>';
-  await bot.api.sendMessage(chatId, header + roleText, { parse_mode: 'HTML' });
+
+  let msg = header;
+  msg += `\n\n🏆 <b>WINNERS:</b>\n`;
+  winners.forEach(w => { msg += `${w} ✅\n`; });
+  msg += `\n💀 <b>LOSERS:</b>\n`;
+  losers.forEach(l => { msg += `${l} ❌\n`; });
+  msg += `\n🔄 <b>Rounds Played:</b> ${lobby.round}`;
+
+  await bot.api.sendMessage(chatId, msg, { parse_mode: 'HTML' });
   processMafiaGameEnd(lobby, result);
   mafiaManager.deleteLobby(chatId);
 }
@@ -698,7 +723,8 @@ function processMafiaGameEnd(lobby, result) {
   lobby.players.forEach(p => {
     const r = lobby.roles[p.id];
     let won = false;
-    if (r === 'JOKER') won = lobby.jokerWon;
+    if (result === 'JOKER_WIN') won = r === 'JOKER';
+    else if (r === 'JOKER') won = false;
     else if (r === 'IMPOSTOR') won = result === 'IMPOSTOR_WIN';
     else won = result === 'CIVILIAN_WIN';
     if (won) sb.recordWin(p.id, p.first_name, lobby.chatId);

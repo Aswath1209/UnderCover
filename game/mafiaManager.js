@@ -7,11 +7,11 @@ const themesPath = path.join(__dirname, '../data/themes.json');
 const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf8'));
 
 function getRoleDistribution(playerCount) {
-  if (playerCount <= 5) return { impostors: 1, joker: 0 };
-  if (playerCount <= 6) return { impostors: 1, joker: 0 };
-  if (playerCount <= 8) return { impostors: 2, joker: 1 };
-  if (playerCount <= 10) return { impostors: 2, joker: 1 };
-  return { impostors: 3, joker: 1 };
+  if (playerCount <= 5) return { impostors: 1, joker: 0 };   // 3-5: 1 impostor
+  if (playerCount <= 7) return { impostors: 2, joker: 0 };   // 6-7: 2 impostors
+  if (playerCount <= 10) return { impostors: 2, joker: 1 };  // 8-10: 2 impostors + joker
+  if (playerCount <= 13) return { impostors: 3, joker: 1 };  // 11-13: 3 impostors + joker
+  return { impostors: 4, joker: 1 };                         // 14+: 4 impostors + joker
 }
 
 class MafiaManager {
