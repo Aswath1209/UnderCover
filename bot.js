@@ -288,6 +288,7 @@ bot.on('message:text', async (ctx) => {
          try { await bot.api.editMessageText(chatId, lobby.clueStatusMessageId, text, { parse_mode: 'HTML' }); } catch(e) {}
       }
       if (result.allReceived) {
+        if (lobby.clueTimer) { clearTimeout(lobby.clueTimer); lobby.clueTimer = null; }
         lobby.state = 'DISCUSSION';
         let clueText = `🔫 <b>Round ${lobby.round} — All Clues Revealed!</b>\n\nSomeone might have a different word... find them!\n\n`;
         lobby.alivePlayers.forEach(p => {
@@ -412,9 +413,10 @@ bot.on('callback_query:data', async (ctx) => {
       if (!ok) return;
       const me = bot.botInfo || await bot.api.getMe();
       const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
-      let text = `🔫 <b>Round 1 — Clue Phase</b>\n\nCheck your DMs and reply with your clue!\n\n<b>Status:</b>\n`;
+      let text = `🔫 <b>Round 1 — Clue Phase</b>\n\nCheck your DMs and reply with your clue! ⏰ <b>60 seconds!</b>\n\n<b>Status:</b>\n`;
       mLobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
       try { const msg = await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: dmKb }); mLobby.clueStatusMessageId = msg.message_id; } catch(e) {}
+      mLobby.clueTimer = setTimeout(() => handleClueTimeout(chatId), 60000);
     }
     else if (data.startsWith('mafv_')) {
       if (mLobby.state !== 'VOTING') return ctx.answerCallbackQuery("Not voting time.");
@@ -608,6 +610,53 @@ async function updateMafiaLobbyMessage(chatId, lobby, messageId) {
   catch (error) { if (!error.message.includes("is not modified")) console.error(error); }
 }
 
+async function handleClueTimeout(chatId) {
+  const lobby = mafiaManager.getLobby(chatId);
+  if (!lobby || lobby.state !== 'CLUE_PHASE') return;
+  lobby.clueTimer = null;
+
+  // Find players who didn't submit
+  const afkPlayers = lobby.alivePlayers.filter(p => !lobby.cluesReceived[p.id]);
+  if (afkPlayers.length === 0) return; // everyone submitted in time
+
+  const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
+  let elimText = `⏰ <b>TIME'S UP!</b>\n\nThe following players didn't submit a clue and have been eliminated:\n\n`;
+
+  for (const p of afkPlayers) {
+    const role = lobby.roles[p.id];
+    mafiaManager.eliminatePlayer(chatId, p.id);
+    elimText += `💤 <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${RE[role]} ${role.charAt(0) + role.slice(1).toLowerCase()}`;
+    if (role === 'IMPOSTOR') elimText += ` (Their word was: <tg-spoiler>${lobby.wordB}</tg-spoiler>)`;
+    elimText += `\n`;
+  }
+
+  elimText += `\n👥 <b>Alive:</b> ${lobby.alivePlayers.length} players remaining`;
+  await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
+
+  // Check win condition after eliminations
+  const win = mafiaManager.checkWinCondition(chatId);
+  if (win) return endMafiaGame(chatId, win);
+
+  // If not enough alive players to continue, end
+  if (lobby.alivePlayers.length < 2) {
+    return endMafiaGame(chatId, 'CIVILIAN_WIN');
+  }
+
+  // Proceed to discussion with whoever did submit
+  lobby.state = 'DISCUSSION';
+  let clueText = `🔫 <b>Round ${lobby.round} — Clues Revealed!</b>\n\n`;
+  lobby.alivePlayers.forEach(p => {
+    clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id] || '—'}</b>\n`;
+  });
+  const dt = lobby.settings.discussion_time || 90;
+  clueText += `\n💬 <b>DISCUSSION:</b> ${dt} seconds to discuss!`;
+  await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
+  setTimeout(async () => {
+    const cl = mafiaManager.getLobby(chatId);
+    if (cl && cl.state === 'DISCUSSION') await startMafiaVoting(chatId);
+  }, dt * 1000);
+}
+
 async function startMafiaVoting(chatId) {
   const lobby = mafiaManager.getLobby(chatId);
   if (!lobby) return;
@@ -668,9 +717,10 @@ async function startNextMafiaRound(chatId) {
   if (!ok) return;
   const me = bot.botInfo || await bot.api.getMe();
   const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
-  let text = `🔫 <b>Round ${lobby.round} — Clue Phase</b>\n\nCheck your DMs and reply with your clue!\n\n<b>Status:</b>\n`;
+  let text = `🔫 <b>Round ${lobby.round} — Clue Phase</b>\n\nCheck your DMs and reply with your clue! ⏰ <b>60 seconds!</b>\n\n<b>Status:</b>\n`;
   lobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
   try { const msg = await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: dmKb }); lobby.clueStatusMessageId = msg.message_id; } catch(e) {}
+  lobby.clueTimer = setTimeout(() => handleClueTimeout(chatId), 60000);
 }
 
 async function endMafiaGame(chatId, result) {
