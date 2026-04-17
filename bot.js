@@ -235,11 +235,22 @@ bot.on('message:text', async (ctx) => {
   const userId = ctx.from.id;
   const word = ctx.message.text;
 
-  // Check which game mode the player is in
+  // Route clue to the lobby that is actually in CLUE_PHASE
   const regularLobby = gameManager.getLobbyByUserId(userId);
   const mafiaLobby = mafiaManager.getLobbyByUserId(userId);
+  
+  let activeLobby = null;
+  let isMafia = false;
 
-  if (regularLobby) {
+  if (regularLobby && regularLobby.state === 'CLUE_PHASE') {
+      activeLobby = regularLobby;
+      isMafia = false;
+  } else if (mafiaLobby && mafiaLobby.state === 'CLUE_PHASE') {
+      activeLobby = mafiaLobby;
+      isMafia = true;
+  }
+
+  if (activeLobby && !isMafia) {
     const result = gameManager.submitClue(userId, word);
     if (result.error) return ctx.reply(`❌ ${result.error}`);
     if (result.success) {
@@ -272,7 +283,7 @@ bot.on('message:text', async (ctx) => {
     return;
   }
 
-  if (mafiaLobby) {
+  if (activeLobby && isMafia) {
     const result = mafiaManager.submitClue(userId, word);
     if (result.error) return ctx.reply(`❌ ${result.error}`);
     if (result.success) {
@@ -304,6 +315,10 @@ bot.on('message:text', async (ctx) => {
       }
     }
     return;
+  }
+
+  if (regularLobby || mafiaLobby) {
+      return ctx.reply("❌ It's not time to submit clues right now.");
   }
 });
 
