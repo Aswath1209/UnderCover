@@ -797,7 +797,11 @@ function processMafiaGameEnd(lobby, result) {
   });
 }
 
-bot.catch((err) => console.error(`Error in update ${err.ctx.update.update_id}:`, err.error));
+bot.catch((err) => {
+  // Ignore stale callback query errors (e.g. after redeploy/restart)
+  if (err.error?.error_code === 400 && err.error?.description?.includes('query is too old')) return;
+  console.error(`Error in update ${err.ctx?.update?.update_id}:`, err.error);
+});
 
 const express = require('express');
 const app = express();
