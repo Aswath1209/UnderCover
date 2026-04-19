@@ -109,7 +109,11 @@ async function getGroupSettings(chatId) {
   
   const defaults = getDefaults();
   // Auto-register the group in the database
-  await supabase.from('group_settings').insert({ chat_id: chatId, ...defaults }).catch(() => {});
+  try {
+    await supabase.from('group_settings').insert({ chat_id: chatId, ...defaults });
+  } catch (e) {
+    // Ignore insertion errors (e.g. duplicate keys or network issues during discovery)
+  }
   settingsCache.set(chatId, defaults);
   return defaults;
 }

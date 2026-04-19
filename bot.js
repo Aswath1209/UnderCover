@@ -20,6 +20,7 @@ bot.use(session({ initial: () => ({}) }));
 bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
   { command: 'mafia', description: 'Start a Mafia mode game (multi-round)' },
+  { command: 'myword', description: 'Re-send your secret word to DM' },
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
   { command: 'settings', description: 'Configure game settings (Admin only)' },
   { command: 'profile', description: 'View your stats and win rate' },
@@ -44,9 +45,13 @@ function processGameEnd(lobby, winners) {
 
 // --- Group Discovery Middleware ---
 bot.use(async (ctx, next) => {
-  if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
-    // This will trigger sb.getGroupSettings which now auto-registers new groups
-    sb.getGroupSettings(ctx.chat.id).catch(() => {});
+  try {
+    if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
+      // Auto-register new groups
+      sb.getGroupSettings(ctx.chat.id).catch(() => {});
+    }
+  } catch (e) {
+    console.error("Discovery Middleware Error:", e);
   }
   return next();
 });
@@ -218,6 +223,56 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   }
   
   await sendBroadcast(ctx, targetIds, broadcastMsg);
+});
+
+// --- Player Utility Commands ---
+
+bot.command('myword', async (ctx) => {
+  const userId = ctx.from.id;
+  const isPrivate = ctx.chat.type === 'private';
+  
+  let data = gameManager.getPlayerData(userId);
+  let mode = 'standard';
+  
+  if (!data) {
+      data = mafiaManager.getPlayerData(userId);
+      mode = 'mafia';
+  }
+
+  if (!data) {
+      return ctx.reply("❌ You are not currently in an active game or the game is still in the lobby phase.");
+  }
+
+  try {
+      const maxW = data.maxWords || 1;
+      const clueLabel = maxW === 1 ? 'exactly ONE word' : `up to ${maxW} words`;
+      
+      let msg = "";
+      if (data.mode === 'standard') {
+          msg = `🕵️‍♂️ <b>Undercover (Reminder)</b>\n\nTheme: <b>${data.theme}</b>\nYour Secret Word: <tg-spoiler>${data.word}</tg-spoiler>\n\nReply here with ${clueLabel} as your clue!`;
+      } else {
+          const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
+          msg = `${RE[data.role]} <b>Mafia Round ${data.round} (Reminder)</b>\n\nTheme: <b>${data.theme}</b>\n`;
+          if (data.role === 'JOKER') {
+              msg += `🃏 <b>You are THE JOKER!</b>\nYou have no word. Your goal is to get voted out!\nReply here with ${clueLabel} as your fake clue.`;
+          } else {
+              msg += `Your Secret Word: <tg-spoiler>${data.word}</tg-spoiler>\n\nReply here with ${clueLabel} to describe your word.`;
+          }
+      }
+      
+      await bot.api.sendMessage(userId, msg, { parse_mode: 'HTML' });
+      if (!isPrivate) {
+          await ctx.reply(`✅ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a>, I've re-sent your word to your DMs!`, { parse_mode: 'HTML' });
+      } else {
+          await ctx.reply("✅ Word re-sent!");
+      }
+  } catch (e) {
+      if (!isPrivate) {
+          await ctx.reply(`⚠️ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a>, I couldn't DM you. Please make sure you have started the bot in private and haven't blocked me!`, { parse_mode: 'HTML' });
+      } else {
+          await ctx.reply("⚠️ I couldn't send the DM. Please check your privacy settings.");
+      }
+  }
 });
 
 bot.command('leaderboard', async (ctx) => {

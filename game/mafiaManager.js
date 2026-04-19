@@ -33,6 +33,22 @@ class MafiaManager {
     return fallback;
   }
 
+  getPlayerData(userId) {
+    const lobby = this.getLobbyByUserId(userId);
+    if (!lobby || lobby.state === 'LOBBY') return null;
+    const role = lobby.roles[userId];
+    if (!role) return null;
+    return {
+        mode: 'mafia',
+        role,
+        word: role === 'IMPOSTOR' ? lobby.wordB : (role === 'JOKER' ? null : lobby.wordA),
+        theme: lobby.theme,
+        maxWords: lobby.settings?.clue_words || 1,
+        round: lobby.round
+    };
+  }
+
+
   createLobby(chatId, hostUser) {
     lobbies.set(chatId, {
       chatId,

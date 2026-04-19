@@ -24,6 +24,20 @@ class GameManager {
     return fallback;
   }
 
+  getPlayerData(userId) {
+    const lobby = this.getLobbyByUserId(userId);
+    if (!lobby || lobby.state === 'LOBBY') return null;
+    const isImpostor = userId === lobby.impostorId;
+    return {
+        mode: 'standard',
+        word: isImpostor ? lobby.wordB : lobby.wordA,
+        theme: lobby.themeName,
+        isImpostor,
+        maxWords: lobby.maxClueWords
+    };
+  }
+
+
   createLobby(chatId, hostUser) {
     lobbies.set(chatId, {
       chatId,
