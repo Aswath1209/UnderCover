@@ -20,10 +20,17 @@ class MafiaManager {
   getActiveGamesCount() { return lobbies.size; }
 
   getLobbyByUserId(userId) {
+    let fallback = null;
     for (const [chatId, lobby] of lobbies.entries()) {
-      if (lobby.alivePlayers.find(p => p.id === userId)) return lobby;
+      // Check both alivePlayers and all players for routing
+      const isMember = (lobby.alivePlayers && lobby.alivePlayers.find(p => p.id === userId)) || 
+                       (lobby.players && lobby.players.find(p => p.id === userId));
+      if (isMember) {
+        if (lobby.state === 'CLUE_PHASE') return lobby;
+        fallback = lobby;
+      }
     }
-    return null;
+    return fallback;
   }
 
   createLobby(chatId, hostUser) {

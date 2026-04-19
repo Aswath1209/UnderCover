@@ -22,6 +22,7 @@ bot.api.setMyCommands([
   { command: 'settings', description: 'Configure game settings (Admin only)' },
   { command: 'profile', description: 'View your stats and win rate' },
   { command: 'leaderboard', description: 'View top players in this group or globally' },
+  { command: 'quit', description: 'Leave your current match or lobby' },
   { command: 'start', description: 'Start the bot (required to play)' },
   { command: 'ping', description: 'Check bot status and global stats' }
 ]).catch(console.error);
@@ -102,6 +103,50 @@ bot.command('profile', async (ctx) => {
     `👤 <b>Profile: <a href="tg://user?id=${user.id}">${profile.first_name}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%`,
     { parse_mode: 'HTML' }
   );
+});
+
+bot.command('quit', async (ctx) => {
+  const userId = ctx.from.id;
+  const regularLobby = gameManager.getLobbyByUserId(userId);
+  const mafiaLobby = mafiaManager.getLobbyByUserId(userId);
+  
+  if (!regularLobby && !mafiaLobby) {
+      return ctx.reply("You are not in any active game or lobby.");
+  }
+  
+  if (regularLobby) {
+      const chatId = regularLobby.chatId;
+      if (regularLobby.state === 'LOBBY') {
+          gameManager.leaveLobby(chatId, userId);
+          await ctx.reply("✅ You have left the Undercover lobby.");
+          await updateLobbyMessage(chatId, regularLobby, regularLobby.joinMessageId);
+      } else {
+          // In Undercover, leaving during a game kills the game
+          gameManager.deleteLobby(chatId);
+          await bot.api.sendMessage(chatId, `🛑 <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has quit. The game has been cancelled.`, { parse_mode: 'HTML' });
+          await ctx.reply("✅ You quit the match. The game was cancelled.");
+      }
+  } else if (mafiaLobby) {
+      const chatId = mafiaLobby.chatId;
+      if (mafiaLobby.state === 'LOBBY') {
+          mafiaManager.leaveLobby(chatId, userId);
+          await ctx.reply("✅ You have left the Mafia lobby.");
+          const msgId = mafiaLobby.pinnedMessageId || mafiaLobby.joinMessageId; // check which one we have
+          if (msgId) await updateMafiaLobbyMessage(chatId, mafiaLobby, msgId);
+      } else {
+          // In Mafia, quitting during a game eliminates you
+          const { player, role } = mafiaManager.eliminatePlayer(chatId, userId);
+          const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
+          let msg = `🏳️ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has <b>QUIT</b> the game!\n\nThey were a <b>${role}</b> ${RE[role]}.`;
+          if (role === 'IMPOSTOR') msg += `\n🔑 Their word was: <tg-spoiler>${mafiaLobby.wordB}</tg-spoiler>`;
+          
+          await bot.api.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+          await ctx.reply("✅ You have quit the Mafia match.");
+          
+          const win = mafiaManager.checkWinCondition(chatId);
+          if (win) await endMafiaGame(chatId, win);
+      }
+  }
 });
 
 bot.command('leaderboard', async (ctx) => {

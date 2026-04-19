@@ -14,10 +14,14 @@ class GameManager {
   getActiveGamesCount() { return lobbies.size; }
 
   getLobbyByUserId(userId) {
+    let fallback = null;
     for (const [chatId, lobby] of lobbies.entries()) {
-      if (lobby.players.find(p => p.id === userId)) return lobby;
+      if (lobby.players.find(p => p.id === userId)) {
+        if (lobby.state === 'CLUE_PHASE') return lobby;
+        fallback = lobby;
+      }
     }
-    return null;
+    return fallback;
   }
 
   createLobby(chatId, hostUser) {
