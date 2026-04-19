@@ -40,6 +40,15 @@ function processGameEnd(lobby, winners) {
   });
 }
 
+// --- Group Discovery Middleware ---
+bot.use(async (ctx, next) => {
+  if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
+    // This will trigger sb.getGroupSettings which now auto-registers new groups
+    sb.getGroupSettings(ctx.chat.id).catch(() => {});
+  }
+  return next();
+});
+
 bot.command('start', async (ctx) => {
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
