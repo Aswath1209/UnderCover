@@ -130,6 +130,18 @@ async function updateGroupSetting(chatId, key, value) {
   return settings;
 }
 
+async function getAllGroupIds() {
+  if (!supabase) return [];
+  const { data } = await supabase.from('group_settings').select('chat_id');
+  return [...new Set((data || []).map(g => g.chat_id))];
+}
+
+async function getAllUserIds() {
+  if (!supabase) return [];
+  const { data } = await supabase.from('profiles').select('user_id');
+  return (data || []).map(u => u.user_id);
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -141,5 +153,7 @@ module.exports = {
   getGroupSettings,
   updateGroupSetting,
   getDefaults,
+  getAllGroupIds,
+  getAllUserIds,
   DEFAULT_SETTINGS
 };

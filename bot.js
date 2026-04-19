@@ -4,6 +4,8 @@ const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
 const sb = require('./db/supabase');
 
+const ADMIN_IDS = [7361215114]; // Bot Owner
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
 });
@@ -156,6 +158,66 @@ bot.command('quit', async (ctx) => {
           if (win) await endMafiaGame(chatId, win);
       }
   }
+});
+
+// --- Admin Broadcast Commands ---
+
+async function sendBroadcast(ctx, targetIds, message) {
+    let success = 0;
+    let failed = 0;
+    const total = targetIds.length;
+    
+    const statusMsg = await ctx.reply(`🚀 Broadcasting to ${total} chats... (0/${total})`);
+    
+    for (let i = 0; i < total; i++) {
+        const targetId = targetIds[i];
+        try {
+            await bot.api.sendMessage(targetId, `📢 <b>ANNOUNCEMENT</b>\n\n${message}`, { parse_mode: 'HTML' });
+            success++;
+        } catch (e) {
+            failed++;
+        }
+        
+        // Update status UI every 5 messages or at the end
+        if (i % 5 === 0 || i === total - 1) {
+            try { await bot.api.editMessageText(ctx.chat.id, statusMsg.message_id, `🚀 Broadcasting... (${i + 1}/${total})\n✅ Success: ${success}\n❌ Failed: ${failed}`); } catch (e) {}
+        }
+        
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    await ctx.reply(`🏁 <b>Broadcast Complete</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
+}
+
+bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) => {
+  if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  const cmd = ctx.message.text.split(' ')[0].replace('/', '');
+  const broadcastMsg = ctx.message.text.split(' ').slice(1).join(' ');
+  
+  if (!broadcastMsg) {
+      return ctx.reply(`❌ Please provide a message. Usage: /${cmd} <message>`);
+  }
+  
+  let targetIds = [];
+  if (cmd === 'broadcast' || cmd === 'broadcast_groups') {
+      const groupIds = await sb.getAllGroupIds();
+      targetIds.push(...groupIds);
+  }
+  if (cmd === 'broadcast' || cmd === 'broadcast_users') {
+      const userIds = await sb.getAllUserIds();
+      targetIds.push(...userIds);
+  }
+  
+  // Unique IDs only
+  targetIds = [...new Set(targetIds)];
+  
+  if (targetIds.length === 0) {
+      return ctx.reply("❌ No target chats found in database.");
+  }
+  
+  await sendBroadcast(ctx, targetIds, broadcastMsg);
 });
 
 bot.command('leaderboard', async (ctx) => {
