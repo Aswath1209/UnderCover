@@ -19,6 +19,7 @@ class LiesManager {
       totalRounds: 10,
       currentQuestion: null,
       submissions: {}, // userId -> { type, value }
+      askedQuestions: [], // Track indices to avoid repetition
       createdAt: Date.now(),
       timer: null
     };
@@ -63,8 +64,18 @@ class LiesManager {
     lobby.state = 'QUIZ_PHASE';
     lobby.submissions = {};
     
-    // Pick random question
-    const qIndex = Math.floor(Math.random() * quizData.questions.length);
+    // Pick random question that hasn't been asked
+    const availableIndices = quizData.questions
+        .map((_, i) => i)
+        .filter(i => !lobby.askedQuestions.includes(i));
+    
+    if (availableIndices.length === 0) {
+        lobby.state = 'END';
+        return { type: 'END' };
+    }
+
+    const qIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+    lobby.askedQuestions.push(qIndex);
     lobby.currentQuestion = quizData.questions[qIndex];
     
     return { type: 'ROUND', round: lobby.round, question: lobby.currentQuestion.q };

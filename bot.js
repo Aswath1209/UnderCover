@@ -413,6 +413,20 @@ bot.command('mafia', async (ctx) => {
   }
 });
 
+bot.command('liesrules', async (ctx) => {
+    const text = `🤥 <b>Game of Lies: Rules & How to Play</b> 🤥\n\n` +
+                 `1. Each match has 10 Cricket questions.\n` +
+                 `2. For each question, you have 90 seconds to reply in DM.\n\n` +
+                 `<b>Scoring:</b>\n` +
+                 `✅ <b>Answer Correctly</b>: +1 Pt\n` +
+                 `❌ <b>Wrong Answer</b>: 0 Pts (unless stolen)\n` +
+                 `😈 <b>Type 'steal'</b>: \n` +
+                 `   - If opponent gets it RIGHT: <b>You get +2</b>, they get 0.\n` +
+                 `   - If opponent gets it WRONG (or they also steal): <b>You get -2</b>.\n\n` +
+                 `Strategy is key! Do you play it safe, or bait your opponent into a steal?`;
+    await ctx.reply(text, { parse_mode: 'HTML' });
+});
+
 bot.command('lies', async (ctx) => {
     if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
     const chatId = ctx.chat.id;
@@ -551,9 +565,13 @@ bot.on('message:text', async (ctx) => {
   // --- Game of Lies DM Logic ---
   const liesLobby = liesManager.getLobbyByUserId(userId);
   if (liesLobby && liesLobby.state === 'QUIZ_PHASE') {
-      const choice = liesManager.submitChoice(userId, 'answer', word);
+      const isSteal = word.toLowerCase().trim() === 'steal';
+      const choice = liesManager.submitChoice(userId, isSteal ? 'steal' : 'answer', isSteal ? "" : word);
       if (choice.error) return ctx.reply(`❌ ${choice.error}`);
-      await ctx.reply("✅ Answer received! Waiting for your opponent...");
+      
+      if (isSteal) await ctx.reply("😈 <b>Move: STEAL</b>\n\nYou are attempting to steal points! Waiting for opponent...", { parse_mode: 'HTML' });
+      else await ctx.reply("✅ <b>Answer received!</b> Waiting for your opponent...", { parse_mode: 'HTML' });
+      
       if (choice.allDone) await processLiesResults(liesLobby.chatId);
       return;
   }
@@ -699,20 +717,12 @@ bot.on('callback_query:data', async (ctx) => {
           const joined = liesManager.joinLobby(chatId, { id: user.id, first_name: user.first_name });
           if (!joined) return ctx.answerCallbackQuery("You cannot join this lobby.");
           ctx.answerCallbackQuery("Joined!");
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML' });
+          await startLiesRound(chatId);
+          return;
       } else {
-          if (user.id !== lLobby.players[0].id) return ctx.answerCallbackQuery("Only the host can start!");
+          return ctx.answerCallbackQuery("Lobby is full!");
       }
-      
-      // Check if both started the bot
-      for (const p of lLobby.players) {
-          try { await bot.api.sendChatAction(p.id, 'typing'); }
-          catch(e) { return ctx.answerCallbackQuery({ text: `${p.first_name} hasn't started the bot in DMs!`, show_alert: true }); }
-      }
-
-      ctx.answerCallbackQuery("Starting match!");
-      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML' });
-      await startLiesRound(chatId);
-      return;
   }
   if (data === 'lies_steal') {
       const liesLobby = liesManager.getLobbyByUserId(user.id);
@@ -841,20 +851,18 @@ async function startLiesRound(chatId) {
     const next = liesManager.nextRound(chatId);
     if (next.type === 'END') return endLiesGame(chatId);
 
-    const kb = new InlineKeyboard().text("😈 I want to STEAL", "lies_steal");
-    
     for (const p of lobby.players) {
         try {
-            await bot.api.sendMessage(p.id, 
-                `🤥 <b>Round ${lobby.round}/10 — Game of Lies</b>\n\n` +
-                `❓ <b>Question:</b> ${next.question}\n\n` +
-                `<b>Your choices:</b>\n` +
-                `1. Reply here with the <b>Correct Answer</b> (+1 pts).\n` +
-                `2. Reply with a <b>Wrong Answer</b> to bait a steal.\n` +
-                `3. Click the button below to <b>STEAL</b> (+2 if they are right, -2 if they are wrong/steal).\n\n` +
-                `⏳ You have 90 seconds!`,
-                { parse_mode: 'HTML', reply_markup: kb }
-            );
+            let msg = `🤥 <b>Round ${lobby.round}/10 — Game of Lies</b>\n\n` +
+                      `❓ <b>Question:</b> ${next.question}\n\n`;
+            
+            if (lobby.round === 1) {
+                msg += `<b>Quick Rules:</b>\n- Reply with <b>Correct Answer</b> for +1 pt.\n- Reply with a <b>Wrong Answer</b> to bait a steal.\n- Type <b>'steal'</b> to take points (+2 if they are right, -2 if not).\n\n`;
+            }
+            
+            msg += `⏳ 90 seconds to reply!`;
+            
+            await bot.api.sendMessage(p.id, msg, { parse_mode: 'HTML' });
         } catch(e) {
             await bot.api.sendMessage(chatId, `⚠️ Could not DM <a href="tg://user?id=${p.id}">${p.first_name}</a>. Match cancelled.`, { parse_mode: 'HTML' });
             liesManager.deleteLobby(chatId);
@@ -880,9 +888,9 @@ async function handleLiesTimeout(chatId) {
 
 async function processLiesResults(chatId) {
     const lobby = liesManager.getLobby(chatId);
-    if (!lobby || lobby.state !== 'QUIZ_PHASE') return;
+    if (!lobby || (lobby.state !== 'QUIZ_PHASE' && lobby.state !== 'RESULTS_SEQUENTIAL')) return;
     if (lobby.timer) { clearTimeout(lobby.timer); lobby.timer = null; }
-    lobby.state = 'RESULTS_SEQUENTIAL'; // Prevent double execution
+    lobby.state = 'RESULTS_SEQUENTIAL'; 
 
     const data = liesManager.calculateResults(chatId);
     const p1 = lobby.players[0];
@@ -891,43 +899,47 @@ async function processLiesResults(chatId) {
     const r2 = data.results[p2.id];
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    const commentaries = [
-        "What a delivery! 🏏", "Straight down the ground! 🔥", "That's a huge wicket! ☝️",
-        "Classic textbook cricket! 📚", "Unbelievable scenes at the group! 🤯",
-        "The crowd is going wild! 📣", "He's making a mess of the stumps! ⚡",
-        "Clinical performance! 🎯", "A strategic masterpiece! 🧠",
-        "That's went miles! 🚀", "Clean bowled! 🔴", "A beautiful cover drive! ✨",
-        "Caught in the deep! 🧤", "Nervous times in the middle... 🥶",
-        "The captain will be pleased with that! 👏"
-    ];
-    const randomComm = () => commentaries[Math.floor(Math.random() * commentaries.length)];
 
-    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Results are in!</b>\n\nWait for the reveal...`);
+    // 1. Reveal Question and Answer
+    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Reveal!</b>\n\n❓ Question: <i>${lobby.currentQuestion.q}</i>\n✅ Answer: <b>${data.question}</b>`, { parse_mode: 'HTML' });
+    await sleep(2500);
+
+    // 2. Reveal P1 Choice
+    const f1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.correct ? 'CORRECT ✅' : (r1.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `Gave Answer ❌`));
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> chose: <b>${f1}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
-    await bot.api.sendMessage(chatId, `🏏 <b>The Actual Answer was:</b> <i>${data.question}</i>`);
+    // 3. Reveal P2 Choice
+    const f2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.correct ? 'CORRECT ✅' : (r2.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `Gave Answer ❌`));
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> chose: <b>${f2}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
-    const f1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.correct ? 'CORRECT ✅' : `WRONG ❌ (${r1.value || 'N/A'})`);
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> chose: <b>${f1}</b>\n${randomComm()}`, { parse_mode: 'HTML' });
+    // 4. Reveal Scoring
+    let resultLine = "";
+    if (r1.points === 1 && r2.points === 1) resultLine = "Both played it safe! +1 each.";
+    else if (r1.points === 2) resultLine = `${p1.first_name} caught the correct answer! +2 Points!`;
+    else if (r2.points === 2) resultLine = `${p2.first_name} caught the correct answer! +2 Points!`;
+    else if (r1.points === -2 && r2.points === -2) resultLine = "Both tried to steal, but failed! -2 each.";
+    else if (r1.points === -2) resultLine = `${p1.first_name} tried to steal from a wrong answer! -2 Points.`;
+    else if (r2.points === -2) resultLine = `${p2.first_name} tried to steal from a wrong answer! -2 Points.`;
+    else if (r1.points === 1) resultLine = `${p1.first_name} got it right! +1 Point.`;
+    else if (r2.points === 1) resultLine = `${p2.first_name} got it right! +1 Point.`;
+    else resultLine = "No points awarded this round.";
+
+    await bot.api.sendMessage(chatId, `📝 <b>Round Verdict:</b>\n${resultLine}\n\n${p1.first_name} ${r1.points >=0 ? '+' : ''}${r1.points} | ${p2.first_name} ${r2.points >= 0 ? '+' : ''}${r2.points}`, { parse_mode: 'HTML' });
     await sleep(2000);
 
-    const f2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.correct ? 'CORRECT ✅' : `WRONG ❌ (${r2.value || 'N/A'})`);
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> chose: <b>${f2}</b>\n${randomComm()}`, { parse_mode: 'HTML' });
-    await sleep(2000);
-
-    let scoreText = `📊 <b>Scoreboard after Round ${lobby.round}:</b>\n` +
-                    `----------------------------\n` +
-                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]} pts</b> (${r1.points >= 0 ? '+' : ''}${r1.points})\n` +
-                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]} pts</b> (${r2.points >= 0 ? '+' : ''}${r2.points})\n` +
-                    `----------------------------`;
+    // 5. Scoreboard
+    let scoreboard = `📊 <b>Scoreboard after Round ${lobby.round}:</b>\n` +
+                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]} pts</b>\n` +
+                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]} pts</b>`;
     
     if (lobby.round < 10) {
-        const kb = new InlineKeyboard().url("📩 Answer next question", `https://t.me/${bot.botInfo.username}`);
-        await bot.api.sendMessage(chatId, scoreText + `\n\nNext round starting in 5 seconds! Check your DMs.`, { parse_mode: 'HTML', reply_markup: kb });
+        const kb = new InlineKeyboard().url("📩 Answer next 📩", `https://t.me/${bot.botInfo.username}`);
+        await bot.api.sendMessage(chatId, scoreboard + `\n\nNext round starting... Check your DMs!`, { parse_mode: 'HTML', reply_markup: kb });
         setTimeout(() => startLiesRound(chatId).catch(console.error), 5000);
     } else {
-        await bot.api.sendMessage(chatId, scoreText, { parse_mode: 'HTML' });
+        await bot.api.sendMessage(chatId, scoreboard, { parse_mode: 'HTML' });
         await endLiesGame(chatId);
     }
 }
