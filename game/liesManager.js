@@ -7,7 +7,7 @@ const quizData = JSON.parse(fs.readFileSync(quizPath, 'utf8'));
 const lobbies = new Map();
 
 class LiesManager {
-  createLobby(chatId, host, challenger = null, rounds = 10) {
+  createLobby(chatId, host, challenger = null, rounds = 5) {
     const lobby = {
       chatId,
       players: [host],

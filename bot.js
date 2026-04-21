@@ -428,7 +428,7 @@ bot.command('mafia', async (ctx) => {
 
 bot.command('liesrules', async (ctx) => {
     const text = `🤥 <b>Game of Lies: Rules & How to Play</b> 🤥\n\n` +
-                 `1. Each match has 10 Cricket questions.\n` +
+                 `1. Each match has 5 Cricket questions.\n` +
                  `2. For each question, you have 90 seconds to reply in DM.\n\n` +
                  `<b>Scoring:</b>\n` +
                  `✅ <b>Answer Correctly</b>: +1 Pt\n` +
@@ -448,7 +448,7 @@ bot.command('lies', async (ctx) => {
     const challenger = ctx.message.reply_to_message?.from;
 
     const args = ctx.message.text.split(' ');
-    let rounds = 10;
+    let rounds = 5;
     if (args[1]) {
         const r = parseInt(args[1]);
         if (!isNaN(r) && r >= 1 && r <= 10) rounds = r;
