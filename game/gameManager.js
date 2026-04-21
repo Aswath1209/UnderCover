@@ -12,6 +12,7 @@ class GameManager {
   hasLobby(chatId) { return lobbies.has(chatId); }
   getLobby(chatId) { return lobbies.get(chatId); }
   getActiveGamesCount() { return lobbies.size; }
+  getLobbies() { return lobbies; }
 
   getLobbyByUserId(userId) {
     let fallback = null;
@@ -49,7 +50,8 @@ class GameManager {
       wordB: null,
       impostorId: null,
       cluesReceived: {},
-      votes: {}
+      votes: {},
+      createdAt: Date.now()
     });
   }
 
@@ -196,6 +198,28 @@ class GameManager {
     }
     
     return { votedOutId: tie ? null : parseInt(votedOutId), tallies, tie };
+  }
+
+  eliminatePlayer(chatId, userId) {
+    const lobby = lobbies.get(chatId);
+    if (!lobby) return null;
+    const idx = lobby.players.findIndex(p => p.id === userId);
+    if (idx !== -1) {
+      const player = lobby.players.splice(idx, 1)[0];
+      return player;
+    }
+    return null;
+  }
+
+  checkWinCondition(chatId) {
+    const lobby = lobbies.get(chatId);
+    if (!lobby) return null;
+    // Standard mode: If impostor is eliminated, majority wins. 
+    // If only 2 players left and one is impostor, impostor wins.
+    const isImpostorAlive = lobby.players.some(p => p.id === lobby.impostorId);
+    if (!isImpostorAlive) return 'MAJORITY_WIN';
+    if (lobby.players.length <= 2 && isImpostorAlive) return 'IMPOSTOR_WIN';
+    return null;
   }
 }
 

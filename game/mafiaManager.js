@@ -18,6 +18,7 @@ class MafiaManager {
   hasLobby(chatId) { return lobbies.has(chatId); }
   getLobby(chatId) { return lobbies.get(chatId); }
   getActiveGamesCount() { return lobbies.size; }
+  getLobbies() { return lobbies; }
 
   getLobbyByUserId(userId) {
     let fallback = null;
@@ -68,7 +69,8 @@ class MafiaManager {
       settings: {},
       pinnedMessageId: null,
       clueStatusMessageId: null,
-      anonymousVoting: false
+      anonymousVoting: false,
+      createdAt: Date.now()
     });
   }
 

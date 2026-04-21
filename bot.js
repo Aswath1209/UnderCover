@@ -83,6 +83,23 @@ bot.command('ping', async (ctx) => {
   await ctx.reply(`🏓 <b>Bot Status</b>\n\n🟢 <b>Active Lobbies:</b> ${activeGames}\n👥 <b>Total Players (All Time):</b> ${totalUsers}\n🏠 <b>Total Groups Played In:</b> ${totalGroups}\n⏱️ <b>Uptime:</b> ${upStr}`, { parse_mode: 'HTML' });
 });
 
+bot.command('admin_stats', async (ctx) => {
+  if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  const ucCount = gameManager.getActiveGamesCount();
+  const mafCount = mafiaManager.getActiveGamesCount();
+  const stats = await sb.getGlobalStats().catch(() => ({ totalUsers: "Error", totalGroups: "Error" }));
+  
+  const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
+               `👥 <b>Total Users:</b> ${stats.totalUsers}\n` +
+               `🏘️ <b>Total Groups:</b> ${stats.totalGroups}\n\n` +
+               `🎮 <b>Live Games:</b>\n` +
+               `- Undercover: ${ucCount}\n` +
+               `- Mafia: ${mafCount}\n\n` +
+               `⏳ <i>Cleanup interval: 30m</i>`;
+               
+  ctx.reply(text, { parse_mode: 'HTML' });
+});
+
 bot.command('cancel', async (ctx) => {
   if (ctx.chat.type === 'private') return;
   const chatId = ctx.chat.id;
@@ -682,7 +699,12 @@ bot.on('callback_query:data', async (ctx) => {
     const gSettings = await sb.getGroupSettings(chatId);
     await gameManager.startGame(chatId, themeName, bot, gSettings);
     
-    let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your ${gSettings.clue_words === 1 ? '1-word' : `1-${gSettings.clue_words} word`} clue!\n\n<b>Status:</b>\n`;
+    // 60s Clue Timer for Standard Mode
+    if (lobby) {
+        lobby.clueTimer = setTimeout(() => handleStandardClueTimeout(chatId), 60000);
+    }
+    
+    let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your ${gSettings.clue_words === 1 ? '1-word' : `1-${gSettings.clue_words} word`} clue!\n⏳ <b>Time: 60s</b>\n\n<b>Status:</b>\n`;
     lobby.players.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
     
     try {
@@ -728,6 +750,46 @@ async function startVotingPhase(chatId) {
        const currentLobby = gameManager.getLobby(chatId);
        if (currentLobby && currentLobby.state === 'VOTING') await tallyVotes(chatId);
     }, gSettings.voting_time * 1000);
+}
+
+async function handleStandardClueTimeout(chatId) {
+    const lobby = gameManager.getLobby(chatId);
+    if (!lobby || lobby.state !== 'CLUE_PHASE') return;
+    lobby.clueTimer = null;
+
+    const afkPlayers = lobby.players.filter(p => !lobby.cluesReceived[p.id]);
+    if (afkPlayers.length === 0) return;
+
+    let elimText = `⏰ <b>TIME'S UP!</b>\n\nThe following players didn't submit a clue and have been eliminated (AFK):\n\n`;
+    for (const p of afkPlayers) {
+        const isImpostor = p.id === lobby.impostorId;
+        gameManager.eliminatePlayer(chatId, p.id);
+        elimText += `💤 <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${isImpostor ? '🔫 Impostor' : '👤 Civilian'}\n`;
+    }
+
+    await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
+
+    const win = gameManager.checkWinCondition(chatId);
+    if (win) {
+        let winText = "";
+        if (win === 'MAJORITY_WIN') {
+            winText = `🎉 <b>THE MAJORITY WINS!</b>\nThe Impostor was eliminated for being AFK.`;
+        } else {
+            winText = `🤯 <b>THE IMPOSTOR WINS!</b>\nToo many Civilians were AFK!`;
+        }
+        await bot.api.sendMessage(chatId, winText, { parse_mode: 'HTML' });
+        gameManager.deleteLobby(chatId);
+        return;
+    }
+
+    // Proceed to discussion
+    lobby.state = 'DISCUSSION';
+    let clueText = `🕵️‍♂️ <b>Clues Revealed!</b>\n\n`;
+    lobby.players.forEach(p => {
+        clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id] || '—'}</b>\n`;
+    });
+    clueText += `\n💬 <b>DISCUSSION:</b> You can now use /vote !`;
+    await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
 }
 
 async function tallyVotes(chatId) {
@@ -981,4 +1043,31 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
 
 module.exports = { bot };
-if (require.main === module) { bot.start(); console.log("Bot started!"); }
+if (require.main === module) { 
+  bot.start(); 
+  console.log("Bot started!"); 
+
+  // --- Stale Game Cleanup (5 Hours) ---
+  setInterval(async () => {
+    const FIVE_HOURS = 5 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Cleanup Undercover
+    const ucLobbies = gameManager.getLobbies();
+    for (const [chatId, lobby] of ucLobbies.entries()) {
+      if (lobby.createdAt && (now - lobby.createdAt) > FIVE_HOURS) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 5 hours and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+        gameManager.deleteLobby(chatId);
+      }
+    }
+
+    // Cleanup Mafia
+    const mafLobbies = mafiaManager.getLobbies();
+    for (const [chatId, lobby] of mafLobbies.entries()) {
+      if (lobby.createdAt && (now - lobby.createdAt) > FIVE_HOURS) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 5 hours and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+        mafiaManager.deleteLobby(chatId);
+      }
+    }
+  }, 30 * 60 * 1000); // Run every 30 minutes
+}
