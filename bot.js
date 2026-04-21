@@ -948,24 +948,7 @@ async function handleVotingTimeout(chatId) {
     const lobby = gameManager.getLobby(chatId);
     if (!lobby || lobby.state !== 'VOTING') return;
 
-    const afkPlayers = lobby.players.filter(p => !lobby.votes[p.id]);
-    if (afkPlayers.length > 0) {
-        let text = "⏰ <b>Voting Time Up!</b>\n\nThe following players didn't vote and have been eliminated:\n";
-        for (const p of afkPlayers) {
-            const isImpostor = p.id === lobby.impostorId;
-            gameManager.eliminatePlayer(chatId, p.id);
-            text += `- <a href="tg://user?id=${p.id}">${p.first_name}</a> (${isImpostor ? 'Impostor 🔫' : 'Civilian 👤'})\n`;
-        }
-        await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML' });
-        
-        const win = gameManager.checkWinCondition(chatId);
-        if (win) {
-            if (win === 'MAJORITY_WIN') await bot.api.sendMessage(chatId, `🎉 <b>THE MAJORITY WINS!</b>\nThe Impostor was eliminated for being AFK.`);
-            else await bot.api.sendMessage(chatId, `🤯 <b>THE IMPOSTOR WINS!</b>\nToo many Civilians were AFK!`);
-            gameManager.deleteLobby(chatId);
-            return;
-        }
-    }
+    await bot.api.sendMessage(chatId, "⏰ <b>Voting time is up!</b> Calculating results...", { parse_mode: 'HTML' });
     await tallyVotes(chatId);
 }
 
