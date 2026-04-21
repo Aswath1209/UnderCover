@@ -433,6 +433,13 @@ bot.command('lies', async (ctx) => {
     const user = ctx.from;
     const challenger = ctx.message.reply_to_message?.from;
 
+    const args = ctx.message.text.split(' ');
+    let rounds = 10;
+    if (args[1]) {
+        const r = parseInt(args[1]);
+        if (!isNaN(r) && r >= 1 && r <= 10) rounds = r;
+    }
+
     if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
         return ctx.reply("You are already in an active game or lobby!");
     }
@@ -440,16 +447,16 @@ bot.command('lies', async (ctx) => {
     if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
     if (challenger && challenger.is_bot) return ctx.reply("You can't challenge a bot!");
 
-    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null);
+    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null, rounds);
     
     const kb = new InlineKeyboard();
     if (!challenger) kb.text("✅ Join Game", "lies_join");
     kb.text("❌ Cancel", "lies_cancel");
 
-    let text = `🤥 <b>Game of Lies Challenge!</b> 🤥\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
+    let text = `🤥 <b>Game of Lies Challenge!</b> (${rounds} Rounds)\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
     if (challenger) {
-        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! The host will start the match once you are ready. (Players must have started the bot in DMs).`;
-        kb.text("▶️ Start Match", "lies_join");
+        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! Match starts automatically when you join.`;
+        kb.text("✅ Accept Challenge", "lies_join");
     } else {
         text += `\nWaiting for someone to join the 1v1 battle...`;
     }
@@ -717,7 +724,8 @@ bot.on('callback_query:data', async (ctx) => {
           const joined = liesManager.joinLobby(chatId, { id: user.id, first_name: user.first_name });
           if (!joined) return ctx.answerCallbackQuery("You cannot join this lobby.");
           ctx.answerCallbackQuery("Joined!");
-          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML' });
+          const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
           await startLiesRound(chatId);
           return;
       } else {
@@ -900,43 +908,42 @@ async function processLiesResults(chatId) {
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // 1. Reveal Question and Answer
-    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Reveal!</b>\n\n❓ Question: <i>${lobby.currentQuestion.q}</i>\n✅ Answer: <b>${data.question}</b>`, { parse_mode: 'HTML' });
+    // 1. Reveal Question
+    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Reveal!</b>\n\n❓ Question: <i>${lobby.currentQuestion.q}</i>`, { parse_mode: 'HTML' });
     await sleep(2500);
 
-    // 2. Reveal P1 Choice
-    const f1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.correct ? 'CORRECT ✅' : (r1.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `Gave Answer ❌`));
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> chose: <b>${f1}</b>`, { parse_mode: 'HTML' });
+    // 2. Reveal P1 Response
+    const v1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${r1.value}"`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> sent: <b>${v1}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
-    // 3. Reveal P2 Choice
-    const f2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.correct ? 'CORRECT ✅' : (r2.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `Gave Answer ❌`));
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> chose: <b>${f2}</b>`, { parse_mode: 'HTML' });
+    // 3. Reveal P2 Response
+    const v2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${r2.value}"`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> sent: <b>${v2}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
-    // 4. Reveal Scoring
-    let resultLine = "";
-    if (r1.points === 1 && r2.points === 1) resultLine = "Both played it safe! +1 each.";
-    else if (r1.points === 2) resultLine = `${p1.first_name} caught the correct answer! +2 Points!`;
-    else if (r2.points === 2) resultLine = `${p2.first_name} caught the correct answer! +2 Points!`;
-    else if (r1.points === -2 && r2.points === -2) resultLine = "Both tried to steal, but failed! -2 each.";
-    else if (r1.points === -2) resultLine = `${p1.first_name} tried to steal from a wrong answer! -2 Points.`;
-    else if (r2.points === -2) resultLine = `${p2.first_name} tried to steal from a wrong answer! -2 Points.`;
-    else if (r1.points === 1) resultLine = `${p1.first_name} got it right! +1 Point.`;
-    else if (r2.points === 1) resultLine = `${p2.first_name} got it right! +1 Point.`;
-    else resultLine = "No points awarded this round.";
+    // 4. Reveal Answer and Verdict
+    let verdict = "";
+    if (r1.points === 1 && r2.points === 1) verdict = "Both correct! +1 each.";
+    else if (r1.points === 2) verdict = `🔥 ${p1.first_name} STOLE the points! +2`;
+    else if (r2.points === 2) verdict = `🔥 ${p2.first_name} STOLE the points! +2`;
+    else if (r1.points === -2 && r2.points === -2) verdict = "Both failed to steal! -2 each.";
+    else if (r1.points === -2) verdict = `❌ ${p1.first_name} failed to steal! -2`;
+    else if (r2.points === -2) verdict = `❌ ${p2.first_name} failed to steal! -2`;
+    else if (r1.points === 1) verdict = `✅ ${p1.first_name} got it right! +1`;
+    else if (r2.points === 1) verdict = `✅ ${p2.first_name} got it right! +1`;
+    else verdict = "Both wrong! 0 points.";
 
-    await bot.api.sendMessage(chatId, `📝 <b>Round Verdict:</b>\n${resultLine}\n\n${p1.first_name} ${r1.points >=0 ? '+' : ''}${r1.points} | ${p2.first_name} ${r2.points >= 0 ? '+' : ''}${r2.points}`, { parse_mode: 'HTML' });
+    await bot.api.sendMessage(chatId, `🏏 <b>Answer:</b> ${data.question}\n\n📝 <b>Verdict:</b> ${verdict}`, { parse_mode: 'HTML' });
     await sleep(2000);
 
     // 5. Scoreboard
-    let scoreboard = `📊 <b>Scoreboard after Round ${lobby.round}:</b>\n` +
-                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]} pts</b>\n` +
-                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]} pts</b>`;
+    let scoreboard = `📊 <b>Current Scores:</b>\n` +
+                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]}</b>\n` +
+                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]}</b>`;
     
-    if (lobby.round < 10) {
-        const kb = new InlineKeyboard().url("📩 Answer next 📩", `https://t.me/${bot.botInfo.username}`);
-        await bot.api.sendMessage(chatId, scoreboard + `\n\nNext round starting... Check your DMs!`, { parse_mode: 'HTML', reply_markup: kb });
+    if (lobby.round < lobby.totalRounds) {
+        await bot.api.sendMessage(chatId, scoreboard + `\n\nNext round starting in 5 seconds...`, { parse_mode: 'HTML' });
         setTimeout(() => startLiesRound(chatId).catch(console.error), 5000);
     } else {
         await bot.api.sendMessage(chatId, scoreboard, { parse_mode: 'HTML' });

@@ -7,7 +7,7 @@ const quizData = JSON.parse(fs.readFileSync(quizPath, 'utf8'));
 const lobbies = new Map();
 
 class LiesManager {
-  createLobby(chatId, host, challenger = null) {
+  createLobby(chatId, host, challenger = null, rounds = 10) {
     const lobby = {
       chatId,
       players: [host],
@@ -16,7 +16,7 @@ class LiesManager {
       scores: { [host.id]: 0 },
       state: 'LOBBY',
       round: 0,
-      totalRounds: 10,
+      totalRounds: rounds,
       currentQuestion: null,
       submissions: {}, // userId -> { type, value }
       askedQuestions: [], // Track indices to avoid repetition
