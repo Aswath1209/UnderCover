@@ -513,6 +513,11 @@ bot.on('message:text', async (ctx) => {
   const userId = ctx.from.id;
   const word = ctx.message.text;
 
+  // Character limit to prevent "message too long" errors in group chat
+  if (word.length > 50) {
+    return ctx.reply("❌ <b>Clue too long!</b>\n\nPlease send a shorter clue (maximum 50 characters) so that it fits in the group chat.", { parse_mode: 'HTML' });
+  }
+
   // Route clue to the lobby that is actually in CLUE_PHASE
   const regularLobby = gameManager.getLobbyByUserId(userId);
   const mafiaLobby = mafiaManager.getLobbyByUserId(userId);
