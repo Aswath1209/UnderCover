@@ -32,6 +32,7 @@ class LiesManager {
   }
 
   getLobby(chatId) { return lobbies.get(chatId); }
+  hasLobby(chatId) { return lobbies.has(chatId); }
   getLobbyByUserId(userId) {
     for (const lobby of lobbies.values()) {
         if (lobby.players.find(p => p.id === userId)) return lobby;

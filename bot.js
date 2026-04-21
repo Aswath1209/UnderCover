@@ -440,6 +440,10 @@ bot.command('lies', async (ctx) => {
         if (!isNaN(r) && r >= 1 && r <= 10) rounds = r;
     }
 
+    if (liesManager.hasLobby(chatId)) {
+        return ctx.reply("❌ A Game of Lies is already ongoing or forming in this chat!");
+    }
+
     if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
         return ctx.reply("You are already in an active game or lobby!");
     }
@@ -450,18 +454,35 @@ bot.command('lies', async (ctx) => {
     const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null, rounds);
     
     const kb = new InlineKeyboard();
-    if (!challenger) kb.text("✅ Join Game", "lies_join");
-    kb.text("❌ Cancel", "lies_cancel");
+    if (!challenger) kb.text("✅ Accept", "lies_join");
+    else kb.text("✅ Accept", "lies_join");
+    kb.text("❌ Decline", "lies_cancel");
 
     let text = `🤥 <b>Game of Lies Challenge!</b> (${rounds} Rounds)\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
     if (challenger) {
-        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! Match starts automatically when you join.`;
-        kb.text("✅ Accept Challenge", "lies_join");
+        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! Match starts automatically when you accept.`;
     } else {
-        text += `\nWaiting for someone to join the 1v1 battle...`;
+        text += `\nWaiting for someone to accept the 1v1 battle...`;
     }
 
     await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+});
+
+bot.command('endlies', async (ctx) => {
+    if (ctx.chat.type === 'private') return;
+    const chatId = ctx.chat.id;
+    const lobby = liesManager.getLobby(chatId);
+    if (!lobby) return ctx.reply("❌ There is no active Game of Lies or lobby in this chat.");
+
+    const member = await ctx.getChatMember(ctx.from.id);
+    const isAdmin = member.status === 'administrator' || member.status === 'creator';
+    
+    if (lobby.players[0].id !== ctx.from.id && !isAdmin) {
+        return ctx.reply("❌ Only the match host or group admins can end this Game of Lies.");
+    }
+
+    const kb = new InlineKeyboard().text("✅ Yes, End Match", "lies_end_confirm").text("❌ No, Continue", "lies_end_cancel");
+    await ctx.reply("⚠️ <b>Are you sure you want to end this match?</b> Current progress will be lost.", { reply_markup: kb, parse_mode: 'HTML' });
 });
 
 bot.on('message:text', async (ctx) => {
@@ -718,6 +739,22 @@ bot.on('callback_query:data', async (ctx) => {
 
   // --- Lies Game Callbacks ---
   const lLobby = liesManager.getLobby(chatId);
+  
+  if (data === 'lies_end_confirm' || data === 'lies_end_cancel') {
+      if (!lLobby) return ctx.answerCallbackQuery("Game already ended!");
+      const member = await ctx.getChatMember(user.id);
+      const isAdmin = member.status === 'administrator' || member.status === 'creator';
+      if (lLobby.players[0].id !== user.id && !isAdmin) return ctx.answerCallbackQuery("Not authorized!");
+
+      if (data === 'lies_end_confirm') {
+          liesManager.deleteLobby(chatId);
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "🛑 <b>Game of Lies has been terminated by an admin.</b>", { parse_mode: 'HTML' });
+      } else {
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "✅ Match continues!");
+      }
+      return ctx.answerCallbackQuery();
+  }
+
   if (data === 'lies_join') {
       if (!lLobby || lLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Lobby expired.");
       if (lLobby.players.length === 1) {
@@ -744,9 +781,9 @@ bot.on('callback_query:data', async (ctx) => {
   }
   if (data === 'lies_cancel') {
       if (!lLobby) return ctx.answerCallbackQuery("Lobby already closed.");
-      if (user.id !== lLobby.players[0].id && (lLobby.challengerId && user.id !== lLobby.challengerId)) return ctx.answerCallbackQuery("You can't cancel this.");
+      if (user.id !== lLobby.players[0].id && (lLobby.challengerId && user.id !== lLobby.challengerId)) return ctx.answerCallbackQuery("You can't decline this.");
       liesManager.deleteLobby(chatId);
-      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "❌ Game of Lies match cancelled.");
+      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "❌ <b>The Game of Lies challenge was declined.</b>", { parse_mode: 'HTML' });
       return;
   }
   
@@ -853,6 +890,7 @@ bot.on('callback_query:data', async (ctx) => {
 async function startLiesRound(chatId) {
     const lobby = liesManager.getLobby(chatId);
     if (!lobby) return;
+    console.log(`[LIES] Starting Round ${lobby.round + 1} for chat ${chatId}`);
 
     if (lobby.timer) { clearTimeout(lobby.timer); lobby.timer = null; }
 
@@ -861,7 +899,7 @@ async function startLiesRound(chatId) {
 
     for (const p of lobby.players) {
         try {
-            let msg = `🤥 <b>Round ${lobby.round}/10 — Game of Lies</b>\n\n` +
+            let msg = `🤥 <b>Round ${lobby.round}/${lobby.totalRounds} — Game of Lies</b>\n\n` +
                       `❓ <b>Question:</b> ${next.question}\n\n`;
             
             if (lobby.round === 1) {
@@ -942,8 +980,9 @@ async function processLiesResults(chatId) {
                     `🏏 ${p1.first_name}: <b>${data.scores[p1.id]}</b>\n` +
                     `🏏 ${p2.first_name}: <b>${data.scores[p2.id]}</b>`;
     
+    const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
     if (lobby.round < lobby.totalRounds) {
-        await bot.api.sendMessage(chatId, scoreboard + `\n\nNext round starting in 5 seconds...`, { parse_mode: 'HTML' });
+        await bot.api.sendMessage(chatId, scoreboard + `\n\nNext round starting in 5 seconds...`, { parse_mode: 'HTML', reply_markup: dmKb });
         setTimeout(() => startLiesRound(chatId).catch(console.error), 5000);
     } else {
         await bot.api.sendMessage(chatId, scoreboard, { parse_mode: 'HTML' });
