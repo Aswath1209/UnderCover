@@ -222,7 +222,7 @@ async function sendBroadcast(ctx, targetIds, message) {
 bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) => {
   if (!ADMIN_IDS.includes(ctx.from.id)) return;
   
-  const cmd = ctx.message.text.split(' ')[0].replace('/', '');
+  const cmd = ctx.message.text.split(' ')[0].replace('/', '').split('@')[0];
   const broadcastMsg = ctx.message.text.split(' ').slice(1).join(' ');
   
   if (!broadcastMsg) {
