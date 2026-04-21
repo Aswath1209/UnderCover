@@ -45,25 +45,20 @@ function processGameEnd(lobby, winners) {
   });
 }
 
-// --- Group Discovery Middleware ---
-bot.use(async (ctx, next) => {
+// --- Discovery Helpers ---
+async function ensureRegistered(ctx) {
   try {
-    // Auto-register new users
     if (ctx.from && !ctx.from.is_bot) {
       sb.ensureUser(ctx.from.id, ctx.from.first_name).catch(() => {});
     }
-
     if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
-      // Auto-register new groups
       sb.getGroupSettings(ctx.chat.id).catch(() => {});
     }
-  } catch (e) {
-    console.error("Discovery Middleware Error:", e);
-  }
-  return next();
-});
+  } catch (e) {}
+}
 
 bot.command('start', async (ctx) => {
+  ensureRegistered(ctx);
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
   } else {
@@ -72,7 +67,7 @@ bot.command('start', async (ctx) => {
 });
 
 bot.command('ping', async (ctx) => {
-  const activeGames = gameManager.getActiveGamesCount() + mafiaManager.getActiveGamesCount();
+  const activeGames = gameManager.getActiveGamesCount() + mafiaManager.getActiveGamesCount() + liesManager.getActiveGamesCount();
   let totalUsers = "Unknown";
   let totalGroups = "Unknown";
   
@@ -110,22 +105,33 @@ bot.command('admin_stats', async (ctx) => {
 bot.command('cancel', async (ctx) => {
   if (ctx.chat.type === 'private') return;
   const chatId = ctx.chat.id;
-  const lobby = gameManager.getLobby(chatId) || mafiaManager.getLobby(chatId);
+  
+  const lobby = gameManager.getLobby(chatId) || mafiaManager.getLobby(chatId) || liesManager.getLobby(chatId);
   if (!lobby) return ctx.reply("No active game to cancel.");
   
-  const member = await ctx.getChatMember(ctx.from.id);
-  const isAdmin = member.status === 'administrator' || member.status === 'creator';
+  const member = await ctx.getChatMember(ctx.from.id).catch(() => ({ status: 'member' }));
+  const isAdmin = member.status === 'administrator' || member.status === 'creator' || ADMIN_IDS.includes(ctx.from.id);
   
-  if (lobby.host.id !== ctx.from.id && !isAdmin) {
+  if (lobby.host && lobby.host.id !== ctx.from.id && !isAdmin) {
       return ctx.reply("Only the lobby host or group admins can cancel the game.");
   }
   
+  // Confirmation for Game of Lies or others
+  if (liesManager.hasLobby(chatId) || lobby.state !== 'LOBBY') {
+      // For simplicity, we'll allow direct cancellation but stop timers
+      if (lobby.timer) clearTimeout(lobby.timer);
+      if (lobby.clueTimer) clearTimeout(lobby.clueTimer);
+      if (lobby.voteTimer) clearTimeout(lobby.voteTimer);
+  }
+
   if (lobby.pinnedMessageId) {
      try { await ctx.api.unpinChatMessage(chatId, lobby.pinnedMessageId); } catch(e) {}
   }
   
   if (gameManager.hasLobby(chatId)) gameManager.deleteLobby(chatId);
-  else mafiaManager.deleteLobby(chatId);
+  else if (mafiaManager.hasLobby(chatId)) mafiaManager.deleteLobby(chatId);
+  else if (liesManager.hasLobby(chatId)) liesManager.deleteLobby(chatId);
+
   await ctx.reply("🛑 The current game was cancelled.");
 });
 
@@ -354,6 +360,7 @@ bot.command('settings', async (ctx) => {
 });
 
 bot.command('play', async (ctx) => {
+  ensureRegistered(ctx);
   if (ctx.chat.type === 'private') return ctx.reply("You can only play this game in a group chat.");
   
   try {
@@ -394,6 +401,7 @@ bot.command('play', async (ctx) => {
 // --- Mafia Command ---
 
 bot.command('mafia', async (ctx) => {
+  ensureRegistered(ctx);
   if (ctx.chat.type === 'private') return ctx.reply("You can only play Mafia in a group chat.");
   try { await ctx.api.sendChatAction(ctx.from.id, 'typing'); }
   catch (e) { return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>, you MUST start the bot first!`, { parse_mode: 'HTML' }); }
@@ -433,6 +441,7 @@ bot.command('liesrules', async (ctx) => {
 });
 
 bot.command('lies', async (ctx) => {
+  ensureRegistered(ctx);
     if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
     const chatId = ctx.chat.id;
     const user = ctx.from;
@@ -473,22 +482,7 @@ bot.command('lies', async (ctx) => {
     await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
 
-bot.command('endlies', async (ctx) => {
-    if (ctx.chat.type === 'private') return;
-    const chatId = ctx.chat.id;
-    const lobby = liesManager.getLobby(chatId);
-    if (!lobby) return ctx.reply("❌ There is no active Game of Lies or lobby in this chat.");
 
-    const member = await ctx.getChatMember(ctx.from.id);
-    const isAdmin = member.status === 'administrator' || member.status === 'creator';
-    
-    if (lobby.players[0].id !== ctx.from.id && !isAdmin) {
-        return ctx.reply("❌ Only the match host or group admins can end this Game of Lies.");
-    }
-
-    const kb = new InlineKeyboard().text("✅ Yes, End Match", "lies_end_confirm").text("❌ No, Continue", "lies_end_cancel");
-    await ctx.reply("⚠️ <b>Are you sure you want to end this match?</b> Current progress will be lost.", { reply_markup: kb, parse_mode: 'HTML' });
-});
 
 bot.on('message:text', async (ctx) => {
   if (ctx.chat.type !== 'private') {

@@ -40,6 +40,7 @@ class LiesManager {
     return null;
   }
   deleteLobby(chatId) { lobbies.delete(chatId); }
+  getActiveGamesCount() { return lobbies.size; }
 
   joinLobby(chatId, user) {
     const lobby = lobbies.get(chatId);
