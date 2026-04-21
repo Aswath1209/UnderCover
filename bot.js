@@ -413,6 +413,36 @@ bot.command('mafia', async (ctx) => {
   }
 });
 
+bot.command('lies', async (ctx) => {
+    if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
+    const chatId = ctx.chat.id;
+    const user = ctx.from;
+    const challenger = ctx.message.reply_to_message?.from;
+
+    if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
+        return ctx.reply("You are already in an active game or lobby!");
+    }
+
+    if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
+    if (challenger && challenger.is_bot) return ctx.reply("You can't challenge a bot!");
+
+    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null);
+    
+    const kb = new InlineKeyboard();
+    if (!challenger) kb.text("✅ Join Game", "lies_join");
+    kb.text("❌ Cancel", "lies_cancel");
+
+    let text = `🤥 <b>Game of Lies Challenge!</b> 🤥\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
+    if (challenger) {
+        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! The host will start the match once you are ready. (Players must have started the bot in DMs).`;
+        kb.text("▶️ Start Match", "lies_join");
+    } else {
+        text += `\nWaiting for someone to join the 1v1 battle...`;
+    }
+
+    await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+});
+
 bot.on('message:text', async (ctx) => {
   if (ctx.chat.type !== 'private') {
     const lobby = gameManager.getLobby(ctx.chat.id);
@@ -1044,38 +1074,6 @@ async function updateLobbyMessage(chatId, lobby, messageId) {
   try { await bot.api.editMessageText(chatId, messageId, text, { reply_markup: keyboard, parse_mode: 'HTML' }); }
   catch (error) { if (!error.message.includes("is not modified")) console.error(error); }
 }
-
-// ==================== MAFIA GAME FLOW ====================
-
-bot.command('lies', async (ctx) => {
-    if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
-    const chatId = ctx.chat.id;
-    const user = ctx.from;
-    const challenger = ctx.message.reply_to_message?.from;
-
-    if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
-        return ctx.reply("You are already in an active game or lobby!");
-    }
-
-    if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
-    if (challenger && challenger.is_bot) return ctx.reply("You can't challenge a bot!");
-
-    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null);
-    
-    const kb = new InlineKeyboard();
-    if (!challenger) kb.text("✅ Join Game", "lies_join");
-    kb.text("❌ Cancel", "lies_cancel");
-
-    let text = `🤥 <b>Game of Lies Challenge!</b> 🤥\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
-    if (challenger) {
-        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! The host will start the match once you are ready. (Players must have started the bot in DMs).`;
-        kb.text("▶️ Start Match", "lies_join");
-    } else {
-        text += `\nWaiting for someone to join the 1v1 battle...`;
-    }
-
-    await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
-});
 
 async function updateMafiaLobbyMessage(chatId, lobby, messageId) {
   const dist = mafiaManager.getRoleDist(lobby.players.length);
