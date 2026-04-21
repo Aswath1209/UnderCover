@@ -48,6 +48,11 @@ function processGameEnd(lobby, winners) {
 // --- Group Discovery Middleware ---
 bot.use(async (ctx, next) => {
   try {
+    // Auto-register new users
+    if (ctx.from && !ctx.from.is_bot) {
+      sb.ensureUser(ctx.from.id, ctx.from.first_name).catch(() => {});
+    }
+
     if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
       // Auto-register new groups
       sb.getGroupSettings(ctx.chat.id).catch(() => {});

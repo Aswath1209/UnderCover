@@ -146,6 +146,23 @@ async function getAllUserIds() {
   return (data || []).map(u => u.user_id);
 }
 
+const userCache = new Set();
+
+async function ensureUser(userId, firstName) {
+  if (!supabase || !userId) return;
+  if (userCache.has(userId)) return;
+
+  try {
+    const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single();
+    if (!existing) {
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0 });
+    }
+    userCache.add(userId);
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -159,5 +176,6 @@ module.exports = {
   getDefaults,
   getAllGroupIds,
   getAllUserIds,
+  ensureUser,
   DEFAULT_SETTINGS
 };
