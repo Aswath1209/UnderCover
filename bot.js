@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Bot, session, InlineKeyboard } = require('grammy');
 const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
+const liesManager = require('./game/liesManager');
 const sb = require('./db/supabase');
 
 const ADMIN_IDS = [7361215114]; // Bot Owner
@@ -20,6 +21,7 @@ bot.use(session({ initial: () => ({}) }));
 bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
   { command: 'mafia', description: 'Start a Mafia mode game (multi-round)' },
+  { command: 'lies', description: 'Challenge someone to a Game of Lies (1v1 Quiz)' },
   { command: 'myword', description: 'Re-send your secret word to DM' },
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
   { command: 'settings', description: 'Configure game settings (Admin only)' },
@@ -238,8 +240,19 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   if (targetIds.length === 0) {
       return ctx.reply("❌ No target chats found in database.");
   }
-  
-  await sendBroadcast(ctx, targetIds, broadcastMsg);
+    await sendBroadcast(ctx, targetIds, broadcastMsg);
+});
+
+bot.command(['feedback', 'report'], async (ctx) => {
+    const text = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!text) return ctx.reply("💬 <b>Feedback System</b>\n\nYou can send feedback or report bugs directly to the admin by typing:\n/feedback Your message here...", { parse_mode: 'HTML' });
+    
+    try {
+        await bot.api.sendMessage(ADMIN_IDS[0], `🚨 <b>FEEDBACK RECEIVED</b>\n\nFrom: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\nGroup: ${ctx.chat.title || 'Private'}\nMessage: ${text}`, { parse_mode: 'HTML' });
+        await ctx.reply("✅ <b>Thank you!</b> Your feedback has been delivered to the admin.", { parse_mode: 'HTML' });
+    } catch(e) {
+        await ctx.reply("❌ Failed to send feedback. Please try again later.");
+    }
 });
 
 // --- Player Utility Commands ---
@@ -505,6 +518,16 @@ bot.on('message:text', async (ctx) => {
     return;
   }
 
+  // --- Game of Lies DM Logic ---
+  const liesLobby = liesManager.getLobbyByUserId(userId);
+  if (liesLobby && liesLobby.state === 'QUIZ_PHASE') {
+      const choice = liesManager.submitChoice(userId, 'answer', word);
+      if (choice.error) return ctx.reply(`❌ ${choice.error}`);
+      await ctx.reply("✅ Answer received! Waiting for your opponent...");
+      if (choice.allDone) await processLiesResults(liesLobby.chatId);
+      return;
+  }
+
   if (regularLobby || mafiaLobby) {
       return ctx.reply("❌ It's not time to submit clues right now.");
   }
@@ -637,6 +660,47 @@ bot.on('callback_query:data', async (ctx) => {
     }
     return;
   }
+
+  // --- Lies Game Callbacks ---
+  const lLobby = liesManager.getLobby(chatId);
+  if (data === 'lies_join') {
+      if (!lLobby || lLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Lobby expired.");
+      if (lLobby.players.length === 1) {
+          const joined = liesManager.joinLobby(chatId, { id: user.id, first_name: user.first_name });
+          if (!joined) return ctx.answerCallbackQuery("You cannot join this lobby.");
+          ctx.answerCallbackQuery("Joined!");
+      } else {
+          if (user.id !== lLobby.players[0].id) return ctx.answerCallbackQuery("Only the host can start!");
+      }
+      
+      // Check if both started the bot
+      for (const p of lLobby.players) {
+          try { await bot.api.sendChatAction(p.id, 'typing'); }
+          catch(e) { return ctx.answerCallbackQuery({ text: `${p.first_name} hasn't started the bot in DMs!`, show_alert: true }); }
+      }
+
+      ctx.answerCallbackQuery("Starting match!");
+      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML' });
+      await startLiesRound(chatId);
+      return;
+  }
+  if (data === 'lies_steal') {
+      const liesLobby = liesManager.getLobbyByUserId(user.id);
+      if (!liesLobby || liesLobby.state !== 'QUIZ_PHASE') return ctx.answerCallbackQuery("Not the time to steal!");
+      const choice = liesManager.submitChoice(user.id, 'steal');
+      if (choice.error) return ctx.answerCallbackQuery(choice.error);
+      ctx.answerCallbackQuery("You decided to STEAL 😈");
+      await bot.api.editMessageText(user.id, ctx.callbackQuery.message.message_id, "😈 <b>Move: STEAL</b>\n\nYou are attempting to steal points if they get the answer right. Wait for results...");
+      if (choice.allDone) await processLiesResults(liesLobby.chatId);
+      return;
+  }
+  if (data === 'lies_cancel') {
+      if (!lLobby) return ctx.answerCallbackQuery("Lobby already closed.");
+      if (user.id !== lLobby.players[0].id && (lLobby.challengerId && user.id !== lLobby.challengerId)) return ctx.answerCallbackQuery("You can't cancel this.");
+      liesManager.deleteLobby(chatId);
+      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "❌ Game of Lies match cancelled.");
+      return;
+  }
   
   // --- Regular Game callbacks ---
   const lobby = gameManager.getLobby(chatId);
@@ -728,10 +792,141 @@ bot.on('callback_query:data', async (ctx) => {
       } else {
         await bot.api.sendMessage(chatId, `🗳️ A vote has been cast! (${Object.keys(lobby.votes).length}/${lobby.players.length})`, { parse_mode: 'HTML' });
       }
-      if (voteResult.allVoted) await tallyVotes(chatId);
+      if (voteResult.allVoted) {
+        if (lobby.voteTimer) { clearTimeout(lobby.voteTimer); lobby.voteTimer = null; }
+        await tallyVotes(chatId);
+      }
     }
   }
 });
+
+// ==================== GAME OF LIES HELPERS ====================
+
+async function startLiesRound(chatId) {
+    const lobby = liesManager.getLobby(chatId);
+    if (!lobby) return;
+
+    if (lobby.timer) { clearTimeout(lobby.timer); lobby.timer = null; }
+
+    const next = liesManager.nextRound(chatId);
+    if (next.type === 'END') return endLiesGame(chatId);
+
+    const kb = new InlineKeyboard().text("😈 I want to STEAL", "lies_steal");
+    
+    for (const p of lobby.players) {
+        try {
+            await bot.api.sendMessage(p.id, 
+                `🤥 <b>Round ${lobby.round}/10 — Game of Lies</b>\n\n` +
+                `❓ <b>Question:</b> ${next.question}\n\n` +
+                `<b>Your choices:</b>\n` +
+                `1. Reply here with the <b>Correct Answer</b> (+1 pts).\n` +
+                `2. Reply with a <b>Wrong Answer</b> to bait a steal.\n` +
+                `3. Click the button below to <b>STEAL</b> (+2 if they are right, -2 if they are wrong/steal).\n\n` +
+                `⏳ You have 90 seconds!`,
+                { parse_mode: 'HTML', reply_markup: kb }
+            );
+        } catch(e) {
+            await bot.api.sendMessage(chatId, `⚠️ Could not DM <a href="tg://user?id=${p.id}">${p.first_name}</a>. Match cancelled.`, { parse_mode: 'HTML' });
+            liesManager.deleteLobby(chatId);
+            return;
+        }
+    }
+
+    lobby.timer = setTimeout(() => handleLiesTimeout(chatId), 90000);
+}
+
+async function handleLiesTimeout(chatId) {
+    const lobby = liesManager.getLobby(chatId);
+    if (!lobby || lobby.state !== 'QUIZ_PHASE') return;
+
+    // Auto-submit 'wrong' for whoever didn't submit
+    for (const p of lobby.players) {
+        if (!lobby.submissions[p.id]) {
+            liesManager.submitChoice(p.id, 'answer', "TIMEOUT_AFK");
+        }
+    }
+    await processLiesResults(chatId);
+}
+
+async function processLiesResults(chatId) {
+    const lobby = liesManager.getLobby(chatId);
+    if (!lobby || lobby.state !== 'QUIZ_PHASE') return;
+    if (lobby.timer) { clearTimeout(lobby.timer); lobby.timer = null; }
+    lobby.state = 'RESULTS_SEQUENTIAL'; // Prevent double execution
+
+    const data = liesManager.calculateResults(chatId);
+    const p1 = lobby.players[0];
+    const p2 = lobby.players[1];
+    const r1 = data.results[p1.id];
+    const r2 = data.results[p2.id];
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const commentaries = [
+        "What a delivery! 🏏", "Straight down the ground! 🔥", "That's a huge wicket! ☝️",
+        "Classic textbook cricket! 📚", "Unbelievable scenes at the group! 🤯",
+        "The crowd is going wild! 📣", "He's making a mess of the stumps! ⚡",
+        "Clinical performance! 🎯", "A strategic masterpiece! 🧠",
+        "That's went miles! 🚀", "Clean bowled! 🔴", "A beautiful cover drive! ✨",
+        "Caught in the deep! 🧤", "Nervous times in the middle... 🥶",
+        "The captain will be pleased with that! 👏"
+    ];
+    const randomComm = () => commentaries[Math.floor(Math.random() * commentaries.length)];
+
+    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Results are in!</b>\n\nWait for the reveal...`);
+    await sleep(2000);
+
+    await bot.api.sendMessage(chatId, `🏏 <b>The Actual Answer was:</b> <i>${data.question}</i>`);
+    await sleep(2000);
+
+    const f1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.correct ? 'CORRECT ✅' : `WRONG ❌ (${r1.value || 'N/A'})`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> chose: <b>${f1}</b>\n${randomComm()}`, { parse_mode: 'HTML' });
+    await sleep(2000);
+
+    const f2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.correct ? 'CORRECT ✅' : `WRONG ❌ (${r2.value || 'N/A'})`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> chose: <b>${f2}</b>\n${randomComm()}`, { parse_mode: 'HTML' });
+    await sleep(2000);
+
+    let scoreText = `📊 <b>Scoreboard after Round ${lobby.round}:</b>\n` +
+                    `----------------------------\n` +
+                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]} pts</b> (${r1.points >= 0 ? '+' : ''}${r1.points})\n` +
+                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]} pts</b> (${r2.points >= 0 ? '+' : ''}${r2.points})\n` +
+                    `----------------------------`;
+    
+    if (lobby.round < 10) {
+        const kb = new InlineKeyboard().url("📩 Answer next question", `https://t.me/${bot.botInfo.username}`);
+        await bot.api.sendMessage(chatId, scoreText + `\n\nNext round starting in 5 seconds! Check your DMs.`, { parse_mode: 'HTML', reply_markup: kb });
+        setTimeout(() => startLiesRound(chatId).catch(console.error), 5000);
+    } else {
+        await bot.api.sendMessage(chatId, scoreText, { parse_mode: 'HTML' });
+        await endLiesGame(chatId);
+    }
+}
+
+async function endLiesGame(chatId) {
+    const lobby = liesManager.getLobby(chatId);
+    if (!lobby) return;
+
+    const p1 = lobby.players[0];
+    const p2 = lobby.players[1];
+    const s1 = lobby.scores[p1.id];
+    const s2 = lobby.scores[p2.id];
+
+    let winnerText = "";
+    if (s1 > s2) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p1.id}">${p1.first_name}</a>!</b>`;
+    else if (s2 > s1) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p2.id}">${p2.first_name}</a>!</b>`;
+    else winnerText = `⚖️ <b>IT'S A DRAW!</b>`;
+
+    await bot.api.sendMessage(chatId, `🏁 <b>Game of Lies Finished!</b>\n\nFinal Scores:\n- ${p1.first_name}: ${s1}\n- ${p2.first_name}: ${s2}\n\n${winnerText}`, { parse_mode: 'HTML' });
+    
+    // Record stats
+    if (sb.supabase) {
+        if (s1 > s2) { sb.recordWin(p1.id, p1.first_name, chatId); sb.recordLoss(p2.id, p2.first_name, chatId); }
+        else if (s2 > s1) { sb.recordWin(p2.id, p2.first_name, chatId); sb.recordLoss(p1.id, p1.first_name, chatId); }
+        else { sb.recordLoss(p1.id, p1.first_name, chatId); sb.recordLoss(p2.id, p2.first_name, chatId); }
+    }
+
+    liesManager.deleteLobby(chatId);
+}
 
 async function startVotingPhase(chatId) {
     const lobby = gameManager.getLobby(chatId);
@@ -746,10 +941,32 @@ async function startVotingPhase(chatId) {
     const voteLabel = gSettings.anonymous_voting ? '(Anonymous Mode 🔒)' : '';
     await bot.api.sendMessage(chatId, `🗳️ <b>VOTING TIME!</b> ${voteLabel}\n\nYou have ${gSettings.voting_time} seconds to lock in your vote below. One vote per player!`, { reply_markup: keyboard, parse_mode: 'HTML' });
     
-    setTimeout(async () => {
-       const currentLobby = gameManager.getLobby(chatId);
-       if (currentLobby && currentLobby.state === 'VOTING') await tallyVotes(chatId);
-    }, gSettings.voting_time * 1000);
+    lobby.voteTimer = setTimeout(() => handleVotingTimeout(chatId).catch(console.error), gSettings.voting_time * 1000);
+}
+
+async function handleVotingTimeout(chatId) {
+    const lobby = gameManager.getLobby(chatId);
+    if (!lobby || lobby.state !== 'VOTING') return;
+
+    const afkPlayers = lobby.players.filter(p => !lobby.votes[p.id]);
+    if (afkPlayers.length > 0) {
+        let text = "⏰ <b>Voting Time Up!</b>\n\nThe following players didn't vote and have been eliminated:\n";
+        for (const p of afkPlayers) {
+            const isImpostor = p.id === lobby.impostorId;
+            gameManager.eliminatePlayer(chatId, p.id);
+            text += `- <a href="tg://user?id=${p.id}">${p.first_name}</a> (${isImpostor ? 'Impostor 🔫' : 'Civilian 👤'})\n`;
+        }
+        await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML' });
+        
+        const win = gameManager.checkWinCondition(chatId);
+        if (win) {
+            if (win === 'MAJORITY_WIN') await bot.api.sendMessage(chatId, `🎉 <b>THE MAJORITY WINS!</b>\nThe Impostor was eliminated for being AFK.`);
+            else await bot.api.sendMessage(chatId, `🤯 <b>THE IMPOSTOR WINS!</b>\nToo many Civilians were AFK!`);
+            gameManager.deleteLobby(chatId);
+            return;
+        }
+    }
+    await tallyVotes(chatId);
 }
 
 async function handleStandardClueTimeout(chatId) {
@@ -846,6 +1063,36 @@ async function updateLobbyMessage(chatId, lobby, messageId) {
 }
 
 // ==================== MAFIA GAME FLOW ====================
+
+bot.command('lies', async (ctx) => {
+    if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
+    const chatId = ctx.chat.id;
+    const user = ctx.from;
+    const challenger = ctx.message.reply_to_message?.from;
+
+    if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
+        return ctx.reply("You are already in an active game or lobby!");
+    }
+
+    if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
+    if (challenger && challenger.is_bot) return ctx.reply("You can't challenge a bot!");
+
+    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null);
+    
+    const kb = new InlineKeyboard();
+    if (!challenger) kb.text("✅ Join Game", "lies_join");
+    kb.text("❌ Cancel", "lies_cancel");
+
+    let text = `🤥 <b>Game of Lies Challenge!</b> 🤥\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
+    if (challenger) {
+        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! The host will start the match once you are ready. (Players must have started the bot in DMs).`;
+        kb.text("▶️ Start Match", "lies_join");
+    } else {
+        text += `\nWaiting for someone to join the 1v1 battle...`;
+    }
+
+    await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+});
 
 async function updateMafiaLobbyMessage(chatId, lobby, messageId) {
   const dist = mafiaManager.getRoleDist(lobby.players.length);
