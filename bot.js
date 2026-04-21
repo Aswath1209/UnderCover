@@ -757,7 +757,22 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (data === 'lies_join') {
       if (!lLobby || lLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Lobby expired.");
+      
+      // Handle Direct Challenge
+      if (lLobby.isDirect) {
+          if (user.id === lLobby.players[0].id) return ctx.answerCallbackQuery("Waiting for opponent to accept!");
+          if (user.id !== lLobby.challengerId) return ctx.answerCallbackQuery("This challenge isn't for you!");
+          
+          ctx.answerCallbackQuery("Accepted!");
+          const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
+          await startLiesRound(chatId);
+          return;
+      }
+
+      // Handle Public Challenge
       if (lLobby.players.length === 1) {
+          if (user.id === lLobby.players[0].id) return ctx.answerCallbackQuery("You are the host!");
           const joined = liesManager.joinLobby(chatId, { id: user.id, first_name: user.first_name });
           if (!joined) return ctx.answerCallbackQuery("You cannot join this lobby.");
           ctx.answerCallbackQuery("Joined!");
