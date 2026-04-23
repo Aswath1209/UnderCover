@@ -1095,9 +1095,15 @@ async function handleStandardClueTimeout(chatId) {
     lobby.players.forEach(p => {
         clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id] || '—'}</b>\n`;
     });
-    clueText += `\n💬 <b>DISCUSSION:</b> You can now use /vote !`;
+    const gSettings = await sb.getGroupSettings(chatId);
+    clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly ${gSettings.discussion_time} seconds to discuss!`;
     await bot.api.sendMessage(chatId, clueText, { parse_mode: 'HTML' });
+    setTimeout(async () => {
+       const cl = gameManager.getLobby(chatId);
+       if (cl && cl.state === 'DISCUSSION') await startVotingPhase(chatId);
+    }, gSettings.discussion_time * 1000);
 }
+
 
 async function tallyVotes(chatId) {
     const lobby = gameManager.getLobby(chatId);
