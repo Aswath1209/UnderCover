@@ -16,9 +16,10 @@ async function recordWin(userId, firstName, chatId) {
   // Update Profile
   let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
   if (profile) {
-    await supabase.from('profiles').update({ wins: profile.wins + 1, matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
+    await supabase.from('profiles').update({ wins: profile.wins + 1, matches_played: profile.matches_played + 1, first_name: firstName, coins: (profile.coins || 0) + 200 }).eq('user_id', userId);
   } else {
-    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1 });
+    // 2000 Welcome Bonus + 200 Win
+    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
   }
 
   // Update Group Stat
@@ -36,7 +37,7 @@ async function recordLoss(userId, firstName, chatId) {
   if (profile) {
     await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
   } else {
-    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1 });
+    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
   }
 
   let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
@@ -51,6 +52,17 @@ async function getProfile(userId) {
   if (!supabase) return null;
   const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
   return data;
+}
+
+async function addCoins(userId, amount) {
+  if (!supabase) return 0;
+  let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+  if (profile) {
+    const newCoins = (profile.coins || 0) + amount;
+    await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+    return newCoins;
+  }
+  return 0;
 }
 
 async function getGlobalLeaderboard() {
@@ -155,7 +167,8 @@ async function ensureUser(userId, firstName) {
   try {
     const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single();
     if (!existing) {
-      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0 });
+      // Create user with 2000 coins Welcome Bonus
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0, coins: 2000 });
     }
     userCache.add(userId);
   } catch (e) {
@@ -168,6 +181,7 @@ module.exports = {
   recordWin,
   recordLoss,
   getProfile,
+  addCoins,
   getGlobalLeaderboard,
   getGroupLeaderboard,
   getGlobalStats,

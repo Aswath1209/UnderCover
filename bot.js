@@ -3,6 +3,7 @@ const { Bot, session, InlineKeyboard } = require('grammy');
 const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
 const liesManager = require('./game/liesManager');
+const hiloManager = require('./game/hiloManager');
 const sb = require('./db/supabase');
 
 const ADMIN_IDS = [7361215114]; // Bot Owner
@@ -22,6 +23,8 @@ bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
   { command: 'mafia', description: 'Start a Mafia mode game (multi-round)' },
   { command: 'lies', description: 'Challenge someone to a Game of Lies (1v1 Quiz)' },
+  { command: 'hilo', description: 'Play High-Low constraint guessing game' },
+  { command: 'balance', description: 'Check your available coin balance' },
   { command: 'myword', description: 'Re-send your secret word to DM' },
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
   { command: 'settings', description: 'Configure game settings (Admin only)' },
@@ -146,9 +149,63 @@ bot.command('profile', async (ctx) => {
   
   const winRate = profile.matches_played > 0 ? Math.round((profile.wins / profile.matches_played) * 100) : 0;
   await ctx.reply(
-    `👤 <b>Profile: <a href="tg://user?id=${user.id}">${profile.first_name}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%`,
+    `👤 <b>Profile: <a href="tg://user?id=${user.id}">${profile.first_name}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%\n💰 <b>Coins:</b> ${profile.coins || 0}`,
     { parse_mode: 'HTML' }
   );
+});
+
+bot.command('balance', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  const user = ctx.message.reply_to_message?.from || ctx.from;
+  const profile = await sb.getProfile(user.id);
+  if (!profile) return ctx.reply("You have not registered yet.");
+  await ctx.reply(`💰 <b>Balance for <a href="tg://user?id=${user.id}">${profile.first_name}</a>:</b> ${profile.coins || 0} Coins`, { parse_mode: 'HTML' });
+});
+
+function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, extraMsg = '') {
+  const text = `${extraMsg}🎲 <b>High-Low Game</b> 🎲\n\n` + 
+               `Bet: ${state.betAmount} 💰\n` +
+               `Current Multiplier: <b>${state.multiplier}x</b>\n\n` +
+               `Current Player: <b>${state.currentPlayer.name}</b>\n` +
+               `Stat (${state.constraint}): <b>${state.currentPlayer[state.constraint]}</b>\n\n` +
+               `Next Player: <b>${state.nextPlayer.name}</b>\n\n` +
+               `Will <b>${state.nextPlayer.name}</b> have a HIGHER or LOWER <b>${state.constraint}</b>?`;
+               
+  const kb = new InlineKeyboard()
+    .text("🔼 Higher", "hilo_higher")
+    .text("🔽 Lower", "hilo_lower").row()
+    .text(`💰 Withdraw (${Math.floor(state.betAmount * state.multiplier)})`, "hilo_withdraw");
+
+  if (isEdit) {
+      return bot.api.editMessageText(chatId, msgId, text, { reply_markup: kb, parse_mode: 'HTML' });
+  }
+  return ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+}
+
+bot.command('hilo', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database disabled.");
+  const userId = ctx.from.id;
+  const args = ctx.message.text.split(' ');
+  const betStr = args[1];
+  
+  if (!betStr || isNaN(betStr) || parseInt(betStr) <= 0) {
+      return ctx.reply("❌ Usage: /hilo <bet_amount>\nExample: /hilo 100");
+  }
+  const bet = parseInt(betStr);
+  
+  const profile = await sb.getProfile(userId);
+  if (!profile || (profile.coins || 0) < bet) {
+      return ctx.reply(`❌ You don't have enough coins! Balance: ${profile?.coins || 0}`);
+  }
+  
+  if (hiloManager.getGame(userId)) {
+      return ctx.reply("❌ You already have an active High-Low game. Finish it first!");
+  }
+  
+  await sb.addCoins(userId, -bet);
+  const state = hiloManager.createGame(userId, bet);
+  const msg = await sendHiloMsg(ctx, state);
+  state.messageId = msg.message_id;
 });
 
 bot.command('quit', async (ctx) => {
@@ -618,6 +675,50 @@ bot.on('callback_query:data', async (ctx) => {
   const chatId = ctx.chat.id;
   const user = ctx.from;
   
+  if (data.startsWith('hilo_')) {
+    const action = data.replace('hilo_', '');
+    const state = hiloManager.getGame(user.id);
+    if (!state) return ctx.answerCallbackQuery({ text: "No active Hilo game found.", show_alert: true });
+    
+    if (ctx.callbackQuery.message.message_id !== state.messageId) {
+        return ctx.answerCallbackQuery("This game session is outdated!");
+    }
+
+    if (action === 'withdraw') {
+        const payout = Math.floor(state.betAmount * state.multiplier);
+        await sb.addCoins(user.id, payout);
+        hiloManager.endGame(user.id);
+        ctx.answerCallbackQuery(`Withdrew ${payout} coins!`);
+        await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x`, { parse_mode: 'HTML' });
+        return;
+    }
+
+    const valCurrent = state.currentPlayer[state.constraint];
+    const valNext = state.nextPlayer[state.constraint];
+    
+    let isCorrect = false;
+    let isEqual = false;
+    
+    if (valCurrent === valNext) isEqual = true;
+    else if (action === 'higher' && valNext > valCurrent) isCorrect = true;
+    else if (action === 'lower' && valNext < valCurrent) isCorrect = true;
+    
+    if (isEqual) {
+        ctx.answerCallbackQuery("It's a draw! No multiplier change.");
+        const nextState = hiloManager.nextRoundDraw(user.id);
+        await sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, "🤝 <b>Equal stats! Moving to next round.</b>\n\n");
+    } else if (isCorrect) {
+        ctx.answerCallbackQuery("Correct! Multiplier increased!");
+        const nextState = hiloManager.nextRound(user.id);
+        await sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${state.nextPlayer.name} had ${valNext})\n\n`);
+    } else {
+        ctx.answerCallbackQuery({ text: `Wrong! ${state.nextPlayer.name} had ${valNext} ${state.constraint}.`, show_alert: true });
+        hiloManager.endGame(user.id);
+        await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n${state.currentPlayer.name} had ${valCurrent} ${state.constraint}.\n${state.nextPlayer.name} had <b>${valNext}</b>.\n\nYou lost your bet of ${state.betAmount} 💰`, { parse_mode: 'HTML' });
+    }
+    return;
+  }
+
   // --- Leaderboard callbacks ---
   if (data === 'lb_global' || data === 'lb_group') {
      const isGlobal = data === 'lb_global';

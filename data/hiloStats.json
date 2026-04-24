@@ -1,0 +1,175 @@
+[
+    {
+        "name": "Virat Kohli",
+        "T20 Runs": 4008,
+        "ODI Runs": 13848,
+        "IPL Runs": 7263,
+        "International Runs": 27134,
+        "T20I Runs": 4008,
+        "Wickets in ODI": 4,
+        "Wickets in IPL": 4
+    },
+    {
+        "name": "Rohit Sharma",
+        "T20 Runs": 4231,
+        "ODI Runs": 10709,
+        "IPL Runs": 6628,
+        "International Runs": 19245,
+        "T20I Runs": 4231,
+        "Wickets in ODI": 9,
+        "Wickets in IPL": 15
+    },
+    {
+        "name": "MS Dhoni",
+        "T20 Runs": 1617,
+        "ODI Runs": 10773,
+        "IPL Runs": 5082,
+        "International Runs": 17266,
+        "T20I Runs": 1617,
+        "Wickets in ODI": 1,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "Sachin Tendulkar",
+        "T20 Runs": 10,
+        "ODI Runs": 18426,
+        "IPL Runs": 2334,
+        "International Runs": 34357,
+        "T20I Runs": 10,
+        "Wickets in ODI": 154,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "Babar Azam",
+        "T20 Runs": 4145,
+        "ODI Runs": 5729,
+        "IPL Runs": 0,
+        "International Runs": 12891,
+        "T20I Runs": 4145,
+        "Wickets in ODI": 0,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "David Warner",
+        "T20 Runs": 3277,
+        "ODI Runs": 6932,
+        "IPL Runs": 6565,
+        "International Runs": 18995,
+        "T20I Runs": 3277,
+        "Wickets in ODI": 0,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "Chris Gayle",
+        "T20 Runs": 1899,
+        "ODI Runs": 10480,
+        "IPL Runs": 4965,
+        "International Runs": 19593,
+        "T20I Runs": 1899,
+        "Wickets in ODI": 167,
+        "Wickets in IPL": 18
+    },
+    {
+        "name": "Jasprit Bumrah",
+        "T20 Runs": 8,
+        "ODI Runs": 19,
+        "IPL Runs": 69,
+        "International Runs": 113,
+        "T20I Runs": 8,
+        "Wickets in ODI": 149,
+        "Wickets in IPL": 165
+    },
+    {
+        "name": "Rashid Khan",
+        "T20 Runs": 381,
+        "ODI Runs": 1269,
+        "IPL Runs": 512,
+        "International Runs": 2603,
+        "T20I Runs": 381,
+        "Wickets in ODI": 183,
+        "Wickets in IPL": 149
+    },
+    {
+        "name": "Hardik Pandya",
+        "T20 Runs": 1492,
+        "ODI Runs": 1769,
+        "IPL Runs": 2525,
+        "International Runs": 3965,
+        "T20I Runs": 1492,
+        "Wickets in ODI": 84,
+        "Wickets in IPL": 53
+    },
+    {
+        "name": "AB de Villiers",
+        "T20 Runs": 1672,
+        "ODI Runs": 9577,
+        "IPL Runs": 5162,
+        "International Runs": 20014,
+        "T20I Runs": 1672,
+        "Wickets in ODI": 7,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "Lasith Malinga",
+        "T20 Runs": 136,
+        "ODI Runs": 567,
+        "IPL Runs": 88,
+        "International Runs": 1104,
+        "T20I Runs": 136,
+        "Wickets in ODI": 338,
+        "Wickets in IPL": 170
+    },
+    {
+        "name": "Yuzvendra Chahal",
+        "T20 Runs": 5,
+        "ODI Runs": 53,
+        "IPL Runs": 37,
+        "International Runs": 60,
+        "T20I Runs": 5,
+        "Wickets in ODI": 121,
+        "Wickets in IPL": 205
+    },
+    {
+        "name": "Sunil Narine",
+        "T20 Runs": 155,
+        "ODI Runs": 363,
+        "IPL Runs": 1534,
+        "International Runs": 568,
+        "T20I Runs": 155,
+        "Wickets in ODI": 92,
+        "Wickets in IPL": 180
+    },
+    {
+        "name": "Virat Kohli (IPL Trophies)",
+        "IPL Trophies as Captain": 0,
+        "T20 Runs": 4008,
+        "ODI Runs": 13848,
+        "IPL Runs": 7263,
+        "International Runs": 27134,
+        "T20I Runs": 4008,
+        "Wickets in ODI": 4,
+        "Wickets in IPL": 4
+    },
+    {
+        "name": "MS Dhoni (IPL Trophies)",
+        "IPL Trophies as Captain": 5,
+        "T20 Runs": 1617,
+        "ODI Runs": 10773,
+        "IPL Runs": 5082,
+        "International Runs": 17266,
+        "T20I Runs": 1617,
+        "Wickets in ODI": 1,
+        "Wickets in IPL": 0
+    },
+    {
+        "name": "Rohit Sharma (IPL Trophies)",
+        "IPL Trophies as Captain": 5,
+        "T20 Runs": 4231,
+        "ODI Runs": 10709,
+        "IPL Runs": 6628,
+        "International Runs": 19245,
+        "T20I Runs": 4231,
+        "Wickets in ODI": 9,
+        "Wickets in IPL": 15
+    }
+]
