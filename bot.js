@@ -162,6 +162,26 @@ bot.command('balance', async (ctx) => {
   await ctx.reply(`💰 <b>Balance for <a href="tg://user?id=${user.id}">${profile.first_name}</a>:</b> ${profile.coins || 0} Coins`, { parse_mode: 'HTML' });
 });
 
+bot.command('addcoins', async (ctx) => {
+  if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  const args = ctx.message.text.split(' ');
+  if (args.length < 3) return ctx.reply("❌ Usage: /addcoins <userId> <amount>");
+  
+  const targetUserId = parseInt(args[1]);
+  const amount = parseInt(args[2]);
+  
+  if (isNaN(amount) || isNaN(targetUserId)) return ctx.reply("❌ Invalid numeric values.");
+  
+  const newBal = await sb.addCoins(targetUserId, amount);
+  if (newBal === 0 && amount !== 0) {
+      // It might have failed or user had exactly -amount. Let's assume failsafe checking.
+      const profile = await sb.getProfile(targetUserId);
+      if (!profile) return ctx.reply("❌ Failed to add coins. User might not exist in the DB.");
+  }
+  
+  await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
+});
+
 function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, extraMsg = '') {
   const text = `${extraMsg}🎲 <b>HIGH-LOW</b> 🎲\n\n` + 
                `💰 Bet: <b>${state.betAmount}</b>\n` +
