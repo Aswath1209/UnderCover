@@ -2,9 +2,13 @@ const stats = require('../data/hiloStats.json');
 
 const activeGames = new Map();
 
-function getRandomPlayer(excludeName = null) {
+function getRandomPlayer(seenPlayersList = []) {
   let pool = stats;
-  if (excludeName) pool = stats.filter(p => p.name !== excludeName);
+  if (seenPlayersList.length > 0) pool = stats.filter(p => !seenPlayersList.includes(p.name));
+  
+  // Failsafe if they manage to see all 32 players (insane luck)
+  if (pool.length === 0) pool = stats; 
+  
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -14,8 +18,11 @@ function getRandomConstraint(player) {
 }
 
 function createGame(userId, betAmount) {
-  const p1 = getRandomPlayer();
-  const p2 = getRandomPlayer(p1.name);
+  const p1 = getRandomPlayer([]);
+  const seenPlayers = [p1.name];
+  const p2 = getRandomPlayer(seenPlayers);
+  seenPlayers.push(p2.name);
+  
   const constraint = getRandomConstraint(p1);
   
   const state = {
@@ -25,6 +32,7 @@ function createGame(userId, betAmount) {
     currentPlayer: p1,
     nextPlayer: p2,
     constraint: constraint,
+    seenPlayers: seenPlayers,
     messageId: null
   };
   
@@ -50,8 +58,9 @@ function nextRound(userId) {
   // Carry over the target player to be the new base player
   state.currentPlayer = state.nextPlayer;
   
-  // Pick a new target player ensuring it's not the same player
-  state.nextPlayer = getRandomPlayer(state.currentPlayer.name);
+  // Pick a new target player ensuring it's not a previously seen player
+  state.nextPlayer = getRandomPlayer(state.seenPlayers);
+  state.seenPlayers.push(state.nextPlayer.name);
   
   // Constraint remains the same!
   return state;
@@ -62,7 +71,8 @@ function nextRoundDraw(userId) {
   if (!state) return null;
   
   state.currentPlayer = state.nextPlayer;
-  state.nextPlayer = getRandomPlayer(state.currentPlayer.name);
+  state.nextPlayer = getRandomPlayer(state.seenPlayers);
+  state.seenPlayers.push(state.nextPlayer.name);
   
   // Constraint remains the same!
   return state;
