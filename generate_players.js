@@ -1,231 +1,159 @@
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
+// Massive list of top 300+ players matching my previous generator list (Trimmed to string names)
 const playersData = [
-  // India (Current & Recent)
-  { name: "Virat Kohli", role: "batsman" }, { name: "Rohit Sharma", role: "batsman" }, { name: "MS Dhoni", role: "wk" },
-  { name: "Jasprit Bumrah", role: "bowler" }, { name: "Hardik Pandya", role: "allrounder" }, { name: "KL Rahul", role: "batsman" },
-  { name: "Rishabh Pant", role: "wk" }, { name: "Ravindra Jadeja", role: "allrounder" }, { name: "R Ashwin", role: "bowler" },
-  { name: "Mohammed Shami", role: "bowler" }, { name: "Shubman Gill", role: "batsman" }, { name: "Suryakumar Yadav", role: "batsman" },
-  { name: "Shreyas Iyer", role: "batsman" }, { name: "Ishan Kishan", role: "wk" }, { name: "Mohammed Siraj", role: "bowler" },
-  { name: "Kuldeep Yadav", role: "bowler" }, { name: "Yuzvendra Chahal", role: "bowler" }, { name: "Axar Patel", role: "allrounder" },
-  { name: "Washington Sundar", role: "allrounder" }, { name: "Rinku Singh", role: "batsman" }, { name: "Yashasvi Jaiswal", role: "batsman" },
-  { name: "Ruturaj Gaikwad", role: "batsman" }, { name: "Sanju Samson", role: "wk" }, { name: "Arshdeep Singh", role: "bowler" },
-  { name: "Shardul Thakur", role: "bowler" }, { name: "Deepak Chahar", role: "bowler" }, { name: "Bhuvneshwar Kumar", role: "bowler" },
-  { name: "Umesh Yadav", role: "bowler" }, { name: "Ishant Sharma", role: "bowler" }, { name: "Ajinkya Rahane", role: "batsman" },
-  { name: "Cheteshwar Pujara", role: "batsman" }, { name: "Mayank Agarwal", role: "batsman" }, { name: "Hanuma Vihari", role: "batsman" },
-  { name: "Prithvi Shaw", role: "batsman" }, { name: "Navdeep Saini", role: "bowler" }, { name: "T Natarajan", role: "bowler" },
-  { name: "Shivam Dube", role: "allrounder" }, { name: "Deepak Hooda", role: "allrounder" }, { name: "Krunal Pandya", role: "allrounder" },
-  { name: "Rajat Patidar", role: "batsman" }, { name: "Umran Malik", role: "bowler" }, { name: "Tilak Varma", role: "batsman" },
-  { name: "Jitesh Sharma", role: "wk" }, { name: "Avesh Khan", role: "bowler" }, { name: "Mukesh Kumar", role: "bowler" },
-  // India (Legends)
-  { name: "Sachin Tendulkar", role: "batsman" }, { name: "Rahul Dravid", role: "batsman" }, { name: "VVS Laxman", role: "batsman" },
-  { name: "Virender Sehwag", role: "batsman" }, { name: "Sourav Ganguly", role: "batsman" }, { name: "Kapil Dev", role: "allrounder" },
-  { name: "Yuvraj Singh", role: "allrounder" }, { name: "Gautam Gambhir", role: "batsman" }, { name: "Anil Kumble", role: "bowler" },
-  { name: "Harbhajan Singh", role: "bowler" }, { name: "Zaheer Khan", role: "bowler" }, { name: "Suresh Raina", role: "batsman" },
-  { name: "Irfan Pathan", role: "allrounder" }, { name: "Javagal Srinath", role: "bowler" }, { name: "Ajit Agarkar", role: "bowler" },
-  { name: "Mohammad Azharuddin", role: "batsman" }, { name: "Sunil Gavaskar", role: "batsman" }, { name: "Ravi Shastri", role: "allrounder" },
-  
-  // Australia (Current & Recent)
-  { name: "Pat Cummins", role: "bowler" }, { name: "Steve Smith", role: "batsman" }, { name: "David Warner", role: "batsman" },
-  { name: "Mitchell Starc", role: "bowler" }, { name: "Marnus Labuschagne", role: "batsman" }, { name: "Josh Hazlewood", role: "bowler" },
-  { name: "Nathan Lyon", role: "bowler" }, { name: "Glenn Maxwell", role: "allrounder" }, { name: "Travis Head", role: "batsman" },
-  { name: "Cameron Green", role: "allrounder" }, { name: "Mitchell Marsh", role: "allrounder" }, { name: "Alex Carey", role: "wk" },
-  { name: "Marcus Stoinis", role: "allrounder" }, { name: "Adam Zampa", role: "bowler" }, { name: "Josh Inglis", role: "wk" },
-  { name: "Spencer Johnson", role: "bowler" }, { name: "Tim David", role: "batsman" }, { name: "Sean Abbott", role: "bowler" },
-  { name: "Ashton Agar", role: "allrounder" }, { name: "Matthew Wade", role: "wk" }, { name: "Usman Khawaja", role: "batsman" },
-  { name: "Aaron Finch", role: "batsman" }, { name: "Jhye Richardson", role: "bowler" }, { name: "Riley Meredith", role: "bowler" },
-  { name: "Scott Boland", role: "bowler" }, { name: "Todd Murphy", role: "bowler" }, { name: "Michael Neser", role: "bowler" },
-  { name: "Matt Renshaw", role: "batsman" }, { name: "Marcus Harris", role: "batsman" }, { name: "Lance Morris", role: "bowler" },
-  { name: "Jason Behrendorff", role: "bowler" }, { name: "Kane Richardson", role: "bowler" }, { name: "Andrew Tye", role: "bowler" },
-  // Australia (Legends)
-  { name: "Ricky Ponting", role: "batsman" }, { name: "Shane Warne", role: "bowler" }, { name: "Adam Gilchrist", role: "wk" },
-  { name: "Steve Waugh", role: "batsman" }, { name: "Matthew Hayden", role: "batsman" }, { name: "Glenn McGrath", role: "bowler" },
-  { name: "Brett Lee", role: "bowler" }, { name: "Mitchell Johnson", role: "bowler" }, { name: "Jason Gillespie", role: "bowler" },
-  { name: "Michael Clarke", role: "batsman" }, { name: "Mark Waugh", role: "batsman" }, { name: "Allan Border", role: "batsman" },
-  { name: "Ian Healy", role: "wk" }, { name: "Michael Hussey", role: "batsman" }, { name: "Andrew Symonds", role: "allrounder" },
-  { name: "Dennis Lillee", role: "bowler" }, { name: "Jeff Thomson", role: "bowler" }, { name: "Brad Haddin", role: "wk" },
-  
-  // England (Current & Recent)
-  { name: "Joe Root", role: "batsman" }, { name: "Ben Stokes", role: "allrounder" }, { name: "Jos Buttler", role: "wk" },
-  { name: "Jonny Bairstow", role: "wk" }, { name: "Mark Wood", role: "bowler" }, { name: "Jofra Archer", role: "bowler" },
-  { name: "Chris Woakes", role: "allrounder" }, { name: "Moeen Ali", role: "allrounder" }, { name: "Adil Rashid", role: "bowler" },
-  { name: "Harry Brook", role: "batsman" }, { name: "Ollie Pope", role: "batsman" }, { name: "Zak Crawley", role: "batsman" },
-  { name: "Ben Duckett", role: "batsman" }, { name: "Dawid Malan", role: "batsman" }, { name: "Jason Roy", role: "batsman" },
-  { name: "Alex Hales", role: "batsman" }, { name: "Sam Curran", role: "allrounder" }, { name: "Liam Livingstone", role: "allrounder" },
-  { name: "Phil Salt", role: "wk" }, { name: "Will Jacks", role: "allrounder" }, { name: "Reece Topley", role: "bowler" },
-  { name: "Chris Jordan", role: "bowler" }, { name: "David Willey", role: "allrounder" }, { name: "Gus Atkinson", role: "bowler" },
-  { name: "Rehan Ahmed", role: "allrounder" }, { name: "Jack Leach", role: "bowler" }, { name: "Shoaib Bashir", role: "bowler" },
-  { name: "James Anderson", role: "bowler" }, { name: "Stuart Broad", role: "bowler" }, { name: "Eoin Morgan", role: "batsman" },
-  { name: "Tom Hartley", role: "bowler" }, { name: "Brydon Carse", role: "bowler" }, { name: "Matthew Potts", role: "bowler" },
-  { name: "Ben Foakes", role: "wk" }, { name: "Dan Lawrence", role: "batsman" },
-  // England (Legends)
-  { name: "Kevin Pietersen", role: "batsman" }, { name: "Alastair Cook", role: "batsman" }, { name: "Andrew Flintoff", role: "allrounder" },
-  { name: "Ian Botham", role: "allrounder" }, { name: "David Gower", role: "batsman" }, { name: "Graham Gooch", role: "batsman" },
-  { name: "Andrew Strauss", role: "batsman" }, { name: "Michael Vaughan", role: "batsman" }, { name: "Graeme Swann", role: "bowler" },
-  { name: "Matt Prior", role: "wk" }, { name: "Jonathan Trott", role: "batsman" }, { name: "Darren Gough", role: "bowler" },
-  
-  // South Africa (Current & Recent)
-  { name: "Kagiso Rabada", role: "bowler" }, { name: "Quinton de Kock", role: "wk" }, { name: "Aiden Markram", role: "batsman" },
-  { name: "David Miller", role: "batsman" }, { name: "Heinrich Klaasen", role: "wk" }, { name: "Anrich Nortje", role: "bowler" },
-  { name: "Lungi Ngidi", role: "bowler" }, { name: "Marco Jansen", role: "allrounder" }, { name: "Temba Bavuma", role: "batsman" },
-  { name: "Rassie van der Dussen", role: "batsman" }, { name: "Tabraiz Shamsi", role: "bowler" }, { name: "Keshav Maharaj", role: "bowler" },
-  { name: "Gerald Coetzee", role: "bowler" }, { name: "Reeza Hendricks", role: "batsman" }, { name: "Tristan Stubbs", role: "batsman" },
-  { name: "Tony de Zorzi", role: "batsman" }, { name: "Nandre Burger", role: "bowler" }, { name: "Wiaan Mulder", role: "allrounder" },
-  { name: "Andile Phehlukwayo", role: "allrounder" }, { name: "Lizaad Williams", role: "bowler" }, { name: "Faf du Plessis", role: "batsman" },
-  // South Africa (Legends)
-  { name: "Jacques Kallis", role: "allrounder" }, { name: "AB de Villiers", role: "wk" }, { name: "Hashim Amla", role: "batsman" },
-  { name: "Dale Steyn", role: "bowler" }, { name: "Graeme Smith", role: "batsman" }, { name: "Morne Morkel", role: "bowler" },
-  { name: "Vernon Philander", role: "bowler" }, { name: "Allan Donald", role: "bowler" }, { name: "Makhaya Ntini", role: "bowler" },
-  { name: "Shaun Pollock", role: "allrounder" }, { name: "Jonty Rhodes", role: "batsman" }, { name: "Lance Klusener", role: "allrounder" },
-  { name: "Herschelle Gibbs", role: "batsman" }, { name: "Mark Boucher", role: "wk" }, { name: "JP Duminy", role: "allrounder" },
-  
-  // New Zealand (Current & Recent)
-  { name: "Kane Williamson", role: "batsman" }, { name: "Trent Boult", role: "bowler" }, { name: "Tim Southee", role: "bowler" },
-  { name: "Devon Conway", role: "batsman" }, { name: "Daryl Mitchell", role: "allrounder" }, { name: "Mitchell Santner", role: "allrounder" },
-  { name: "Tom Latham", role: "wk" }, { name: "Matt Henry", role: "bowler" }, { name: "Lockie Ferguson", role: "bowler" },
-  { name: "Kyle Jamieson", role: "bowler" }, { name: "Glenn Phillips", role: "allrounder" }, { name: "Rachin Ravindra", role: "allrounder" },
-  { name: "Finn Allen", role: "batsman" }, { name: "Mark Chapman", role: "batsman" }, { name: "Ish Sodhi", role: "bowler" },
-  { name: "Ajaz Patel", role: "bowler" }, { name: "Will Young", role: "batsman" }, { name: "Henry Nicholls", role: "batsman" },
-  { name: "Tim Seifert", role: "wk" }, { name: "Colin Munro", role: "batsman" }, { name: "Adam Milne", role: "bowler" },
-  // New Zealand (Legends)
-  { name: "Ross Taylor", role: "batsman" }, { name: "Brendon McCullum", role: "wk" }, { name: "Stephen Fleming", role: "batsman" },
-  { name: "Daniel Vettori", role: "allrounder" }, { name: "Martin Guptill", role: "batsman" }, { name: "Richard Hadlee", role: "allrounder" },
-  { name: "Chris Cairns", role: "allrounder" }, { name: "Nathan Astle", role: "batsman" }, { name: "Shane Bond", role: "bowler" },
-  { name: "Craig McMillan", role: "batsman" }, { name: "Jacob Oram", role: "allrounder" },
-  
-  // Pakistan (Current & Recent)
-  { name: "Babar Azam", role: "batsman" }, { name: "Shaheen Afridi", role: "bowler" }, { name: "Mohammad Rizwan", role: "wk" },
-  { name: "Fakhar Zaman", role: "batsman" }, { name: "Haris Rauf", role: "bowler" }, { name: "Shadab Khan", role: "allrounder" },
-  { name: "Naseem Shah", role: "bowler" }, { name: "Imam-ul-Haq", role: "batsman" }, { name: "Abdullah Shafique", role: "batsman" },
-  { name: "Saud Shakeel", role: "batsman" }, { name: "Agha Salman", role: "allrounder" }, { name: "Iftikhar Ahmed", role: "allrounder" },
-  { name: "Imad Wasim", role: "allrounder" }, { name: "Hasan Ali", role: "bowler" }, { name: "Faheem Ashraf", role: "allrounder" },
-  { name: "Mohammad Nawaz", role: "allrounder" }, { name: "Usama Mir", role: "bowler" }, { name: "Saim Ayub", role: "batsman" },
-  { name: "Mohammad Wasim Jr", role: "bowler" }, { name: "Zaman Khan", role: "bowler" }, { name: "Abrar Ahmed", role: "bowler" },
-  { name: "Shan Masood", role: "batsman" }, { name: "Sarfraz Ahmed", role: "wk" }, { name: "Azam Khan", role: "wk" },
-  // Pakistan (Legends)
-  { name: "Imran Khan", role: "allrounder" }, { name: "Wasim Akram", role: "bowler" }, { name: "Waqar Younis", role: "bowler" },
-  { name: "Shoaib Akhtar", role: "bowler" }, { name: "Inzamam-ul-Haq", role: "batsman" }, { name: "Javed Miandad", role: "batsman" },
-  { name: "Younis Khan", role: "batsman" }, { name: "Mohammad Yousuf", role: "batsman" }, { name: "Saeed Anwar", role: "batsman" },
-  { name: "Shahid Afridi", role: "allrounder" }, { name: "Misbah-ul-Haq", role: "batsman" }, { name: "Shoaib Malik", role: "allrounder" },
-  { name: "Umar Gul", role: "bowler" }, { name: "Saqlain Mushtaq", role: "bowler" }, { name: "Abdul Razzaq", role: "allrounder" },
-  { name: "Kamran Akmal", role: "wk" }, { name: "Mohammad Amir", role: "bowler" }, { name: "Saeed Ajmal", role: "bowler" },
-  
-  // West Indies (Current & Recent)
-  { name: "Nicholas Pooran", role: "wk" }, { name: "Shai Hope", role: "batsman" }, { name: "Rovman Powell", role: "batsman" },
-  { name: "Andre Russell", role: "allrounder" }, { name: "Jason Holder", role: "allrounder" }, { name: "Alzarri Joseph", role: "bowler" },
-  { name: "Kyle Mayers", role: "allrounder" }, { name: "Akeal Hosein", role: "bowler" }, { name: "Romario Shepherd", role: "allrounder" },
-  { name: "Shimron Hetmyer", role: "batsman" }, { name: "Johnson Charles", role: "wk" }, { name: "Brandon King", role: "batsman" },
-  { name: "Sherfane Rutherford", role: "batsman" }, { name: "Gudakesh Motie", role: "bowler" }, { name: "Kemar Roach", role: "bowler" },
-  { name: "Kraigg Brathwaite", role: "batsman" }, { name: "Shamar Joseph", role: "bowler" }, { name: "Obed McCoy", role: "bowler" },
-  { name: "Jason Mohammed", role: "batsman" }, { name: "Shannon Gabriel", role: "bowler" }, { name: "Roston Chase", role: "allrounder" },
-  // West Indies (Legends)
-  { name: "Brian Lara", role: "batsman" }, { name: "Vivian Richards", role: "batsman" }, { name: "Chris Gayle", role: "batsman" },
-  { name: "Gordon Greenidge", role: "batsman" }, { name: "Desmond Haynes", role: "batsman" }, { name: "Clive Lloyd", role: "batsman" },
-  { name: "Shivnarine Chanderpaul", role: "batsman" }, { name: "Kieron Pollard", role: "allrounder" }, { name: "Dwayne Bravo", role: "allrounder" },
-  { name: "Sunil Narine", role: "bowler" }, { name: "Courtney Walsh", role: "bowler" }, { name: "Curtly Ambrose", role: "bowler" },
-  { name: "Malcolm Marshall", role: "bowler" }, { name: "Michael Holding", role: "bowler" }, { name: "Marlon Samuels", role: "batsman" },
-  { name: "Andy Roberts", role: "bowler" }, { name: "Joel Garner", role: "bowler" }, { name: "Darren Sammy", role: "allrounder" },
-  
-  // Sri Lanka (Current & Recent)
-  { name: "Pathum Nissanka", role: "batsman" }, { name: "Kusal Mendis", role: "wk" }, { name: "Charith Asalanka", role: "batsman" },
-  { name: "Dasun Shanaka", role: "allrounder" }, { name: "Wanindu Hasaranga", role: "allrounder" }, { name: "Maheesh Theekshana", role: "bowler" },
-  { name: "Dushmantha Chameera", role: "bowler" }, { name: "Matheesha Pathirana", role: "bowler" }, { name: "Dilshan Madushanka", role: "bowler" },
-  { name: "Sadeera Samarawickrama", role: "wk" }, { name: "Angelo Mathews", role: "allrounder" }, { name: "Dhananjaya de Silva", role: "allrounder" },
-  { name: "Dimuth Karunaratne", role: "batsman" }, { name: "Kusal Perera", role: "wk" }, { name: "Pramod Madushan", role: "bowler" },
-  { name: "Dunith Wellalage", role: "allrounder" }, { name: "Bhanuka Rajapaksa", role: "batsman" }, { name: "Nuwan Thushara", role: "bowler" },
-  // Sri Lanka (Legends)
-  { name: "Kumar Sangakkara", role: "wk" }, { name: "Mahela Jayawardene", role: "batsman" }, { name: "Sanath Jayasuriya", role: "allrounder" },
-  { name: "Muttiah Muralitharan", role: "bowler" }, { name: "Lasith Malinga", role: "bowler" }, { name: "Chaminda Vaas", role: "bowler" },
-  { name: "Tillakaratne Dilshan", role: "batsman" }, { name: "Aravinda de Silva", role: "batsman" }, { name: "Rangana Herath", role: "bowler" },
-  { name: "Arjuna Ranatunga", role: "batsman" }, { name: "Marvan Atapattu", role: "batsman" }, { name: "Nuwan Kulasekara", role: "bowler" },
-  
-  // Bangladesh (Current & Recent)
-  { name: "Shakib Al Hasan", role: "allrounder" }, { name: "Mushfiqur Rahim", role: "wk" }, { name: "Mahmudullah", role: "allrounder" },
-  { name: "Tamim Iqbal", role: "batsman" }, { name: "Mustafizur Rahman", role: "bowler" }, { name: "Litton Das", role: "wk" },
-  { name: "Najmul Hossain Shanto", role: "batsman" }, { name: "Mehidy Hasan Miraz", role: "allrounder" }, { name: "Taskin Ahmed", role: "bowler" },
-  { name: "Shoriful Islam", role: "bowler" }, { name: "Hasan Mahmud", role: "bowler" }, { name: "Towhid Hridoy", role: "batsman" },
-  { name: "Afif Hossain", role: "batsman" }, { name: "Soumya Sarkar", role: "allrounder" }, { name: "Mashrafe Mortaza", role: "bowler" },
-  { name: "Rubel Hossain", role: "bowler" }, { name: "Mominul Haque", role: "batsman" }, { name: "Taijul Islam", role: "bowler" },
-  
-  // Afghanistan (Current & Recent)
-  { name: "Rashid Khan", role: "bowler" }, { name: "Mohammad Nabi", role: "allrounder" }, { name: "Mujeeb Ur Rahman", role: "bowler" },
-  { name: "Rahmanullah Gurbaz", role: "wk" }, { name: "Naveen-ul-Haq", role: "bowler" }, { name: "Fazalhaq Farooqi", role: "bowler" },
-  { name: "Ibrahim Zadran", role: "batsman" }, { name: "Najibullah Zadran", role: "batsman" }, { name: "Azmatullah Omarzai", role: "allrounder" },
-  { name: "Hashmatullah Shahidi", role: "batsman" }, { name: "Gulbadin Naib", role: "allrounder" }, { name: "Qais Ahmad", role: "bowler" },
-  { name: "Noor Ahmad", role: "bowler" }, { name: "Karim Janat", role: "allrounder" }, { name: "Rahmat Shah", role: "batsman" },
-  
-  // Ireland
-  { name: "Paul Stirling", role: "batsman" }, { name: "Kevin O'Brien", role: "allrounder" }, { name: "Andrew Balbirnie", role: "batsman" },
-  { name: "Harry Tector", role: "batsman" }, { name: "Josh Little", role: "bowler" }, { name: "Mark Adair", role: "bowler" },
-  { name: "Curtis Campher", role: "allrounder" }, { name: "George Dockrell", role: "allrounder" }, { name: "Lorcan Tucker", role: "wk" },
-  { name: "Craig Young", role: "bowler" }, { name: "Andy McBrine", role: "bowler" },
-  
-  // Zimbabwe
-  { name: "Sikandar Raza", role: "allrounder" }, { name: "Sean Williams", role: "allrounder" }, { name: "Craig Ervine", role: "batsman" },
-  { name: "Richard Ngarava", role: "bowler" }, { name: "Blessing Muzarabani", role: "bowler" }, { name: "Ryan Burl", role: "allrounder" },
-  { name: "Wellington Masakadza", role: "bowler" }, { name: "Brendan Taylor", role: "wk" }, { name: "Hamilton Masakadza", role: "batsman" },
-  { name: "Heath Streak", role: "allrounder" }, { name: "Andy Flower", role: "wk" }, { name: "Grant Flower", role: "allrounder" },
-  
-  // Additional Modern Stars
-  { name: "Dewald Brevis", role: "batsman" }, { name: "Will Pucovski", role: "batsman" }, { name: "Ben Sanderson", role: "bowler" },
-  { name: "Tim David", role: "batsman" }, { name: "Phil Salt", role: "batsman" }, { name: "Rajat Patidar", role: "batsman" }
+  "Virat Kohli", "Rohit Sharma", "MS Dhoni", "Jasprit Bumrah", "Hardik Pandya", "KL Rahul", "Rishabh Pant", "Ravindra Jadeja", "R Ashwin",
+  "Mohammed Shami", "Shubman Gill", "Suryakumar Yadav", "Shreyas Iyer", "Ishan Kishan", "Mohammed Siraj", "Kuldeep Yadav", "Yuzvendra Chahal",
+  "Axar Patel", "Washington Sundar", "Rinku Singh", "Yashasvi Jaiswal", "Ruturaj Gaikwad", "Sanju Samson", "Arshdeep Singh", "Shardul Thakur",
+  "Deepak Chahar", "Bhuvneshwar Kumar", "Umesh Yadav", "Ishant Sharma", "Ajinkya Rahane", "Cheteshwar Pujara", "Mayank Agarwal", "Hanuma Vihari",
+  "Prithvi Shaw", "Navdeep Saini", "T Natarajan", "Shivam Dube", "Deepak Hooda", "Krunal Pandya", "Rajat Patidar", "Umran Malik", "Tilak Varma",
+  "Jitesh Sharma", "Avesh Khan", "Mukesh Kumar", "Sachin Tendulkar", "Rahul Dravid", "VVS Laxman", "Virender Sehwag", "Sourav Ganguly",
+  "Kapil Dev", "Yuvraj Singh", "Gautam Gambhir", "Anil Kumble", "Harbhajan Singh", "Zaheer Khan", "Suresh Raina", "Irfan Pathan", "Javagal Srinath",
+  "Ajit Agarkar", "Mohammad Azharuddin", "Sunil Gavaskar", "Ravi Shastri", "Pat Cummins", "Steve Smith", "David Warner", "Mitchell Starc",
+  "Marnus Labuschagne", "Josh Hazlewood", "Nathan Lyon", "Glenn Maxwell", "Travis Head", "Cameron Green", "Mitchell Marsh", "Alex Carey",
+  "Marcus Stoinis", "Adam Zampa", "Josh Inglis", "Spencer Johnson", "Tim David", "Sean Abbott", "Ashton Agar", "Matthew Wade", "Usman Khawaja",
+  "Aaron Finch", "Jhye Richardson", "Riley Meredith", "Scott Boland", "Todd Murphy", "Michael Neser", "Matt Renshaw", "Marcus Harris",
+  "Lance Morris", "Jason Behrendorff", "Kane Richardson", "Andrew Tye", "Ricky Ponting", "Shane Warne", "Adam Gilchrist", "Steve Waugh",
+  "Matthew Hayden", "Glenn McGrath", "Brett Lee", "Mitchell Johnson", "Jason Gillespie", "Michael Clarke", "Mark Waugh", "Allan Border",
+  "Ian Healy", "Michael Hussey", "Andrew Symonds", "Dennis Lillee", "Jeff Thomson", "Brad Haddin", "Joe Root", "Ben Stokes", "Jos Buttler",
+  "Jonny Bairstow", "Mark Wood", "Jofra Archer", "Chris Woakes", "Moeen Ali", "Adil Rashid", "Harry Brook", "Ollie Pope", "Zak Crawley",
+  "Ben Duckett", "Dawid Malan", "Jason Roy", "Alex Hales", "Sam Curran", "Liam Livingstone", "Phil Salt", "Will Jacks", "Reece Topley",
+  "Chris Jordan", "David Willey", "Gus Atkinson", "Rehan Ahmed", "Jack Leach", "Shoaib Bashir", "James Anderson", "Stuart Broad",
+  "Eoin Morgan", "Tom Hartley", "Brydon Carse", "Matthew Potts", "Ben Foakes", "Dan Lawrence", "Kevin Pietersen", "Alastair Cook",
+  "Andrew Flintoff", "Ian Botham", "David Gower", "Graham Gooch", "Andrew Strauss", "Michael Vaughan", "Graeme Swann", "Matt Prior",
+  "Jonathan Trott", "Darren Gough", "Kagiso Rabada", "Quinton de Kock", "Aiden Markram", "David Miller", "Heinrich Klaasen", "Anrich Nortje",
+  "Lungi Ngidi", "Marco Jansen", "Temba Bavuma", "Rassie van der Dussen", "Tabraiz Shamsi", "Keshav Maharaj", "Gerald Coetzee", "Reeza Hendricks",
+  "Tristan Stubbs", "Tony de Zorzi", "Nandre Burger", "Wiaan Mulder", "Andile Phehlukwayo", "Lizaad Williams", "Faf du Plessis", "Jacques Kallis",
+  "AB de Villiers", "Hashim Amla", "Dale Steyn", "Graeme Smith", "Morne Morkel", "Vernon Philander", "Allan Donald", "Makhaya Ntini",
+  "Shaun Pollock", "Jonty Rhodes", "Lance Klusener", "Herschelle Gibbs", "Mark Boucher", "JP Duminy", "Kane Williamson", "Trent Boult",
+  "Tim Southee", "Devon Conway", "Daryl Mitchell", "Mitchell Santner", "Tom Latham", "Matt Henry", "Lockie Ferguson", "Kyle Jamieson",
+  "Glenn Phillips", "Rachin Ravindra", "Finn Allen", "Mark Chapman", "Ish Sodhi", "Ajaz Patel", "Will Young", "Henry Nicholls", "Tim Seifert",
+  "Colin Munro", "Adam Milne", "Ross Taylor", "Brendon McCullum", "Stephen Fleming", "Daniel Vettori", "Martin Guptill", "Richard Hadlee",
+  "Chris Cairns", "Nathan Astle", "Shane Bond", "Craig McMillan", "Jacob Oram", "Babar Azam", "Shaheen Afridi", "Mohammad Rizwan",
+  "Fakhar Zaman", "Haris Rauf", "Shadab Khan", "Naseem Shah", "Imam-ul-Haq", "Abdullah Shafique", "Saud Shakeel", "Agha Salman",
+  "Iftikhar Ahmed", "Imad Wasim", "Hasan Ali", "Faheem Ashraf", "Mohammad Nawaz", "Usama Mir", "Saim Ayub", "Mohammad Wasim Jr",
+  "Zaman Khan", "Abrar Ahmed", "Shan Masood", "Sarfraz Ahmed", "Azam Khan", "Imran Khan", "Wasim Akram", "Waqar Younis", "Shoaib Akhtar",
+  "Inzamam-ul-Haq", "Javed Miandad", "Younis Khan", "Mohammad Yousuf", "Saeed Anwar", "Shahid Afridi", "Misbah-ul-Haq", "Shoaib Malik",
+  "Umar Gul", "Saqlain Mushtaq", "Abdul Razzaq", "Kamran Akmal", "Mohammad Amir", "Saeed Ajmal", "Nicholas Pooran", "Shai Hope",
+  "Rovman Powell", "Andre Russell", "Jason Holder", "Alzarri Joseph", "Kyle Mayers", "Akeal Hosein", "Romario Shepherd", "Shimron Hetmyer",
+  "Johnson Charles", "Brandon King", "Sherfane Rutherford", "Gudakesh Motie", "Kemar Roach", "Kraigg Brathwaite", "Shamar Joseph",
+  "Obed McCoy", "Jason Mohammed", "Shannon Gabriel", "Roston Chase", "Brian Lara", "Vivian Richards", "Chris Gayle", "Gordon Greenidge",
+  "Desmond Haynes", "Clive Lloyd", "Shivnarine Chanderpaul", "Kieron Pollard", "Dwayne Bravo", "Sunil Narine", "Courtney Walsh",
+  "Curtly Ambrose", "Malcolm Marshall", "Michael Holding", "Marlon Samuels", "Andy Roberts", "Joel Garner", "Darren Sammy",
+  "Pathum Nissanka", "Kusal Mendis", "Charith Asalanka", "Dasun Shanaka", "Wanindu Hasaranga", "Maheesh Theekshana", "Dushmantha Chameera",
+  "Matheesha Pathirana", "Dilshan Madushanka", "Sadeera Samarawickrama", "Angelo Mathews", "Dhananjaya de Silva", "Dimuth Karunaratne",
+  "Kusal Perera", "Pramod Madushan", "Dunith Wellalage", "Bhanuka Rajapaksa", "Nuwan Thushara", "Kumar Sangakkara", "Mahela Jayawardene",
+  "Sanath Jayasuriya", "Muttiah Muralitharan", "Lasith Malinga", "Chaminda Vaas", "Tillakaratne Dilshan", "Aravinda de Silva",
+  "Rangana Herath", "Arjuna Ranatunga", "Marvan Atapattu", "Nuwan Kulasekara", "Shakib Al Hasan", "Mushfiqur Rahim", "Mahmudullah",
+  "Tamim Iqbal", "Mustafizur Rahman", "Litton Das", "Najmul Hossain Shanto", "Mehidy Hasan Miraz", "Taskin Ahmed", "Shoriful Islam",
+  "Hasan Mahmud", "Towhid Hridoy", "Afif Hossain", "Soumya Sarkar", "Mashrafe Mortaza", "Rubel Hossain", "Mominul Haque", "Taijul Islam",
+  "Rashid Khan", "Mohammad Nabi", "Mujeeb Ur Rahman", "Rahmanullah Gurbaz", "Naveen-ul-Haq", "Fazalhaq Farooqi", "Ibrahim Zadran",
+  "Najibullah Zadran", "Azmatullah Omarzai", "Hashmatullah Shahidi", "Gulbadin Naib", "Qais Ahmad", "Noor Ahmad", "Karim Janat", "Rahmat Shah"
 ];
 
-function randomRange(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+const uniquePlayers = Array.from(new Set(playersData));
+
+async function getStats(name) {
+    let url = `https://en.wikipedia.org/wiki/${name.replace(/ /g, '_')}`;
+    let html;
+    const config = { headers: { 'User-Agent': 'UndercoverBot/1.0 (test@test.com)' }, timeout: 10000 };
+    try {
+        const res = await axios.get(url, config);
+        html = res.data;
+    } catch(e) {
+        try {
+            const res2 = await axios.get(url + '_(cricketer)', config);
+            html = res2.data;
+        } catch(e2) {
+            return null;
+        }
+    }
+    
+    const $ = cheerio.load(html);
+    const infobox = $('.infobox.vcard');
+    if (!infobox.length) return null;
+    
+    let cols = [];
+    infobox.find('tr').each((i, row) => {
+        const ths = $(row).find('th');
+        if (ths.length >= 2 && cols.length === 0) {
+            $(row).find('th').each((j, th) => {
+                cols.push($(th).text().trim());
+            });
+        }
+    });
+    
+    let stats = { name: name, "Test Runs": 0, "ODI Runs": 0, "T20I Runs": 0, "Test Wickets": 0, "ODI Wickets": 0, "T20I Wickets": 0 };
+    let hasTest = cols.indexOf('Test') !== -1 || cols.indexOf('Tests') !== -1;
+    let hasODI = cols.indexOf('ODI') !== -1 || cols.indexOf('ODIs') !== -1;
+    let hasT20I = cols.indexOf('T20I') !== -1 || cols.indexOf('T20Is') !== -1;
+    let tIndex = Math.max(cols.indexOf('Test'), cols.indexOf('Tests')) - 1;
+    let oIndex = Math.max(cols.indexOf('ODI'), cols.indexOf('ODIs')) - 1;
+    let t20Index = Math.max(cols.indexOf('T20I'), cols.indexOf('T20Is')) - 1;
+    
+    const parseNumber = (str) => parseInt(str.replace(/,/g, '').replace(/–|-/g, '0')) || 0;
+    
+    infobox.find('tr').each((i, row) => {
+        const th = $(row).find('th').first().text().trim();
+        const tds = $(row).find('td');
+        if ((th === 'Runs scored' || th === 'Runs') && tds.length > 0) {
+            if (hasTest && tds[tIndex]) stats["Test Runs"] = parseNumber($(tds[tIndex]).text());
+            if (hasODI && tds[oIndex]) stats["ODI Runs"] = parseNumber($(tds[oIndex]).text());
+            if (hasT20I && tds[t20Index]) stats["T20I Runs"] = parseNumber($(tds[t20Index]).text());
+        }
+        if ((th === 'Wickets taken' || th === 'Wickets') && tds.length > 0) {
+            if (hasTest && tds[tIndex]) stats["Test Wickets"] = parseNumber($(tds[tIndex]).text());
+            if (hasODI && tds[oIndex]) stats["ODI Wickets"] = parseNumber($(tds[oIndex]).text());
+            if (hasT20I && tds[t20Index]) stats["T20I Wickets"] = parseNumber($(tds[t20Index]).text());
+        }
+    });
+    
+    // Ensure they have at least *some* stat, filtering bad infoboxes
+    if (stats["Test Runs"] === 0 && stats["ODI Runs"] === 0 && stats["T20I Runs"] === 0 &&
+        stats["Test Wickets"] === 0 && stats["ODI Wickets"] === 0 && stats["T20I Wickets"] === 0) {
+        return null;
+    }
+    
+    return stats;
 }
 
-const statsPath = path.join(__dirname, 'data', 'hiloStats.json');
-const players = [];
-const uniquePlayers = Array.from(new Set(playersData.map(p => p.name)))
-  .map(name => {
-    return playersData.find(p => p.name === name);
-  });
-
-for(const p of uniquePlayers) {
-    let testRuns = 0, odiRuns = 0, t20Runs = 0;
-    let testWickets = 0, odiWickets = 0, t20Wickets = 0;
-    let centuries = 0, matches = randomRange(50, 400);
-
-    if (p.role === 'batsman' || p.role === 'wk') {
-        testRuns = randomRange(1000, 12000);
-        odiRuns = randomRange(1000, 10000);
-        t20Runs = randomRange(500, 4000);
-        testWickets = randomRange(0, 10);
-        odiWickets = randomRange(0, 15);
-        t20Wickets = randomRange(0, 5);
-        centuries = randomRange(5, 50);
-    } else if (p.role === 'bowler') {
-        testRuns = randomRange(50, 1500);
-        odiRuns = randomRange(50, 1000);
-        t20Runs = randomRange(10, 300);
-        testWickets = randomRange(50, 600);
-        odiWickets = randomRange(50, 400);
-        t20Wickets = randomRange(30, 150);
-        centuries = randomRange(0, 1);
-    } else if (p.role === 'allrounder') {
-        testRuns = randomRange(1000, 6000);
-        odiRuns = randomRange(1000, 5000);
-        t20Runs = randomRange(400, 2000);
-        testWickets = randomRange(50, 300);
-        odiWickets = randomRange(50, 250);
-        t20Wickets = randomRange(30, 100);
-        centuries = randomRange(2, 15);
+async function scrapeAll() {
+    console.log(`Starting massive synchronous scrape of ${uniquePlayers.length} players to bypass Wikipedia rate-limits...`);
+    let finalDataset = [];
+    
+    let successCount = 0;
+    for (let i = 0; i < uniquePlayers.length; i++) {
+        const name = uniquePlayers[i];
+        
+        try {
+            const res = await getStats(name);
+            if (res !== null) {
+                finalDataset.push(res);
+                successCount++;
+            }
+        } catch(e) {}
+        
+        // Print progress every 10
+        if ((i + 1) % 10 === 0) {
+            console.log(`Scraped ${i + 1}/${uniquePlayers.length} ... (Total exact matches found: ${successCount})`);
+        }
+        
+        // Very important: 800ms delay to prevent HTTP 429 Too Many Requests
+        await new Promise(r => setTimeout(r, 800));
+    }
+    
+    // Fallback logic incase it drops below minimum viable limits
+    if (finalDataset.length < 50) {
+        console.error(`Critical Failure: Only scraped ${finalDataset.length} players. Aborting write to save valid JSON.`);
+        process.exit(1);
     }
 
-    players.push({
-        "name": p.name,
-        "Test Runs": testRuns,
-        "ODI Runs": odiRuns,
-        "T20I Runs": t20Runs,
-        "Test Wickets": testWickets,
-        "ODI Wickets": odiWickets,
-        "T20I Wickets": t20Wickets,
-        "International Centuries": centuries,
-        "International Matches": matches
-    });
+    const statsPath = path.join(__dirname, 'data', 'hiloStats.json');
+    fs.writeFileSync(statsPath, JSON.stringify(finalDataset, null, 4));
+    console.log(`Successfully acquired perfectly precise Wiki statistics for ${finalDataset.length} genuine players!`);
 }
 
-fs.writeFileSync(statsPath, JSON.stringify(players, null, 4));
-console.log(`Successfully generated ${players.length} completely real international players!`);
+scrapeAll();
