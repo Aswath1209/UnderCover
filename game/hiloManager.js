@@ -44,8 +44,8 @@ function nextRound(userId) {
   const state = activeGames.get(userId);
   if (!state) return null;
   
-  // Increase multiplier
-  state.multiplier = parseFloat((state.multiplier + 0.5).toFixed(1));
+  // Increase multiplier slowly (+0.2x)
+  state.multiplier = parseFloat((state.multiplier + 0.2).toFixed(1));
   
   // Carry over the target player to be the new base player
   state.currentPlayer = state.nextPlayer;
