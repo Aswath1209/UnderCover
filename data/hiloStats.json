@@ -138,38 +138,5 @@
         "T20I Runs": 155,
         "Wickets in ODI": 92,
         "Wickets in IPL": 180
-    },
-    {
-        "name": "Virat Kohli (IPL Trophies)",
-        "IPL Trophies as Captain": 0,
-        "T20 Runs": 4008,
-        "ODI Runs": 13848,
-        "IPL Runs": 7263,
-        "International Runs": 27134,
-        "T20I Runs": 4008,
-        "Wickets in ODI": 4,
-        "Wickets in IPL": 4
-    },
-    {
-        "name": "MS Dhoni (IPL Trophies)",
-        "IPL Trophies as Captain": 5,
-        "T20 Runs": 1617,
-        "ODI Runs": 10773,
-        "IPL Runs": 5082,
-        "International Runs": 17266,
-        "T20I Runs": 1617,
-        "Wickets in ODI": 1,
-        "Wickets in IPL": 0
-    },
-    {
-        "name": "Rohit Sharma (IPL Trophies)",
-        "IPL Trophies as Captain": 5,
-        "T20 Runs": 4231,
-        "ODI Runs": 10709,
-        "IPL Runs": 6628,
-        "International Runs": 19245,
-        "T20I Runs": 4231,
-        "Wickets in ODI": 9,
-        "Wickets in IPL": 15
     }
 ]
