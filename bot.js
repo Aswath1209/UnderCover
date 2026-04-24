@@ -163,13 +163,12 @@ bot.command('balance', async (ctx) => {
 });
 
 function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, extraMsg = '') {
-  const text = `${extraMsg}🎲 <b>High-Low Game</b> 🎲\n\n` + 
-               `Bet: ${state.betAmount} 💰\n` +
-               `Current Multiplier: <b>${state.multiplier}x</b>\n\n` +
-               `Current Player: <b>${state.currentPlayer.name}</b>\n` +
-               `Stat (${state.constraint}): <b>${state.currentPlayer[state.constraint]}</b>\n\n` +
-               `Next Player: <b>${state.nextPlayer.name}</b>\n\n` +
-               `Will <b>${state.nextPlayer.name}</b> have a HIGHER or LOWER <b>${state.constraint}</b>?`;
+  const text = `${extraMsg}🎲 <b>HIGH-LOW</b> 🎲\n\n` + 
+               `💰 Bet: <b>${state.betAmount}</b>\n` +
+               `🔥 Multiplier: <b>${state.multiplier}x</b>\n\n` +
+               `👤 <b>${state.currentPlayer.name}</b>\n` +
+               `📊 <b>${state.constraint}</b>: ${state.currentPlayer[state.constraint]}\n\n` +
+               `Will the next random player's <b>${state.constraint}</b> be Higher or Lower?`;
                
   const kb = new InlineKeyboard()
     .text("🔼 Higher", "hilo_higher")
@@ -177,7 +176,7 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
     .text(`💰 Withdraw (${Math.floor(state.betAmount * state.multiplier)})`, "hilo_withdraw");
 
   if (isEdit) {
-      return bot.api.editMessageText(chatId, msgId, text, { reply_markup: kb, parse_mode: 'HTML' });
+      return bot.api.editMessageText(chatId, msgId, text, { reply_markup: kb, parse_mode: 'HTML' }).catch(()=>{});
   }
   return ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 }
@@ -678,18 +677,22 @@ bot.on('callback_query:data', async (ctx) => {
   if (data.startsWith('hilo_')) {
     const action = data.replace('hilo_', '');
     const state = hiloManager.getGame(user.id);
-    if (!state) return ctx.answerCallbackQuery({ text: "No active Hilo game found.", show_alert: true });
+    if (!state) {
+        ctx.answerCallbackQuery({ text: "No active Hilo game found.", show_alert: true }).catch(()=>{});
+        return;
+    }
     
     if (ctx.callbackQuery.message.message_id !== state.messageId) {
-        return ctx.answerCallbackQuery("This game session is outdated!");
+        ctx.answerCallbackQuery("This game session is outdated!").catch(()=>{});
+        return;
     }
 
     if (action === 'withdraw') {
         const payout = Math.floor(state.betAmount * state.multiplier);
-        await sb.addCoins(user.id, payout);
+        ctx.answerCallbackQuery(`Withdrew ${payout} coins!`).catch(()=>{});
         hiloManager.endGame(user.id);
-        ctx.answerCallbackQuery(`Withdrew ${payout} coins!`);
-        await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x`, { parse_mode: 'HTML' });
+        sb.addCoins(user.id, payout).catch(()=>{});
+        bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x`, { parse_mode: 'HTML' }).catch(()=>{});
         return;
     }
 
@@ -704,17 +707,17 @@ bot.on('callback_query:data', async (ctx) => {
     else if (action === 'lower' && valNext < valCurrent) isCorrect = true;
     
     if (isEqual) {
-        ctx.answerCallbackQuery("It's a draw! No multiplier change.");
+        ctx.answerCallbackQuery("It's a draw! No multiplier change.").catch(()=>{});
         const nextState = hiloManager.nextRoundDraw(user.id);
-        await sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, "🤝 <b>Equal stats! Moving to next round.</b>\n\n");
+        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `🤝 <b>Draw! Next player was ${state.nextPlayer.name} with ${valNext}.</b>\n\n`);
     } else if (isCorrect) {
-        ctx.answerCallbackQuery("Correct! Multiplier increased!");
+        ctx.answerCallbackQuery("Correct! Multiplier increased!").catch(()=>{});
         const nextState = hiloManager.nextRound(user.id);
-        await sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${state.nextPlayer.name} had ${valNext})\n\n`);
+        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${state.nextPlayer.name} had ${valNext})\n\n`);
     } else {
-        ctx.answerCallbackQuery({ text: `Wrong! ${state.nextPlayer.name} had ${valNext} ${state.constraint}.`, show_alert: true });
+        ctx.answerCallbackQuery({ text: `Wrong! ${state.nextPlayer.name} had ${valNext} ${state.constraint}.`, show_alert: true }).catch(()=>{});
         hiloManager.endGame(user.id);
-        await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n${state.currentPlayer.name} had ${valCurrent} ${state.constraint}.\n${state.nextPlayer.name} had <b>${valNext}</b>.\n\nYou lost your bet of ${state.betAmount} 💰`, { parse_mode: 'HTML' });
+        bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n👤 <b>${state.currentPlayer.name}</b> had ${valCurrent} ${state.constraint}.\n👤 <b>${state.nextPlayer.name}</b> had <b>${valNext}</b>.\n\nYou bet: ${state.betAmount} 💰`, { parse_mode: 'HTML' }).catch(()=>{});
     }
     return;
   }
