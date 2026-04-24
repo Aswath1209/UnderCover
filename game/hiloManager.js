@@ -50,12 +50,10 @@ function nextRound(userId) {
   // Carry over the target player to be the new base player
   state.currentPlayer = state.nextPlayer;
   
-  // Pick a new target player
+  // Pick a new target player ensuring it's not the same player
   state.nextPlayer = getRandomPlayer(state.currentPlayer.name);
   
-  // Pick a new random constraint
-  state.constraint = getRandomConstraint(state.currentPlayer);
-  
+  // Constraint remains the same!
   return state;
 }
 
@@ -65,8 +63,8 @@ function nextRoundDraw(userId) {
   
   state.currentPlayer = state.nextPlayer;
   state.nextPlayer = getRandomPlayer(state.currentPlayer.name);
-  state.constraint = getRandomConstraint(state.currentPlayer);
   
+  // Constraint remains the same!
   return state;
 }
 

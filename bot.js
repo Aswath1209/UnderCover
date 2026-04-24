@@ -166,9 +166,9 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
   const text = `${extraMsg}🎲 <b>HIGH-LOW</b> 🎲\n\n` + 
                `💰 Bet: <b>${state.betAmount}</b>\n` +
                `🔥 Multiplier: <b>${state.multiplier}x</b>\n\n` +
-               `👤 <b>${state.currentPlayer.name}</b>\n` +
-               `📊 <b>${state.constraint}</b>: ${state.currentPlayer[state.constraint]}\n\n` +
-               `Will the next random player's <b>${state.constraint}</b> be Higher or Lower?`;
+               `👤 Base Player: <b>${state.currentPlayer.name}</b>\n` +
+               `📊 Constraint: <b>${state.constraint}</b>\n\n` +
+               `Will the next random player's <b>${state.constraint}</b> be Higher or Lower than ${state.currentPlayer.name}'s?`;
                
   const kb = new InlineKeyboard()
     .text("🔼 Higher", "hilo_higher")
