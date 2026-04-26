@@ -69,7 +69,7 @@ bot.command('start', async (ctx) => {
 });
 
 bot.command('ping', async (ctx) => {
-  const activeGames = gameManager.getActiveGamesCount() + mafiaManager.getActiveGamesCount() + liesManager.getActiveGamesCount();
+  const activeGames = gameManager.getActiveGamesCount() + mafiaManager.getActiveGamesCount() + liesManager.getActiveGamesCount() + hiloManager.getActiveGamesCount();
   let totalUsers = "Unknown";
   let totalGroups = "Unknown";
   
@@ -91,6 +91,8 @@ bot.command('admin_stats', async (ctx) => {
   if (!ADMIN_IDS.includes(ctx.from.id)) return;
   const ucCount = gameManager.getActiveGamesCount();
   const mafCount = mafiaManager.getActiveGamesCount();
+  const liesCount = liesManager.getActiveGamesCount();
+  const hiloCount = hiloManager.getActiveGamesCount();
   const stats = await sb.getGlobalStats().catch(() => ({ totalUsers: "Error", totalGroups: "Error" }));
   
   const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
@@ -98,7 +100,9 @@ bot.command('admin_stats', async (ctx) => {
                `🏘️ <b>Total Groups:</b> ${stats.totalGroups}\n\n` +
                `🎮 <b>Live Games:</b>\n` +
                `- Undercover: ${ucCount}\n` +
-               `- Mafia: ${mafCount}\n\n` +
+               `- Mafia: ${mafCount}\n` +
+               `- Lies: ${liesCount}\n` +
+               `- Hilo: ${hiloCount}\n\n` +
                `⏳ <i>Cleanup interval: 30m</i>`;
                
   ctx.reply(text, { parse_mode: 'HTML' });
@@ -1528,16 +1532,16 @@ if (require.main === module) {
   bot.start(); 
   console.log("Bot started!"); 
 
-  // --- Stale Game Cleanup (5 Hours) ---
+  // --- Stale Game Cleanup (1 Hour) ---
   setInterval(async () => {
-    const FIVE_HOURS = 5 * 60 * 60 * 1000;
+    const ONE_HOUR = 1 * 60 * 60 * 1000;
     const now = Date.now();
 
     // Cleanup Undercover
     const ucLobbies = gameManager.getLobbies();
     for (const [chatId, lobby] of ucLobbies.entries()) {
-      if (lobby.createdAt && (now - lobby.createdAt) > FIVE_HOURS) {
-        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 5 hours and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+      if (lobby.createdAt && (now - lobby.createdAt) > ONE_HOUR) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 1 hour and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
         gameManager.deleteLobby(chatId);
       }
     }
@@ -1545,9 +1549,18 @@ if (require.main === module) {
     // Cleanup Mafia
     const mafLobbies = mafiaManager.getLobbies();
     for (const [chatId, lobby] of mafLobbies.entries()) {
-      if (lobby.createdAt && (now - lobby.createdAt) > FIVE_HOURS) {
-        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 5 hours and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+      if (lobby.createdAt && (now - lobby.createdAt) > ONE_HOUR) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This match has been inactive for more than 1 hour and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
         mafiaManager.deleteLobby(chatId);
+      }
+    }
+
+    // Cleanup Lies
+    const liesLobbies = liesManager.getLobbies ? liesManager.getLobbies() : new Map();
+    for (const [chatId, lobby] of liesLobbies.entries()) {
+      if (lobby.createdAt && (now - lobby.createdAt) > ONE_HOUR) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Game Closed:</b> This Game of Lies has been inactive for more than 1 hour and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+        liesManager.deleteLobby(chatId);
       }
     }
   }, 30 * 60 * 1000); // Run every 30 minutes

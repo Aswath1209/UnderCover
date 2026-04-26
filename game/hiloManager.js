@@ -44,6 +44,10 @@ function getGame(userId) {
   return activeGames.get(userId);
 }
 
+function getActiveGamesCount() {
+  return activeGames.size;
+}
+
 function endGame(userId) {
   activeGames.delete(userId);
 }
@@ -81,6 +85,7 @@ function nextRoundDraw(userId) {
 module.exports = {
   createGame,
   getGame,
+  getActiveGamesCount,
   endGame,
   nextRound,
   nextRoundDraw
