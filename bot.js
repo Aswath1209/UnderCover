@@ -121,7 +121,7 @@ bot.command('admin_stats', async (ctx) => {
   active24.sort((a, b) => b.cmds - a.cmds);
   let topPlayersStr = "";
   for (let i = 0; i < Math.min(3, active24.length); i++) {
-     const safeName = (active24[i].name || 'Unknown').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+     const safeName = (active24[i].name || 'Unknown').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
      topPlayersStr += `  ${i+1}. ${safeName} (${active24[i].cmds} interactions)\n`;
   }
   if (!topPlayersStr) topPlayersStr = "  None yet\n";
