@@ -803,6 +803,7 @@ bot.on('callback_query:data', async (ctx) => {
 
     const valCurrent = state.currentPlayer[state.constraint];
     const valNext = state.nextPlayer[state.constraint];
+    const oldNextName = state.nextPlayer.name;
     
     let isCorrect = false;
     let isEqual = false;
@@ -814,15 +815,15 @@ bot.on('callback_query:data', async (ctx) => {
     if (isEqual) {
         ctx.answerCallbackQuery("It's a draw! No multiplier change.").catch(()=>{});
         const nextState = hiloManager.nextRoundDraw(user.id);
-        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `🤝 <b>Draw! Next player was ${state.nextPlayer.name} with ${valNext}.</b>\n\n`);
+        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `🤝 <b>Draw! Next player was ${oldNextName} with ${valNext}.</b>\n\n`);
     } else if (isCorrect) {
         ctx.answerCallbackQuery("Correct! Multiplier increased!").catch(()=>{});
         const nextState = hiloManager.nextRound(user.id);
-        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${state.nextPlayer.name} had ${valNext})\n\n`);
+        sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${oldNextName} had ${valNext})\n\n`);
     } else {
-        ctx.answerCallbackQuery({ text: `Wrong! ${state.nextPlayer.name} had ${valNext} ${state.constraint}.`, show_alert: true }).catch(()=>{});
+        ctx.answerCallbackQuery({ text: `Wrong! ${oldNextName} had ${valNext} ${state.constraint}.`, show_alert: true }).catch(()=>{});
         hiloManager.endGame(user.id);
-        bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n👤 <b>${state.currentPlayer.name}</b> had ${valCurrent} ${state.constraint}.\n👤 <b>${state.nextPlayer.name}</b> had <b>${valNext}</b>.\n\nYou bet: ${state.betAmount} 💰`, { parse_mode: 'HTML' }).catch(()=>{});
+        bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n👤 <b>${state.currentPlayer.name}</b> had ${valCurrent} ${state.constraint}.\n👤 <b>${oldNextName}</b> had <b>${valNext}</b>.\n\nYou bet: ${state.betAmount} 💰`, { parse_mode: 'HTML' }).catch(()=>{});
     }
     return;
   }
