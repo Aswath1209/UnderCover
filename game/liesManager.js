@@ -5,6 +5,20 @@ const quizPath = path.join(__dirname, '../data/quiz.json');
 const quizData = JSON.parse(fs.readFileSync(quizPath, 'utf8'));
 
 const lobbies = new Map();
+const userLobbies = new Map();
+
+function addUserLobby(userId, chatId) {
+  if (!userLobbies.has(userId)) userLobbies.set(userId, new Set());
+  userLobbies.get(userId).add(chatId);
+}
+
+function removeUserLobby(userId, chatId) {
+  const s = userLobbies.get(userId);
+  if (s) {
+    s.delete(chatId);
+    if (s.size === 0) userLobbies.delete(userId);
+  }
+}
 
 class LiesManager {
   createLobby(chatId, host, challenger = null, rounds = 5) {
@@ -23,9 +37,11 @@ class LiesManager {
       createdAt: Date.now(),
       timer: null
     };
+    addUserLobby(host.id, chatId);
     if (challenger) {
         lobby.players.push(challenger);
         lobby.scores[challenger.id] = 0;
+        addUserLobby(challenger.id, chatId);
     }
     lobbies.set(chatId, lobby);
     return lobby;
@@ -34,12 +50,19 @@ class LiesManager {
   getLobby(chatId) { return lobbies.get(chatId); }
   hasLobby(chatId) { return lobbies.has(chatId); }
   getLobbyByUserId(userId) {
-    for (const lobby of lobbies.values()) {
-        if (lobby.players.find(p => p.id === userId)) return lobby;
+    const chatIds = userLobbies.get(userId);
+    if (!chatIds) return null;
+    for (const chatId of chatIds) {
+        const lobby = lobbies.get(chatId);
+        if (lobby && lobby.players.find(p => p.id === userId)) return lobby;
     }
     return null;
   }
-  deleteLobby(chatId) { lobbies.delete(chatId); }
+  deleteLobby(chatId) {
+    const lobby = lobbies.get(chatId);
+    if (lobby) { lobby.players.forEach(p => removeUserLobby(p.id, chatId)); }
+    lobbies.delete(chatId);
+  }
   getActiveGamesCount() { return lobbies.size; }
 
   joinLobby(chatId, user) {
@@ -50,6 +73,7 @@ class LiesManager {
     
     lobby.players.push(user);
     lobby.scores[user.id] = 0;
+    addUserLobby(user.id, chatId);
     return true;
   }
 

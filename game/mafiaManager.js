@@ -3,6 +3,20 @@ const path = require('path');
 const { InlineKeyboard } = require('grammy');
 
 const lobbies = new Map();
+const userLobbies = new Map();
+
+function addUserLobby(userId, chatId) {
+  if (!userLobbies.has(userId)) userLobbies.set(userId, new Set());
+  userLobbies.get(userId).add(chatId);
+}
+
+function removeUserLobby(userId, chatId) {
+  const s = userLobbies.get(userId);
+  if (s) {
+    s.delete(chatId);
+    if (s.size === 0) userLobbies.delete(userId);
+  }
+}
 const themesPath = path.join(__dirname, '../data/themes.json');
 const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf8'));
 
@@ -21,8 +35,12 @@ class MafiaManager {
   getLobbies() { return lobbies; }
 
   getLobbyByUserId(userId) {
+    const chatIds = userLobbies.get(userId);
+    if (!chatIds) return null;
     let fallback = null;
-    for (const [chatId, lobby] of lobbies.entries()) {
+    for (const chatId of chatIds) {
+      const lobby = lobbies.get(chatId);
+      if (!lobby) continue;
       // Check both alivePlayers and all players for routing
       const isMember = (lobby.alivePlayers && lobby.alivePlayers.find(p => p.id === userId)) || 
                        (lobby.players && lobby.players.find(p => p.id === userId));
@@ -72,6 +90,7 @@ class MafiaManager {
       anonymousVoting: false,
       createdAt: Date.now()
     });
+    addUserLobby(hostUser.id, chatId);
   }
 
   joinLobby(chatId, user) {
@@ -79,6 +98,7 @@ class MafiaManager {
     if (!lobby || lobby.state !== 'LOBBY') return false;
     if (lobby.players.find(p => p.id === user.id)) return false;
     lobby.players.push(user);
+    addUserLobby(user.id, chatId);
     return true;
   }
 
@@ -86,11 +106,15 @@ class MafiaManager {
     const lobby = lobbies.get(chatId);
     if (!lobby) return false;
     const idx = lobby.players.findIndex(p => p.id === userId);
-    if (idx !== -1) { lobby.players.splice(idx, 1); return true; }
+    if (idx !== -1) { lobby.players.splice(idx, 1); removeUserLobby(userId, chatId); return true; }
     return false;
   }
 
-  deleteLobby(chatId) { lobbies.delete(chatId); }
+  deleteLobby(chatId) {
+    const lobby = lobbies.get(chatId);
+    if (lobby) { lobby.players.forEach(p => removeUserLobby(p.id, chatId)); }
+    lobbies.delete(chatId);
+  }
 
   moveToThemeSelection(chatId) {
     const lobby = lobbies.get(chatId);

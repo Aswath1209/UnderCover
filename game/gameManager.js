@@ -4,6 +4,20 @@ const { InlineKeyboard } = require('grammy');
 
 // In-memory lobby storage 
 const lobbies = new Map();
+const userLobbies = new Map();
+
+function addUserLobby(userId, chatId) {
+  if (!userLobbies.has(userId)) userLobbies.set(userId, new Set());
+  userLobbies.get(userId).add(chatId);
+}
+
+function removeUserLobby(userId, chatId) {
+  const s = userLobbies.get(userId);
+  if (s) {
+    s.delete(chatId);
+    if (s.size === 0) userLobbies.delete(userId);
+  }
+}
 
 const themesPath = path.join(__dirname, '../data/themes.json');
 const themesData = JSON.parse(fs.readFileSync(themesPath, 'utf8'));
@@ -15,9 +29,12 @@ class GameManager {
   getLobbies() { return lobbies; }
 
   getLobbyByUserId(userId) {
+    const chatIds = userLobbies.get(userId);
+    if (!chatIds) return null;
     let fallback = null;
-    for (const [chatId, lobby] of lobbies.entries()) {
-      if (lobby.players.find(p => p.id === userId)) {
+    for (const chatId of chatIds) {
+      const lobby = lobbies.get(chatId);
+      if (lobby && lobby.players.find(p => p.id === userId)) {
         if (lobby.state === 'CLUE_PHASE') return lobby;
         fallback = lobby;
       }
@@ -53,6 +70,7 @@ class GameManager {
       votes: {},
       createdAt: Date.now()
     });
+    addUserLobby(hostUser.id, chatId);
   }
 
   joinLobby(chatId, user) {
@@ -60,6 +78,7 @@ class GameManager {
     if (!lobby || lobby.state !== 'LOBBY') return false;
     if (lobby.players.find(p => p.id === user.id)) return false;
     lobby.players.push(user);
+    addUserLobby(user.id, chatId);
     return true;
   }
 
@@ -69,12 +88,17 @@ class GameManager {
     const idx = lobby.players.findIndex(p => p.id === userId);
     if (idx !== -1) {
       lobby.players.splice(idx, 1);
+      removeUserLobby(userId, chatId);
       return true;
     }
     return false;
   }
 
   deleteLobby(chatId) {
+    const lobby = lobbies.get(chatId);
+    if (lobby) {
+      lobby.players.forEach(p => removeUserLobby(p.id, chatId));
+    }
     lobbies.delete(chatId);
   }
 
@@ -206,6 +230,7 @@ class GameManager {
     const idx = lobby.players.findIndex(p => p.id === userId);
     if (idx !== -1) {
       const player = lobby.players.splice(idx, 1)[0];
+      removeUserLobby(userId, chatId);
       return player;
     }
     return null;

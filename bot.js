@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Bot, session, InlineKeyboard } = require('grammy');
+const { Bot, InlineKeyboard } = require('grammy');
 const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
 const liesManager = require('./game/liesManager');
@@ -17,14 +17,13 @@ process.on('uncaughtException', (error) => {
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
-bot.use(session({ initial: () => ({}) }));
-
 bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
   { command: 'mafia', description: 'Start a Mafia mode game (multi-round)' },
   { command: 'lies', description: 'Challenge someone to a Game of Lies (1v1 Quiz)' },
   { command: 'hilo', description: 'Play High-Low constraint guessing game' },
   { command: 'balance', description: 'Check your available coin balance' },
+  { command: 'send', description: 'Send coins to another user (reply to their message)' },
   { command: 'myword', description: 'Re-send your secret word to DM' },
   { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
   { command: 'settings', description: 'Configure game settings (Admin only)' },
@@ -180,6 +179,53 @@ bot.command('addcoins', async (ctx) => {
   }
   
   await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
+});
+
+bot.command('send', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database is currently disabled.");
+  
+  const replyTo = ctx.message.reply_to_message;
+  if (!replyTo) {
+      return ctx.reply("❌ You must reply to the user you want to send coins to.\nUsage: Reply to a user with <code>/send 100</code>", { parse_mode: 'HTML' });
+  }
+  
+  if (replyTo.from.is_bot) {
+      return ctx.reply("❌ You cannot send coins to a bot.");
+  }
+  
+  if (replyTo.from.id === ctx.from.id) {
+      return ctx.reply("❌ You cannot send coins to yourself.");
+  }
+  
+  const args = ctx.message.text.split(' ');
+  if (args.length < 2) {
+      return ctx.reply("❌ Usage: Reply to a user with <code>/send &lt;amount&gt;</code>", { parse_mode: 'HTML' });
+  }
+  
+  const amount = parseInt(args[1]);
+  if (isNaN(amount) || amount <= 0) {
+      return ctx.reply("❌ Invalid amount. Please specify a positive number of coins.");
+  }
+  
+  const senderId = ctx.from.id;
+  const receiverId = replyTo.from.id;
+  
+  // Ensure both users exist in DB
+  await sb.ensureUser(senderId, ctx.from.first_name).catch(() => {});
+  await sb.ensureUser(receiverId, replyTo.from.first_name).catch(() => {});
+  
+  const senderProfile = await sb.getProfile(senderId);
+  if (!senderProfile || (senderProfile.coins || 0) < amount) {
+      return ctx.reply(`❌ You don't have enough coins! Your balance: ${senderProfile?.coins || 0}`);
+  }
+  
+  const deductSuccess = await sb.addCoins(senderId, -amount);
+  if (deductSuccess !== false && deductSuccess !== null) {
+      await sb.addCoins(receiverId, amount);
+      await ctx.reply(`💸 <b>Transfer Successful!</b>\n\n<a href="tg://user?id=${senderId}">${ctx.from.first_name}</a> sent <b>${amount}</b> coins to <a href="tg://user?id=${receiverId}">${replyTo.from.first_name}</a>!`, { parse_mode: 'HTML' });
+  } else {
+      await ctx.reply("❌ Transfer failed. Please try again later.");
+  }
 });
 
 function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, extraMsg = '') {
