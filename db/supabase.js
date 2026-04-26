@@ -58,6 +58,7 @@ async function addCoins(userId, amount) {
   if (!supabase) return 0;
   let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
   if (profile) {
+    if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false; // Prevent concurrent overdraft exploitation
     const newCoins = (profile.coins || 0) + amount;
     await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
     return newCoins;

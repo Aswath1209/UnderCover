@@ -6,16 +6,36 @@ const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const sb = require('./db/supabase');
 
-const ADMIN_IDS = [7361215114]; // Bot Owner
+// --- 24-Hour Analytics Tracking ---
+const activity24h = new Map();
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
-});
-process.on('uncaughtException', (error) => {
-  console.error("Ignored Uncaught Exception:", error.description || error.message || error);
-});
+function trackActivity(userId, name) {
+    const now = Date.now();
+    if (!activity24h.has(userId)) {
+        activity24h.set(userId, { name, cmds: 0, ts: now });
+    }
+    const data = activity24h.get(userId);
+    data.name = name;
+    data.cmds++;
+    data.ts = now;
+}
+
+setInterval(() => {
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const [uid, data] of activity24h.entries()) {
+        if (now - data.ts > ONE_DAY) activity24h.delete(uid);
+    }
+}, 60 * 60 * 1000);
 
 const bot = new Bot(process.env.BOT_TOKEN);
+
+bot.use((ctx, next) => {
+  if (ctx.from && !ctx.from.is_bot) {
+    trackActivity(ctx.from.id, ctx.from.first_name);
+  }
+  return next();
+});
 
 bot.api.setMyCommands([
   { command: 'play', description: 'Start an Undercover game lobby' },
@@ -95,9 +115,22 @@ bot.command('admin_stats', async (ctx) => {
   const hiloCount = hiloManager.getActiveGamesCount();
   const stats = await sb.getGlobalStats().catch(() => ({ totalUsers: "Error", totalGroups: "Error" }));
   
+  // Build 24h stats
+  const active24 = Array.from(activity24h.values());
+  const activeUsers24Count = active24.length;
+  active24.sort((a, b) => b.cmds - a.cmds);
+  let topPlayersStr = "";
+  for (let i = 0; i < Math.min(3, active24.length); i++) {
+     topPlayersStr += `  ${i+1}. ${active24[i].name} (${active24[i].cmds} interactions)\n`;
+  }
+  if (!topPlayersStr) topPlayersStr = "  None yet\n";
+
   const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
-               `👥 <b>Total Users:</b> ${stats.totalUsers}\n` +
-               `🏘️ <b>Total Groups:</b> ${stats.totalGroups}\n\n` +
+               `👥 <b>Total Users (DB):</b> ${stats.totalUsers}\n` +
+               `🏘️ <b>Total Groups (DB):</b> ${stats.totalGroups}\n\n` +
+               `🔥 <b>24-Hour Activity:</b>\n` +
+               `  Active Players: ${activeUsers24Count}\n` +
+               `  <b>Most Active:</b>\n${topPlayersStr}\n` +
                `🎮 <b>Live Games:</b>\n` +
                `- Undercover: ${ucCount}\n` +
                `- Mafia: ${mafCount}\n` +
@@ -236,7 +269,7 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
   const text = `${extraMsg}🎲 <b>HIGH-LOW</b> 🎲\n\n` + 
                `💰 Bet: <b>${state.betAmount}</b>\n` +
                `🔥 Multiplier: <b>${state.multiplier}x</b>\n\n` +
-               `👤 Base Player: <b>${state.currentPlayer.name}</b>\n` +
+               `👤 Base Player: <b>${state.currentPlayer.name}</b> (${state.currentPlayer[state.constraint]})\n` +
                `📊 Constraint: <b>${state.constraint}</b>\n\n` +
                `Will the next random player's <b>${state.constraint}</b> be Higher or Lower than ${state.currentPlayer.name}'s?`;
                
@@ -271,7 +304,9 @@ bot.command('hilo', async (ctx) => {
       return ctx.reply("❌ You already have an active High-Low game. Finish it first!");
   }
   
-  await sb.addCoins(userId, -bet);
+  const deduct = await sb.addCoins(userId, -bet);
+  if (deduct === false) return ctx.reply("❌ Error processing bet. Please try again.");
+  
   const state = hiloManager.createGame(userId, bet);
   const msg = await sendHiloMsg(ctx, state);
   state.messageId = msg.message_id;
