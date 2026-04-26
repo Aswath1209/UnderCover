@@ -6,6 +6,15 @@ const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const sb = require('./db/supabase');
 
+const ADMIN_IDS = [7361215114]; // Bot Owner
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error("Ignored Uncaught Exception:", error.description || error.message || error);
+});
+
 // --- 24-Hour Analytics Tracking ---
 const activity24h = new Map();
 
