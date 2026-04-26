@@ -48,6 +48,7 @@ class LiesManager {
   }
 
   getLobby(chatId) { return lobbies.get(chatId); }
+  getLobbies() { return lobbies; }
   hasLobby(chatId) { return lobbies.has(chatId); }
   getLobbyByUserId(userId) {
     const chatIds = userLobbies.get(userId);
