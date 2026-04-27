@@ -120,8 +120,9 @@ class LiesManager {
 
   checkAnswer(input, questionObj) {
     if (!input) return false;
-    const variants = questionObj.v.map(v => v.toLowerCase());
-    return variants.some(v => input.includes(v) || v.includes(input));
+    const cleanInput = input.toLowerCase().trim();
+    const variants = questionObj.v.map(v => v.toLowerCase().trim());
+    return variants.some(v => v === cleanInput);
   }
 
   calculateResults(chatId) {
