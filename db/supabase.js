@@ -78,6 +78,22 @@ async function getGroupLeaderboard(chatId) {
   return data;
 }
 
+async function getUserGlobalRank(userId) {
+  if (!supabase) return null;
+  const profile = await getProfile(userId);
+  if (!profile) return null;
+  const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt('wins', profile.wins);
+  return (count !== null ? count : 0) + 1;
+}
+
+async function getUserGroupRank(chatId, userId) {
+  if (!supabase) return null;
+  const { data: gstat } = await supabase.from('group_stats').select('wins').eq('user_id', userId).eq('chat_id', chatId).single();
+  if (!gstat) return null;
+  const { count } = await supabase.from('group_stats').select('user_id', { count: 'exact', head: true }).eq('chat_id', chatId).gt('wins', gstat.wins);
+  return (count !== null ? count : 0) + 1;
+}
+
 async function getGlobalStats() {
   if (!supabase) return { totalUsers: 0, totalGroups: 0 };
   const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
@@ -185,6 +201,8 @@ module.exports = {
   addCoins,
   getGlobalLeaderboard,
   getGroupLeaderboard,
+  getUserGlobalRank,
+  getUserGroupRank,
   getGlobalStats,
   getGroupSettings,
   updateGroupSetting,

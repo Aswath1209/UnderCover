@@ -844,13 +844,19 @@ bot.on('callback_query:data', async (ctx) => {
      const records = isGlobal ? await sb.getGlobalLeaderboard() : await sb.getGroupLeaderboard(chatId);
      
      let text = isGlobal ? `🌍 <b>Global Top 10 Players</b> 🌍\n\n` : `🏠 <b>Group Top 10 Players</b> 🏠\n\n`;
+     
      if (!records || records.length === 0) {
-        text += "<i>No records found yet! Play some games!</i>";
+        text += "<i>No records found yet! Play some games!</i>\n";
      } else {
         records.forEach((r, i) => {
            const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
-           text += `${i+1}. <b>${r.first_name || 'Player'}</b> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
+           text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
         });
+     }
+
+     const userRank = isGlobal ? await sb.getUserGlobalRank(user.id) : await sb.getUserGroupRank(chatId, user.id);
+     if (userRank !== null && userRank !== undefined) {
+         text += `\n📌 <b>Your Position:</b> #${userRank}`;
      }
      
      const keyboard = new InlineKeyboard()
