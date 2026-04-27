@@ -121,8 +121,42 @@ class LiesManager {
   checkAnswer(input, questionObj) {
     if (!input) return false;
     const cleanInput = input.toLowerCase().trim();
+    const inputNoSpace = cleanInput.replace(/[\s,.-]+/g, '');
+    const inputWords = cleanInput.split(/[\s,.-]+/);
     const variants = questionObj.v.map(v => v.toLowerCase().trim());
-    return variants.some(v => v === cleanInput);
+    
+    // 1. Exact match, spaceless match, and acronym match
+    for (const v of variants) {
+        if (v === cleanInput) return true;
+        
+        const vNoSpace = v.replace(/[\s,.-]+/g, '');
+        if (vNoSpace === inputNoSpace) return true;
+        
+        const vWords = v.split(/[\s-]+/);
+        if (vWords.length > 1) {
+            const acronym = vWords.map(w => w[0]).join('');
+            if (acronym === cleanInput && acronym.length >= 2) return true;
+        }
+    }
+    
+    // 2. Phrase matching (if variant appears standalone in input)
+    for (const v of variants) {
+        const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?:^|\\W)${escaped}(?:\\W|$)`);
+        if (regex.test(cleanInput)) return true;
+    }
+
+    // 3. Significant partial match (e.g. first or last names exclusively)
+    for (const v of variants) {
+        const vWords = v.split(/[\s-]+/).filter(w => w.length >= 4);
+        for (const vw of vWords) {
+            if (inputWords.includes(vw)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
   }
 
   calculateResults(chatId) {
