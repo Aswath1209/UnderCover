@@ -82,11 +82,37 @@ function nextRoundDraw(userId) {
   return state;
 }
 
+function getRiggedPlayer(basePlayer, constraint, guess, seenPlayersList = []) {
+  const baseVal = basePlayer[constraint];
+  let pool = stats.filter(p => !seenPlayersList.includes(p.name));
+  
+  // Failsafe if empty
+  if (pool.length === 0) pool = stats;
+
+  let riggedPool = [];
+  if (guess === 'higher') {
+    // User guessed Higher, so we want a card that is LOWER or EQUAL
+    riggedPool = pool.filter(p => p[constraint] <= baseVal);
+  } else if (guess === 'lower') {
+    // User guessed Lower, so we want a card that is HIGHER or EQUAL
+    riggedPool = pool.filter(p => p[constraint] >= baseVal);
+  }
+
+  // If we found candidates to make them lose, pick one
+  if (riggedPool.length > 0) {
+    return riggedPool[Math.floor(Math.random() * riggedPool.length)];
+  }
+
+  // If no candidates found to force a loss (rare), just give them a normal random one
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 module.exports = {
   createGame,
   getGame,
   getActiveGamesCount,
   endGame,
   nextRound,
-  nextRoundDraw
+  nextRoundDraw,
+  getRiggedPlayer
 };

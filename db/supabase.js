@@ -260,6 +260,8 @@ module.exports = {
   getProfile,
   addCoins,
   transferCoins,
+  acquireLock,
+  releaseLock,
   getGlobalLeaderboard,
   getGroupLeaderboard,
   getUserGlobalRank,
