@@ -54,28 +54,63 @@ async function getProfile(userId) {
   return data;
 }
 
-const userLocks = new Map();
+const coinLocks = new Map();
+
+async function acquireLock(userId) {
+  while (coinLocks.get(userId)) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  coinLocks.set(userId, true);
+}
+
+function releaseLock(userId) {
+  coinLocks.delete(userId);
+}
 
 async function addCoins(userId, amount) {
   if (!supabase) return 0;
   
-  // Prevent TOCTOU concurrent overdraft exploits
-  while (userLocks.get(userId)) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  userLocks.set(userId, true);
-  
+  await acquireLock(userId);
   try {
-      let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+      let { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
       if (profile) {
-        if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false; // Prevent concurrent overdraft exploitation
+        if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false;
         const newCoins = (profile.coins || 0) + amount;
         await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
         return newCoins;
       }
       return 0;
   } finally {
-      userLocks.delete(userId);
+      releaseLock(userId);
+  }
+}
+
+// Atomic transfer: locks BOTH sender and receiver, re-reads sender balance inside lock
+async function transferCoins(senderId, receiverId, amount) {
+  if (!supabase || amount <= 0) return { success: false, error: 'Invalid transfer' };
+  
+  // Always lock in consistent order to prevent deadlocks
+  const [firstId, secondId] = senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId];
+  await acquireLock(firstId);
+  await acquireLock(secondId);
+  
+  try {
+      // Re-read sender balance INSIDE the lock — this is the critical fix
+      const { data: sender } = await supabase.from('profiles').select('coins').eq('user_id', senderId).single();
+      if (!sender || (sender.coins || 0) < amount) {
+          return { success: false, error: `Insufficient coins! Balance: ${sender?.coins || 0}` };
+      }
+      
+      const { data: receiver } = await supabase.from('profiles').select('coins').eq('user_id', receiverId).single();
+      if (!receiver) return { success: false, error: 'Receiver not found' };
+      
+      await supabase.from('profiles').update({ coins: sender.coins - amount }).eq('user_id', senderId);
+      await supabase.from('profiles').update({ coins: (receiver.coins || 0) + amount }).eq('user_id', receiverId);
+      
+      return { success: true, senderBalance: sender.coins - amount, receiverBalance: (receiver.coins || 0) + amount };
+  } finally {
+      releaseLock(firstId);
+      releaseLock(secondId);
   }
 }
 
@@ -212,6 +247,7 @@ module.exports = {
   recordLoss,
   getProfile,
   addCoins,
+  transferCoins,
   getGlobalLeaderboard,
   getGroupLeaderboard,
   getUserGlobalRank,

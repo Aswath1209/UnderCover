@@ -228,8 +228,19 @@ bot.command('addcoins', async (ctx) => {
   await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
 });
 
+const sendCooldowns = new Map();
+
 bot.command('send', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database is currently disabled.");
+  
+  const senderId = ctx.from.id;
+  
+  // Rate limit: 5 second cooldown per user
+  const lastSend = sendCooldowns.get(senderId);
+  if (lastSend && Date.now() - lastSend < 5000) {
+      return ctx.reply("⏳ Please wait a few seconds before sending again.");
+  }
+  sendCooldowns.set(senderId, Date.now());
   
   const replyTo = ctx.message.reply_to_message;
   if (!replyTo) {
@@ -254,24 +265,19 @@ bot.command('send', async (ctx) => {
       return ctx.reply("❌ Invalid amount. Please specify a positive number of coins.");
   }
   
-  const senderId = ctx.from.id;
   const receiverId = replyTo.from.id;
   
   // Ensure both users exist in DB
   await sb.ensureUser(senderId, ctx.from.first_name).catch(() => {});
   await sb.ensureUser(receiverId, replyTo.from.first_name).catch(() => {});
   
-  const senderProfile = await sb.getProfile(senderId);
-  if (!senderProfile || (senderProfile.coins || 0) < amount) {
-      return ctx.reply(`❌ You don't have enough coins! Your balance: ${senderProfile?.coins || 0}`);
-  }
+  // Atomic transfer — balance check + deduction + deposit all happen inside the lock
+  const result = await sb.transferCoins(senderId, receiverId, amount);
   
-  const deductSuccess = await sb.addCoins(senderId, -amount);
-  if (deductSuccess !== false && deductSuccess !== null) {
-      await sb.addCoins(receiverId, amount);
+  if (result.success) {
       await ctx.reply(`💸 <b>Transfer Successful!</b>\n\n<a href="tg://user?id=${senderId}">${ctx.from.first_name}</a> sent <b>${amount}</b> coins to <a href="tg://user?id=${receiverId}">${replyTo.from.first_name}</a>!`, { parse_mode: 'HTML' });
   } else {
-      await ctx.reply("❌ Transfer failed. Please try again later.");
+      await ctx.reply(`❌ ${result.error}`);
   }
 });
 
