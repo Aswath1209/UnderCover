@@ -815,7 +815,7 @@ bot.on('callback_query:data', async (ctx) => {
             const payout = Math.floor(state.betAmount * state.multiplier);
             ctx.answerCallbackQuery(`Withdrew ${payout} coins!`).catch(()=>{});
             hiloManager.endGame(user.id);
-            await sb.addCoins(user.id, payout);
+            await sb.addCoinsInternal(user.id, payout);
             bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x`, { parse_mode: 'HTML' }).catch(()=>{});
             return;
         }

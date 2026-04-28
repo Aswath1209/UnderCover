@@ -11,57 +11,7 @@ if (supabaseUrl && supabaseKey) {
   console.log("WARNING: Supabase URL or Key missing. Database features will be bypassed.");
 }
 
-async function recordWin(userId, firstName, chatId) {
-  if (!supabase) return;
-  const release = await acquireLock(userId);
-  try {
-    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-    if (profile) {
-      await supabase.from('profiles').update({ wins: profile.wins + 1, matches_played: profile.matches_played + 1, first_name: firstName, coins: (profile.coins || 0) + 200 }).eq('user_id', userId);
-    } else {
-      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
-    }
-  } finally {
-    releaseLock(release);
-  }
-
-  // Update Group Stat (no coins involved, no lock needed)
-  let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
-  if (gstat) {
-    await supabase.from('group_stats').update({ wins: gstat.wins + 1, matches_played: gstat.matches_played + 1, first_name: firstName }).eq('user_id', userId).eq('chat_id', chatId);
-  } else {
-    await supabase.from('group_stats').insert({ user_id: userId, chat_id: chatId, first_name: firstName, wins: 1, matches_played: 1 });
-  }
-}
-
-async function recordLoss(userId, firstName, chatId) {
-  if (!supabase) return;
-  const release = await acquireLock(userId);
-  try {
-    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-    if (profile) {
-      await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
-    } else {
-      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
-    }
-  } finally {
-    releaseLock(release);
-  }
-
-  let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
-  if (gstat) {
-    await supabase.from('group_stats').update({ matches_played: gstat.matches_played + 1, first_name: firstName }).eq('user_id', userId).eq('chat_id', chatId);
-  } else {
-    await supabase.from('group_stats').insert({ user_id: userId, chat_id: chatId, first_name: firstName, wins: 0, matches_played: 1 });
-  }
-}
-
-async function getProfile(userId) {
-  if (!supabase) return null;
-  const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-  return data;
-}
-
+// --- Mutex Lock System ---
 const coinLocks = new Map();
 
 async function acquireLock(userId) {
@@ -82,52 +32,116 @@ function releaseLock(releaseFn) {
   if (typeof releaseFn === 'function') releaseFn();
 }
 
-async function addCoins(userId, amount) {
-  if (!supabase) return 0;
+// --- Internal Coin Logic (No Locks) ---
+
+async function addCoinsInternal(userId, amount) {
+  let { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
+  if (profile) {
+    if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false;
+    const newCoins = (profile.coins || 0) + amount;
+    if (amount >= 1000) console.log(`[COINS] Adding ${amount} to ${userId}. New balance: ${newCoins}`);
+    await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+    return newCoins;
+  }
+  return 0;
+}
+
+async function transferCoinsInternal(senderId, receiverId, amount) {
+  const { data: sender } = await supabase.from('profiles').select('coins').eq('user_id', senderId).single();
+  if (!sender || (sender.coins || 0) < amount) {
+      return { success: false, error: `Insufficient coins! Balance: ${sender?.coins || 0}` };
+  }
   
+  const { data: receiver } = await supabase.from('profiles').select('coins').eq('user_id', receiverId).single();
+  if (!receiver) return { success: false, error: 'Receiver not found' };
+  
+  await supabase.from('profiles').update({ coins: sender.coins - amount }).eq('user_id', senderId);
+  await supabase.from('profiles').update({ coins: (receiver.coins || 0) + amount }).eq('user_id', receiverId);
+  
+  return { success: true, senderBalance: sender.coins - amount, receiverBalance: (receiver.coins || 0) + amount };
+}
+
+// --- Public API (With Locks) ---
+
+async function recordWin(userId, firstName, chatId) {
+  if (!supabase) return;
   const release = await acquireLock(userId);
   try {
-      let { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
-      if (profile) {
-        if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false;
-        const newCoins = (profile.coins || 0) + amount;
-        if (amount >= 1000) console.log(`[COINS] Adding ${amount} to ${userId}. New balance: ${newCoins}`);
-        await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
-        return newCoins;
-      }
-      return 0;
+    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    if (profile) {
+      const newCoins = (profile.coins || 0) + 200;
+      await supabase.from('profiles').update({ 
+          wins: profile.wins + 1, 
+          matches_played: profile.matches_played + 1, 
+          first_name: firstName, 
+          coins: newCoins 
+      }).eq('user_id', userId);
+    } else {
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
+    }
+  } finally {
+    releaseLock(release);
+  }
+  // No lock needed for group stats (no coins)
+  await updateGroupStat(userId, chatId, firstName, true);
+}
+
+async function recordLoss(userId, firstName, chatId) {
+  if (!supabase) return;
+  const release = await acquireLock(userId);
+  try {
+    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    if (profile) {
+      await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
+    } else {
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
+    }
+  } finally {
+    releaseLock(release);
+  }
+  await updateGroupStat(userId, chatId, firstName, false);
+}
+
+async function updateGroupStat(userId, chatId, firstName, isWin) {
+  let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
+  if (gstat) {
+    await supabase.from('group_stats').update({ 
+        wins: gstat.wins + (isWin ? 1 : 0), 
+        matches_played: gstat.matches_played + 1, 
+        first_name: firstName 
+    }).eq('user_id', userId).eq('chat_id', chatId);
+  } else {
+    await supabase.from('group_stats').insert({ user_id: userId, chat_id: chatId, first_name: firstName, wins: isWin ? 1 : 0, matches_played: 1 });
+  }
+}
+
+async function addCoins(userId, amount) {
+  if (!supabase) return 0;
+  const release = await acquireLock(userId);
+  try {
+      return await addCoinsInternal(userId, amount);
   } finally {
       releaseLock(release);
   }
 }
 
-// Atomic transfer: locks BOTH sender and receiver, re-reads sender balance inside lock
 async function transferCoins(senderId, receiverId, amount) {
   if (!supabase || amount <= 0) return { success: false, error: 'Invalid transfer' };
-  
-  // Always lock in consistent order to prevent deadlocks
   const [firstId, secondId] = senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId];
   const release1 = await acquireLock(firstId);
   const release2 = await acquireLock(secondId);
-  
   try {
-      // Re-read sender balance INSIDE the lock — this is the critical fix
-      const { data: sender } = await supabase.from('profiles').select('coins').eq('user_id', senderId).single();
-      if (!sender || (sender.coins || 0) < amount) {
-          return { success: false, error: `Insufficient coins! Balance: ${sender?.coins || 0}` };
-      }
-      
-      const { data: receiver } = await supabase.from('profiles').select('coins').eq('user_id', receiverId).single();
-      if (!receiver) return { success: false, error: 'Receiver not found' };
-      
-      await supabase.from('profiles').update({ coins: sender.coins - amount }).eq('user_id', senderId);
-      await supabase.from('profiles').update({ coins: (receiver.coins || 0) + amount }).eq('user_id', receiverId);
-      
-      return { success: true, senderBalance: sender.coins - amount, receiverBalance: (receiver.coins || 0) + amount };
+      return await transferCoinsInternal(senderId, receiverId, amount);
   } finally {
       releaseLock(release1);
       releaseLock(release2);
   }
+}
+
+async function getProfile(userId) {
+  if (!supabase) return null;
+  const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+  return data;
 }
 
 async function getGlobalLeaderboard() {
@@ -178,15 +192,9 @@ const DEFAULT_SETTINGS = {
 
 const settingsCache = new Map();
 
-function getDefaults() {
-  return { ...DEFAULT_SETTINGS };
-}
-
 async function getGroupSettings(chatId) {
   if (settingsCache.has(chatId)) return settingsCache.get(chatId);
-
-  if (!supabase) return getDefaults();
-
+  if (!supabase) return { ...DEFAULT_SETTINGS };
   const { data } = await supabase.from('group_settings').select('*').eq('chat_id', chatId).single();
   if (data) {
     const settings = {
@@ -199,14 +207,8 @@ async function getGroupSettings(chatId) {
     settingsCache.set(chatId, settings);
     return settings;
   }
-  
-  const defaults = getDefaults();
-  // Auto-register the group in the database
-  try {
-    await supabase.from('group_settings').insert({ chat_id: chatId, ...defaults });
-  } catch (e) {
-    // Ignore insertion errors (e.g. duplicate keys or network issues during discovery)
-  }
+  const defaults = { ...DEFAULT_SETTINGS };
+  try { await supabase.from('group_settings').insert({ chat_id: chatId, ...defaults }); } catch (e) {}
   settingsCache.set(chatId, defaults);
   return defaults;
 }
@@ -215,14 +217,12 @@ async function updateGroupSetting(chatId, key, value) {
   const settings = await getGroupSettings(chatId);
   settings[key] = value;
   settingsCache.set(chatId, settings);
-
   if (!supabase) return settings;
-
   const { data: existing } = await supabase.from('group_settings').select('chat_id').eq('chat_id', chatId).single();
   if (existing) {
     await supabase.from('group_settings').update({ [key]: value }).eq('chat_id', chatId);
   } else {
-    await supabase.from('group_settings').insert({ chat_id: chatId, ...settings });
+    await supabase.from('group_settings').insert({ chat_id: chatId, [key]: value });
   }
   return settings;
 }
@@ -240,23 +240,17 @@ async function getAllUserIds() {
 }
 
 const userCache = new Set();
-
 async function ensureUser(userId, firstName) {
-  if (!supabase || !userId) return;
-  if (userCache.has(userId)) return;
-
+  if (!supabase || !userId || userCache.has(userId)) return;
   const release = await acquireLock(userId);
   try {
-    // Double-check after acquiring lock (another request may have created the user)
     if (userCache.has(userId)) return;
     const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single();
     if (!existing) {
       await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0, coins: 2000 });
     }
     userCache.add(userId);
-  } catch (e) {
-    // Ignore errors
-  } finally {
+  } catch (e) {} finally {
     releaseLock(release);
   }
 }
@@ -267,7 +261,9 @@ module.exports = {
   recordLoss,
   getProfile,
   addCoins,
+  addCoinsInternal,
   transferCoins,
+  transferCoinsInternal,
   acquireLock,
   releaseLock,
   getGlobalLeaderboard,
@@ -277,7 +273,6 @@ module.exports = {
   getGlobalStats,
   getGroupSettings,
   updateGroupSetting,
-  getDefaults,
   getAllGroupIds,
   getAllUserIds,
   ensureUser,
