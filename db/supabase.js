@@ -54,16 +54,29 @@ async function getProfile(userId) {
   return data;
 }
 
+const userLocks = new Map();
+
 async function addCoins(userId, amount) {
   if (!supabase) return 0;
-  let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-  if (profile) {
-    if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false; // Prevent concurrent overdraft exploitation
-    const newCoins = (profile.coins || 0) + amount;
-    await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
-    return newCoins;
+  
+  // Prevent TOCTOU concurrent overdraft exploits
+  while (userLocks.get(userId)) {
+      await new Promise(resolve => setTimeout(resolve, 50));
   }
-  return 0;
+  userLocks.set(userId, true);
+  
+  try {
+      let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+      if (profile) {
+        if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false; // Prevent concurrent overdraft exploitation
+        const newCoins = (profile.coins || 0) + amount;
+        await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+        return newCoins;
+      }
+      return 0;
+  } finally {
+      userLocks.delete(userId);
+  }
 }
 
 async function getGlobalLeaderboard() {
