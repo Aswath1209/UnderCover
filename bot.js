@@ -829,6 +829,7 @@ bot.on('callback_query:data', async (ctx) => {
         if (profile && profile.coins >= 100000 && (action === 'higher' || action === 'lower')) {
             const riggedPlayer = hiloManager.getRiggedPlayer(state.currentPlayer, state.constraint, action, state.seenPlayers);
             if (riggedPlayer) {
+                console.log(`[WHALE] Rigging Hilo for ${user.id} (${profile.coins} coins)`);
                 state.nextPlayer = riggedPlayer;
                 valNext = state.nextPlayer[state.constraint];
             }

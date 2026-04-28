@@ -84,6 +84,7 @@ async function addCoins(userId, amount) {
       if (profile) {
         if (amount < 0 && (profile.coins || 0) < Math.abs(amount)) return false;
         const newCoins = (profile.coins || 0) + amount;
+        if (amount >= 1000) console.log(`[COINS] Adding ${amount} to ${userId}. New balance: ${newCoins}`);
         await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
         return newCoins;
       }
