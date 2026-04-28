@@ -13,7 +13,7 @@ if (supabaseUrl && supabaseKey) {
 
 async function recordWin(userId, firstName, chatId) {
   if (!supabase) return;
-  await acquireLock(userId);
+  const release = await acquireLock(userId);
   try {
     let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
     if (profile) {
@@ -22,7 +22,7 @@ async function recordWin(userId, firstName, chatId) {
       await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
     }
   } finally {
-    releaseLock(userId);
+    releaseLock(release);
   }
 
   // Update Group Stat (no coins involved, no lock needed)
@@ -36,7 +36,7 @@ async function recordWin(userId, firstName, chatId) {
 
 async function recordLoss(userId, firstName, chatId) {
   if (!supabase) return;
-  await acquireLock(userId);
+  const release = await acquireLock(userId);
   try {
     let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
     if (profile) {
@@ -45,7 +45,7 @@ async function recordLoss(userId, firstName, chatId) {
       await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
     }
   } finally {
-    releaseLock(userId);
+    releaseLock(release);
   }
 
   let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
@@ -65,20 +65,27 @@ async function getProfile(userId) {
 const coinLocks = new Map();
 
 async function acquireLock(userId) {
-  while (coinLocks.get(userId)) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+  if (!coinLocks.has(userId)) {
+    coinLocks.set(userId, Promise.resolve());
   }
-  coinLocks.set(userId, true);
+  const prev = coinLocks.get(userId);
+  let release;
+  const next = new Promise(resolve => {
+    release = resolve;
+  });
+  coinLocks.set(userId, next);
+  await prev;
+  return release;
 }
 
-function releaseLock(userId) {
-  coinLocks.delete(userId);
+function releaseLock(releaseFn) {
+  if (typeof releaseFn === 'function') releaseFn();
 }
 
 async function addCoins(userId, amount) {
   if (!supabase) return 0;
   
-  await acquireLock(userId);
+  const release = await acquireLock(userId);
   try {
       let { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
       if (profile) {
@@ -90,7 +97,7 @@ async function addCoins(userId, amount) {
       }
       return 0;
   } finally {
-      releaseLock(userId);
+      releaseLock(release);
   }
 }
 
@@ -100,8 +107,8 @@ async function transferCoins(senderId, receiverId, amount) {
   
   // Always lock in consistent order to prevent deadlocks
   const [firstId, secondId] = senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId];
-  await acquireLock(firstId);
-  await acquireLock(secondId);
+  const release1 = await acquireLock(firstId);
+  const release2 = await acquireLock(secondId);
   
   try {
       // Re-read sender balance INSIDE the lock — this is the critical fix
@@ -118,8 +125,8 @@ async function transferCoins(senderId, receiverId, amount) {
       
       return { success: true, senderBalance: sender.coins - amount, receiverBalance: (receiver.coins || 0) + amount };
   } finally {
-      releaseLock(firstId);
-      releaseLock(secondId);
+      releaseLock(release1);
+      releaseLock(release2);
   }
 }
 
@@ -238,7 +245,7 @@ async function ensureUser(userId, firstName) {
   if (!supabase || !userId) return;
   if (userCache.has(userId)) return;
 
-  await acquireLock(userId);
+  const release = await acquireLock(userId);
   try {
     // Double-check after acquiring lock (another request may have created the user)
     if (userCache.has(userId)) return;
@@ -250,7 +257,7 @@ async function ensureUser(userId, firstName) {
   } catch (e) {
     // Ignore errors
   } finally {
-    releaseLock(userId);
+    releaseLock(release);
   }
 }
 

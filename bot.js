@@ -798,7 +798,7 @@ bot.on('callback_query:data', async (ctx) => {
   if (data.startsWith('hilo_')) {
     const action = data.replace('hilo_', '');
     
-    await sb.acquireLock(user.id);
+    const release = await sb.acquireLock(user.id);
     try {
         const state = hiloManager.getGame(user.id);
         if (!state) {
@@ -855,8 +855,11 @@ bot.on('callback_query:data', async (ctx) => {
             hiloManager.endGame(user.id);
             bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `❌ <b>You Lost!</b>\n\n👤 <b>${state.currentPlayer.name}</b> had ${valCurrent} ${state.constraint}.\n👤 <b>${oldNextName}</b> had <b>${valNext}</b>.\n\nYou bet: ${state.betAmount} 💰`, { parse_mode: 'HTML' }).catch(()=>{});
         }
+    } catch (err) {
+        console.error("Hilo Callback Error:", err);
+        ctx.answerCallbackQuery("Error processing your move. Please try again.").catch(()=>{});
     } finally {
-        sb.releaseLock(user.id);
+        sb.releaseLock(release);
     }
     return;
   }
