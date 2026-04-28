@@ -13,16 +13,19 @@ if (supabaseUrl && supabaseKey) {
 
 async function recordWin(userId, firstName, chatId) {
   if (!supabase) return;
-  // Update Profile
-  let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-  if (profile) {
-    await supabase.from('profiles').update({ wins: profile.wins + 1, matches_played: profile.matches_played + 1, first_name: firstName, coins: (profile.coins || 0) + 200 }).eq('user_id', userId);
-  } else {
-    // 2000 Welcome Bonus + 200 Win
-    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
+  await acquireLock(userId);
+  try {
+    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    if (profile) {
+      await supabase.from('profiles').update({ wins: profile.wins + 1, matches_played: profile.matches_played + 1, first_name: firstName, coins: (profile.coins || 0) + 200 }).eq('user_id', userId);
+    } else {
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
+    }
+  } finally {
+    releaseLock(userId);
   }
 
-  // Update Group Stat
+  // Update Group Stat (no coins involved, no lock needed)
   let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
   if (gstat) {
     await supabase.from('group_stats').update({ wins: gstat.wins + 1, matches_played: gstat.matches_played + 1, first_name: firstName }).eq('user_id', userId).eq('chat_id', chatId);
@@ -33,11 +36,16 @@ async function recordWin(userId, firstName, chatId) {
 
 async function recordLoss(userId, firstName, chatId) {
   if (!supabase) return;
-  let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
-  if (profile) {
-    await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
-  } else {
-    await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
+  await acquireLock(userId);
+  try {
+    let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    if (profile) {
+      await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
+    } else {
+      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
+    }
+  } finally {
+    releaseLock(userId);
   }
 
   let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
@@ -229,15 +237,19 @@ async function ensureUser(userId, firstName) {
   if (!supabase || !userId) return;
   if (userCache.has(userId)) return;
 
+  await acquireLock(userId);
   try {
+    // Double-check after acquiring lock (another request may have created the user)
+    if (userCache.has(userId)) return;
     const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single();
     if (!existing) {
-      // Create user with 2000 coins Welcome Bonus
       await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0, coins: 2000 });
     }
     userCache.add(userId);
   } catch (e) {
     // Ignore errors
+  } finally {
+    releaseLock(userId);
   }
 }
 
