@@ -6,7 +6,7 @@ const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const sb = require('./db/supabase');
 
-const ADMIN_IDS = [7361215114]; // Bot Owner
+const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
