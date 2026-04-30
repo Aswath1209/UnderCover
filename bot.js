@@ -231,6 +231,9 @@ bot.command('addcoins', async (ctx) => {
 const sendCooldowns = new Map();
 
 bot.command('send', async (ctx) => {
+  if (ctx.chat.id !== -1003906592838) {
+      return ctx.reply("❌ The <code>/send</code> command is restricted to the Official Group Chat.", { parse_mode: 'HTML' });
+  }
   if (!sb.supabase) return ctx.reply("Database is currently disabled.");
   
   const senderId = ctx.from.id;
@@ -289,10 +292,13 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
                `📊 Constraint: <b>${state.constraint}</b>\n\n` +
                `Will the next random player's <b>${state.constraint}</b> be Higher or Lower than ${state.currentPlayer.name}'s?`;
                
+  let withdrawAmount = Math.floor(state.betAmount * state.multiplier);
+  if (state.multiplier <= 1.0) withdrawAmount = Math.floor(state.betAmount * 0.9);
+
   const kb = new InlineKeyboard()
     .text("🔼 Higher", "hilo_higher")
     .text("🔽 Lower", "hilo_lower").row()
-    .text(`💰 Withdraw (${Math.floor(state.betAmount * state.multiplier)})`, "hilo_withdraw");
+    .text(`💰 Withdraw (${withdrawAmount})`, "hilo_withdraw");
 
   if (isEdit) {
       return bot.api.editMessageText(chatId, msgId, text, { reply_markup: kb, parse_mode: 'HTML' }).catch(()=>{});
@@ -812,11 +818,19 @@ bot.on('callback_query:data', async (ctx) => {
         }
 
         if (action === 'withdraw') {
-            const payout = Math.floor(state.betAmount * state.multiplier);
+            let payout = Math.floor(state.betAmount * state.multiplier);
+            let penaltyMsg = "";
+            
+            // If withdrawing immediately at 1.0x, only get 0.9x back
+            if (state.multiplier <= 1.0) {
+                payout = Math.floor(state.betAmount * 0.9);
+                penaltyMsg = "\n⚠️ <i>Penalty applied for immediate withdrawal (0.9x).</i>";
+            }
+
             ctx.answerCallbackQuery(`Withdrew ${payout} coins!`).catch(()=>{});
             hiloManager.endGame(user.id);
             await sb.addCoinsInternal(user.id, payout);
-            bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x`, { parse_mode: 'HTML' }).catch(()=>{});
+            bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `💰 <b>Withdrawn!</b>\n\nYou walked away with ${payout} coins!\nMultiplier reached: ${state.multiplier}x${penaltyMsg}`, { parse_mode: 'HTML' }).catch(()=>{});
             return;
         }
 
@@ -824,16 +838,6 @@ bot.on('callback_query:data', async (ctx) => {
         const valCurrent = state.currentPlayer[state.constraint];
         let valNext = state.nextPlayer[state.constraint];
         const oldNextName = state.nextPlayer.name;
-
-        // --- RIGGING LOGIC FOR WHALES (>= 1Lakh) ---
-        if (profile && profile.coins >= 100000 && (action === 'higher' || action === 'lower')) {
-            const riggedPlayer = hiloManager.getRiggedPlayer(state.currentPlayer, state.constraint, action, state.seenPlayers);
-            if (riggedPlayer) {
-                console.log(`[WHALE] Rigging Hilo for ${user.id} (${profile.coins} coins)`);
-                state.nextPlayer = riggedPlayer;
-                valNext = state.nextPlayer[state.constraint];
-            }
-        }
 
         let isCorrect = false;
         let isEqual = false;
@@ -848,7 +852,7 @@ bot.on('callback_query:data', async (ctx) => {
             sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `🤝 <b>Draw! Next player was ${oldNextName} with ${valNext}.</b>\n\n`);
         } else if (isCorrect) {
             ctx.answerCallbackQuery("Correct! Multiplier increased!").catch(()=>{});
-            const nextState = hiloManager.nextRound(user.id);
+            const nextState = hiloManager.nextRound(user.id, action);
             sendHiloMsg(ctx, nextState, true, chatId, ctx.callbackQuery.message.message_id, `✅ <b>Correct!</b> (${oldNextName} had ${valNext})\n\n`);
         } else {
             ctx.answerCallbackQuery({ text: `Wrong! ${oldNextName} had ${valNext} ${state.constraint}.`, show_alert: true }).catch(()=>{});

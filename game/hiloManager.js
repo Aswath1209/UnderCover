@@ -52,12 +52,39 @@ function endGame(userId) {
   activeGames.delete(userId);
 }
 
-function nextRound(userId) {
+function calculateIncrement(basePlayer, constraint, guess) {
+  const baseVal = basePlayer[constraint];
+  const total = stats.length;
+  
+  let winCount = 0;
+  if (guess === 'higher') {
+    winCount = stats.filter(p => p[constraint] > baseVal).length;
+  } else {
+    winCount = stats.filter(p => p[constraint] < baseVal).length;
+  }
+
+  // Probability of winning
+  const prob = winCount / total;
+  
+  // Difficulty is Inverse Probability
+  // If prob is 0.9 (easy), diff is 0.1
+  // If prob is 0.1 (hard), diff is 0.9
+  const diff = 1 - prob;
+
+  // Multiplier increment between 0.01 and 0.40
+  // Scaling: increment = 0.01 + (diff * 0.39)
+  let increment = 0.01 + (diff * 0.39);
+  
+  return parseFloat(increment.toFixed(3));
+}
+
+function nextRound(userId, guess) {
   const state = activeGames.get(userId);
   if (!state) return null;
   
-  // Increase multiplier slowly (+0.2x)
-  state.multiplier = parseFloat((state.multiplier + 0.2).toFixed(1));
+  // Calculate dynamic multiplier increase based on the PREVIOUS base and the guess made
+  const increment = calculateIncrement(state.currentPlayer, state.constraint, guess);
+  state.multiplier = parseFloat((state.multiplier + increment).toFixed(3));
   
   // Carry over the target player to be the new base player
   state.currentPlayer = state.nextPlayer;
@@ -66,7 +93,6 @@ function nextRound(userId) {
   state.nextPlayer = getRandomPlayer(state.seenPlayers);
   state.seenPlayers.push(state.nextPlayer.name);
   
-  // Constraint remains the same!
   return state;
 }
 
@@ -82,37 +108,11 @@ function nextRoundDraw(userId) {
   return state;
 }
 
-function getRiggedPlayer(basePlayer, constraint, guess, seenPlayersList = []) {
-  const baseVal = basePlayer[constraint];
-  let pool = stats.filter(p => !seenPlayersList.includes(p.name));
-  
-  // Failsafe if empty
-  if (pool.length === 0) pool = stats;
-
-  let riggedPool = [];
-  if (guess === 'higher') {
-    // User guessed Higher, so we want a card that is LOWER or EQUAL
-    riggedPool = pool.filter(p => p[constraint] <= baseVal);
-  } else if (guess === 'lower') {
-    // User guessed Lower, so we want a card that is HIGHER or EQUAL
-    riggedPool = pool.filter(p => p[constraint] >= baseVal);
-  }
-
-  // If we found candidates to make them lose, pick one
-  if (riggedPool.length > 0) {
-    return riggedPool[Math.floor(Math.random() * riggedPool.length)];
-  }
-
-  // If no candidates found to force a loss (rare), just give them a normal random one
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 module.exports = {
   createGame,
   getGame,
   getActiveGamesCount,
   endGame,
   nextRound,
-  nextRoundDraw,
-  getRiggedPlayer
+  nextRoundDraw
 };
