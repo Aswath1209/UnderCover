@@ -232,9 +232,8 @@ const sendCooldowns = new Map();
 
 bot.command('send', async (ctx) => {
   if (ctx.chat.id !== -1003906592838) {
-      const me = ctx.me || await bot.api.getMe();
       const kb = new InlineKeyboard().url("📢 Join Official Group", "https://t.me/UnderCoverOfficialGroup");
-      return ctx.reply(`❌ The <code>/send</code> command is restricted to the Official Group Chat of @${me.username}.`, { 
+      return ctx.reply("❌ The <code>/send</code> command is restricted to the Official Group Chat.", { 
           reply_markup: kb, 
           parse_mode: 'HTML' 
       });
