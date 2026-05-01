@@ -1,11 +1,13 @@
--- Run this snippet in your Supabase Dashboard SQL Editor
--- This will add the coins column to the profiles table
--- and backward-compatibly assign the 2000 coin Welcome Bonus to everyone who already exists.
-
-ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS coins INT DEFAULT 2000;
-
--- In case there are already rows that somehow missed the default
-UPDATE profiles 
-SET coins = 2000 
-WHERE coins IS NULL;
+-- Hilo Games Persistence
+CREATE TABLE IF NOT EXISTS hilo_games (
+    user_id BIGINT PRIMARY KEY,
+    bet_amount INT NOT NULL,
+    multiplier FLOAT DEFAULT 1.0,
+    current_player JSONB,
+    next_player JSONB,
+    constraint_name TEXT,
+    seen_players JSONB DEFAULT '[]',
+    message_id BIGINT,
+    chat_id BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

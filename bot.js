@@ -37,7 +37,21 @@ setInterval(() => {
     }
 }, 60 * 60 * 1000);
 
+// Cleanup task for stale games (every 1 hour)
+setInterval(() => {
+    console.log("[CLEANUP] Running stale game cleanup...");
+    gameManager.cleanupStaleLobbies();
+    mafiaManager.cleanupStaleLobbies();
+    sb.cleanupStaleHiloGames();
+}, 60 * 60 * 1000);
+
 const bot = new Bot(process.env.BOT_TOKEN);
+
+function getActiveLobbyForUser(userId) {
+    return gameManager.getLobbyByUserId(userId) || 
+           mafiaManager.getLobbyByUserId(userId) || 
+           liesManager.getLobbyByUserId(userId);
+}
 
 bot.use((ctx, next) => {
   if (ctx.from && !ctx.from.is_bot) {
@@ -165,23 +179,22 @@ bot.command('cancel', async (ctx) => {
       return ctx.reply("Only the lobby host or group admins can cancel the game.");
   }
   
-  // Confirmation for Game of Lies or others
-  if (liesManager.hasLobby(chatId) || lobby.state !== 'LOBBY') {
-      // For simplicity, we'll allow direct cancellation but stop timers
-      if (lobby.timer) clearTimeout(lobby.timer);
-      if (lobby.clueTimer) clearTimeout(lobby.clueTimer);
-      if (lobby.voteTimer) clearTimeout(lobby.voteTimer);
-  }
-
   if (lobby.pinnedMessageId) {
      try { await ctx.api.unpinChatMessage(chatId, lobby.pinnedMessageId); } catch(e) {}
   }
   
   if (gameManager.hasLobby(chatId)) gameManager.deleteLobby(chatId);
-  else if (mafiaManager.hasLobby(chatId)) mafiaManager.deleteLobby(chatId);
-  else if (liesManager.hasLobby(chatId)) liesManager.deleteLobby(chatId);
+  if (mafiaManager.hasLobby(chatId)) mafiaManager.deleteLobby(chatId);
+  if (liesManager.hasLobby(chatId)) liesManager.deleteLobby(chatId);
 
-  await ctx.reply("🛑 The current game was cancelled.");
+  const hiloGames = hiloManager.getActiveGames();
+  for (const [uid, hstate] of hiloGames) {
+      if (hstate.chatId === chatId) {
+          hiloManager.endGame(uid);
+      }
+  }
+  
+  await ctx.reply("🛑 The game has been cancelled and cleaned up.");
 });
 
 bot.command('profile', async (ctx) => {
@@ -220,7 +233,6 @@ bot.command('addcoins', async (ctx) => {
   
   const newBal = await sb.addCoins(targetUserId, amount);
   if (newBal === 0 && amount !== 0) {
-      // It might have failed or user had exactly -amount. Let's assume failsafe checking.
       const profile = await sb.getProfile(targetUserId);
       if (!profile) return ctx.reply("❌ Failed to add coins. User might not exist in the DB.");
   }
@@ -242,7 +254,6 @@ bot.command('send', async (ctx) => {
   
   const senderId = ctx.from.id;
   
-  // Rate limit: 5 second cooldown per user
   const lastSend = sendCooldowns.get(senderId);
   if (lastSend && Date.now() - lastSend < 5000) {
       return ctx.reply("⏳ Please wait a few seconds before sending again.");
@@ -274,11 +285,9 @@ bot.command('send', async (ctx) => {
   
   const receiverId = replyTo.from.id;
   
-  // Ensure both users exist in DB
   await sb.ensureUser(senderId, ctx.from.first_name).catch(() => {});
   await sb.ensureUser(receiverId, replyTo.from.first_name).catch(() => {});
   
-  // Atomic transfer — balance check + deduction + deposit all happen inside the lock
   const result = await sb.transferCoins(senderId, receiverId, amount);
   
   if (result.success) {
@@ -326,7 +335,7 @@ bot.command('hilo', async (ctx) => {
       return ctx.reply(`❌ You don't have enough coins! Balance: ${profile?.coins || 0}`);
   }
   
-  if (hiloManager.getGame(userId)) {
+  if (await hiloManager.getGame(userId)) {
       return ctx.reply("❌ You already have an active High-Low game. Finish it first!");
   }
   
@@ -343,31 +352,27 @@ bot.command('quit', async (ctx) => {
   const regularLobby = gameManager.getLobbyByUserId(userId);
   const mafiaLobby = mafiaManager.getLobbyByUserId(userId);
   
-  if (!regularLobby && !mafiaLobby) {
-      return ctx.reply("You are not in any active game or lobby.");
-  }
-  
   if (regularLobby) {
       const chatId = regularLobby.chatId;
       if (regularLobby.state === 'LOBBY') {
           gameManager.leaveLobby(chatId, userId);
           await ctx.reply("✅ You have left the Undercover lobby.");
-          await updateLobbyMessage(chatId, regularLobby, regularLobby.joinMessageId);
       } else {
-          // In Undercover, leaving during a game kills the game
           gameManager.deleteLobby(chatId);
           await bot.api.sendMessage(chatId, `🛑 <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has quit. The game has been cancelled.`, { parse_mode: 'HTML' });
           await ctx.reply("✅ You quit the match. The game was cancelled.");
       }
-  } else if (mafiaLobby) {
+      return;
+  } 
+  
+  if (mafiaLobby) {
       const chatId = mafiaLobby.chatId;
       if (mafiaLobby.state === 'LOBBY') {
           mafiaManager.leaveLobby(chatId, userId);
           await ctx.reply("✅ You have left the Mafia lobby.");
-          const msgId = mafiaLobby.pinnedMessageId || mafiaLobby.joinMessageId; // check which one we have
+          const msgId = mafiaLobby.pinnedMessageId || mafiaLobby.joinMessageId;
           if (msgId) await updateMafiaLobbyMessage(chatId, mafiaLobby, msgId);
       } else {
-          // In Mafia, quitting during a game eliminates you
           const { player, role } = mafiaManager.eliminatePlayer(chatId, userId);
           const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
           let msg = `🏳️ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has <b>QUIT</b> the game!\n\nThey were a <b>${role}</b> ${RE[role]}.`;
@@ -379,7 +384,48 @@ bot.command('quit', async (ctx) => {
           const win = mafiaManager.checkWinCondition(chatId);
           if (win) await endMafiaGame(chatId, win);
       }
+      return;
   }
+
+  // Check for Game of Lies
+  const liesLobby = liesManager.getLobbyByUserId(userId);
+  if (liesLobby) {
+      const chatId = liesLobby.chatId;
+      const opponent = liesLobby.players.find(p => p.id !== userId);
+      
+      liesManager.deleteLobby(chatId);
+      
+      let msg = `🛑 <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has quit.`;
+      if (opponent) {
+          await sb.recordWin(opponent.id, opponent.first_name, chatId).catch(()=>{});
+          msg += `\n🏆 <a href="tg://user?id=${opponent.id}">${opponent.first_name}</a> has been awarded the <b>WIN</b>!`;
+      }
+      
+      await bot.api.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+      return ctx.reply("✅ You quit the quiz. Your opponent was awarded the win.");
+  }
+
+  // Check for Hilo (Quit = Withdraw)
+  const hiloState = await hiloManager.getGame(userId);
+  if (hiloState) {
+      let payout = Math.floor(hiloState.betAmount * hiloState.multiplier);
+      let penaltyMsg = '';
+      if (hiloState.multiplier <= 1.0) {
+          payout = Math.floor(hiloState.betAmount * 0.9);
+          penaltyMsg = "\n⚠️ <i>Penalty applied for immediate withdrawal (0.9x).</i>";
+      }
+      
+      hiloManager.endGame(userId);
+      await sb.addCoinsInternal(userId, payout);
+      
+      await ctx.reply(`✅ You quit Hilo. Your current balance of <b>${payout}</b> coins has been withdrawn.${penaltyMsg}`, { parse_mode: 'HTML' });
+      if (hiloState.messageId && hiloState.chatId) {
+          bot.api.editMessageText(hiloState.chatId, hiloState.messageId, `💰 <b>Withdrawn via /quit!</b>\n\nYou walked away with ${payout} coins!${penaltyMsg}`, { parse_mode: 'HTML' }).catch(()=>{});
+      }
+      return;
+  }
+
+  return ctx.reply("You are not in any active game.");
 });
 
 // --- Admin Broadcast Commands ---
@@ -558,6 +604,10 @@ bot.command('play', async (ctx) => {
   
   const chatId = ctx.chat.id;
   const creator = ctx.from;
+
+  if (getActiveLobbyForUser(creator.id)) {
+      return ctx.reply("❌ You are already in an active game or lobby! Use /quit first.");
+  }
   
   if (gameManager.hasLobby(chatId) || mafiaManager.hasLobby(chatId)) return ctx.reply("A game is already ongoing or forming in this chat!");
 
@@ -594,6 +644,9 @@ bot.command('mafia', async (ctx) => {
   catch (e) { return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>, you MUST start the bot first!`, { parse_mode: 'HTML' }); }
 
   const chatId = ctx.chat.id;
+  if (getActiveLobbyForUser(ctx.from.id)) {
+      return ctx.reply("❌ You are already in an active game or lobby! Use /quit first.");
+  }
   if (gameManager.hasLobby(chatId) || mafiaManager.hasLobby(chatId)) return ctx.reply("A game is already ongoing in this chat!");
 
   mafiaManager.createLobby(chatId, ctx.from);
@@ -645,8 +698,8 @@ bot.command('lies', async (ctx) => {
         return ctx.reply("❌ A Game of Lies is already ongoing or forming in this chat!");
     }
 
-    if (gameManager.getLobbyByUserId(user.id) || mafiaManager.getLobbyByUserId(user.id) || liesManager.getLobbyByUserId(user.id)) {
-        return ctx.reply("You are already in an active game or lobby!");
+    if (getActiveLobbyForUser(user.id)) {
+        return ctx.reply("❌ You are already in an active game or lobby! Use /quit first.");
     }
 
     if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
@@ -810,7 +863,7 @@ bot.on('callback_query:data', async (ctx) => {
     
     const release = await sb.acquireLock(user.id);
     try {
-        const state = hiloManager.getGame(user.id);
+        const state = await hiloManager.getGame(user.id);
         if (!state) {
             ctx.answerCallbackQuery({ text: "No active Hilo game found.", show_alert: true }).catch(()=>{});
             return;
@@ -933,6 +986,11 @@ bot.on('callback_query:data', async (ctx) => {
 
     if (data === 'maf_join') {
       if (mLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Game already started!");
+      
+      if (getActiveLobbyForUser(user.id)) {
+          return ctx.answerCallbackQuery({ text: "❌ You are already in an active game or lobby! Use /quit first.", show_alert: true });
+      }
+
       try { await ctx.api.sendChatAction(user.id, 'typing'); }
       catch(e) { return ctx.answerCallbackQuery({ text: "You MUST start the bot first!", show_alert: true }); }
       const joined = mafiaManager.joinLobby(chatId, user);
@@ -1021,6 +1079,10 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (data === 'lies_join') {
       if (!lLobby || lLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Lobby expired.");
+
+      if (getActiveLobbyForUser(user.id)) {
+          return ctx.answerCallbackQuery({ text: "❌ You are already in an active game or lobby! Use /quit first.", show_alert: true });
+      }
       
       // Handle Direct Challenge
       if (lLobby.isDirect) {
@@ -1073,6 +1135,11 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (data === 'join_game') {
     if (lobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Game already started!");
+
+    if (getActiveLobbyForUser(user.id)) {
+        return ctx.answerCallbackQuery({ text: "❌ You are already in an active game or lobby! Use /quit first.", show_alert: true });
+    }
+
     try { await ctx.api.sendChatAction(user.id, 'typing'); } 
     catch (e) { return ctx.answerCallbackQuery({ text: "You MUST start the bot in private messages first! Tap my profile picture, hit Start, and come back.", show_alert: true }); }
 

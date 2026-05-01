@@ -1,6 +1,7 @@
 const stats = require('../data/hiloStats.json');
 
 const activeGames = new Map();
+const sb = require('../db/supabase');
 
 function getRandomPlayer(seenPlayersList = []) {
   let pool = stats;
@@ -37,11 +38,22 @@ function createGame(userId, betAmount) {
   };
   
   activeGames.set(userId, state);
+  sb.saveHiloGame(state); // Sync to DB
   return state;
 }
 
-function getGame(userId) {
-  return activeGames.get(userId);
+async function getGame(userId) {
+  let state = activeGames.get(userId);
+  if (!state) {
+    // Try loading from DB if in-memory is missing (e.g. after restart)
+    state = await sb.getHiloGame(userId);
+    if (state) activeGames.set(userId, state);
+  }
+  return state;
+}
+
+function getActiveGames() {
+  return activeGames;
 }
 
 function getActiveGamesCount() {
@@ -50,6 +62,7 @@ function getActiveGamesCount() {
 
 function endGame(userId) {
   activeGames.delete(userId);
+  sb.deleteHiloGame(userId); // Remove from DB
 }
 
 function calculateIncrement(basePlayer, constraint, guess) {
@@ -93,6 +106,7 @@ function nextRound(userId, guess) {
   state.nextPlayer = getRandomPlayer(state.seenPlayers);
   state.seenPlayers.push(state.nextPlayer.name);
   
+  sb.saveHiloGame(state); // Sync to DB
   return state;
 }
 
@@ -105,6 +119,7 @@ function nextRoundDraw(userId) {
   state.seenPlayers.push(state.nextPlayer.name);
   
   // Constraint remains the same!
+  sb.saveHiloGame(state); // Sync to DB
   return state;
 }
 
@@ -114,5 +129,6 @@ module.exports = {
   getActiveGamesCount,
   endGame,
   nextRound,
-  nextRoundDraw
+  nextRoundDraw,
+  getActiveGames
 };

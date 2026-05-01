@@ -255,6 +255,52 @@ async function ensureUser(userId, firstName) {
   }
 }
 
+// --- Hilo Persistence ---
+async function saveHiloGame(state) {
+  if (!supabase) return;
+  const { error } = await supabase.from('hilo_games').upsert({
+    user_id: state.userId,
+    bet_amount: state.betAmount,
+    multiplier: state.multiplier,
+    current_player: state.currentPlayer,
+    next_player: state.nextPlayer,
+    constraint_name: state.constraint,
+    seen_players: state.seenPlayers,
+    message_id: state.messageId,
+    chat_id: state.chatId
+  });
+  if (error) console.error("Error saving Hilo game:", error);
+}
+
+async function getHiloGame(userId) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('hilo_games').select('*').eq('user_id', userId).single();
+  if (error || !data) return null;
+  return {
+    userId: data.user_id,
+    betAmount: data.bet_amount,
+    multiplier: data.multiplier,
+    currentPlayer: data.current_player,
+    nextPlayer: data.next_player,
+    constraint: data.constraint_name,
+    seenPlayers: data.seen_players,
+    messageId: data.message_id,
+    chatId: data.chat_id
+  };
+}
+
+async function deleteHiloGame(userId) {
+  if (!supabase) return;
+  await supabase.from('hilo_games').delete().eq('user_id', userId);
+}
+
+async function cleanupStaleHiloGames() {
+  if (!supabase) return;
+  // Cleanup games older than 24 hours
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from('hilo_games').delete().lt('created_at', yesterday);
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -276,5 +322,9 @@ module.exports = {
   getAllGroupIds,
   getAllUserIds,
   ensureUser,
+  saveHiloGame,
+  getHiloGame,
+  deleteHiloGame,
+  cleanupStaleHiloGames,
   DEFAULT_SETTINGS
 };
