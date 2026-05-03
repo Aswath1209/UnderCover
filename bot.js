@@ -171,7 +171,7 @@ bot.command('admin_stats', async (ctx) => {
                `- Lies: ${liesCount}\n` +
                `- Hilo: ${hiloCount}\n\n` +
                `⏳ <i>Cleanup interval: 30m</i>`;
-               
+                
   await ctx.reply(text, { parse_mode: 'HTML' });
 });
 
@@ -179,14 +179,21 @@ bot.command('cancel', async (ctx) => {
   if (ctx.chat.type === 'private') return;
   const chatId = ctx.chat.id;
   
-  const lobby = gameManager.getLobby(chatId) || mafiaManager.getLobby(chatId) || liesManager.getLobby(chatId);
+  const lobby = gameManager.getLobby(chatId) || 
+                mafiaManager.getLobby(chatId) || 
+                liesManager.getLobby(chatId) || 
+                guessManager.getGame(chatId);
+                
   if (!lobby) return ctx.reply("No active game to cancel.");
   
   const member = await ctx.getChatMember(ctx.from.id).catch(() => ({ status: 'member' }));
   const isAdmin = member.status === 'administrator' || member.status === 'creator' || ADMIN_IDS.includes(ctx.from.id);
   
-  if (lobby.host && lobby.host.id !== ctx.from.id && !isAdmin) {
-      return ctx.reply("Only the lobby host or group admins can cancel the game.");
+  // Use .host (all managers store host info)
+  const hostId = lobby.host?.id || (lobby.players ? lobby.players[0]?.id : null);
+
+  if (hostId && hostId !== ctx.from.id && !isAdmin) {
+      return ctx.reply("Only the host or group admins can cancel the game.");
   }
   
   if (lobby.pinnedMessageId) {
@@ -196,6 +203,7 @@ bot.command('cancel', async (ctx) => {
   if (gameManager.hasLobby(chatId)) gameManager.deleteLobby(chatId);
   if (mafiaManager.hasLobby(chatId)) mafiaManager.deleteLobby(chatId);
   if (liesManager.hasLobby(chatId)) liesManager.deleteLobby(chatId);
+  if (guessManager.getGame(chatId)) guessManager.endGame(chatId);
 
   const hiloGames = hiloManager.getActiveGames();
   for (const [uid, hstate] of hiloGames) {
@@ -1813,6 +1821,18 @@ app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
 
 module.exports = { bot };
 if (require.main === module) { 
+  bot.api.setMyCommands([
+    { command: "play", description: "Start an Undercover lobby" },
+    { command: "mafia", description: "Start a Mafia lobby" },
+    { command: "lies", description: "Challenge someone to Game of Lies" },
+    { command: "hilo", description: "Play High-Low Cricket Stats" },
+    { command: "guessword", description: "Start a Guess the Word game" },
+    { command: "profile", description: "Check your stats" },
+    { command: "top", description: "Global leaderboard" },
+    { command: "cancel", description: "Cancel current game (Admin/Host only)" },
+    { command: "quit", description: "Quit current game / Withdraw Hilo coins" },
+    { command: "help", description: "Show bot help" }
+  ]);
   bot.start(); 
   console.log("Bot started!"); 
 
