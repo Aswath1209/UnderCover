@@ -4,6 +4,7 @@ const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
 const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
+const guessManager = require('./game/guessManager');
 const sb = require('./db/supabase');
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -48,9 +49,18 @@ setInterval(() => {
 const bot = new Bot(process.env.BOT_TOKEN);
 
 function getActiveLobbyForUser(userId) {
-    return gameManager.getLobbyByUserId(userId) || 
-           mafiaManager.getLobbyByUserId(userId) || 
-           liesManager.getLobbyByUserId(userId);
+    const regular = gameManager.getLobbyByUserId(userId);
+    if (regular) return regular;
+    const mafia = mafiaManager.getLobbyByUserId(userId);
+    if (mafia) return mafia;
+    const lies = liesManager.getLobbyByUserId(userId);
+    if (lies) return lies;
+    
+    // Check guess game host
+    for (const game of guessManager.getAllGames().values()) {
+        if (game.host.id === userId) return game;
+    }
+    return null;
 }
 
 bot.use((ctx, next) => {
@@ -722,6 +732,29 @@ bot.command('lies', async (ctx) => {
     await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
 
+bot.command('guessword', async (ctx) => {
+    if (ctx.chat.type === 'private') return ctx.reply("❌ Use this command in a group!");
+    const chatId = ctx.chat.id;
+    const user = ctx.from;
+
+    if (gameManager.hasLobby(chatId) || mafiaManager.hasLobby(chatId) || liesManager.getLobby(chatId) || guessManager.getGame(chatId)) {
+        return ctx.reply("❌ A game is already active in this chat!");
+    }
+
+    const game = guessManager.createGame(chatId, { id: user.id, first_name: user.first_name });
+    
+    const kb = new InlineKeyboard()
+        .text("👁️ See Word", "guess_see")
+        .text("⏭️ Next Word", "guess_next");
+
+    await ctx.reply(
+        `🎮 <b>Guess the Word!</b>\n\n` +
+        `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is the <b>Host</b>!\n\n` +
+        `They are explaining a word. Everyone else, start guessing in the chat!`,
+        { reply_markup: kb, parse_mode: 'HTML' }
+    );
+});
+
 
 
 bot.on('message:text', async (ctx) => {
@@ -740,6 +773,36 @@ bot.on('message:text', async (ctx) => {
          await ctx.reply(`🎉 <b>THE MAJORITY WINS!</b>\n\nThe Impostor was <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>. They guessed "${guess}", but the real group word was <b>${lobby.wordA}</b>!`, { parse_mode: 'HTML' });
       }
       gameManager.deleteLobby(ctx.chat.id);
+    }
+    // Guess the Word check
+    const gGame = guessManager.getGame(ctx.chat.id);
+    if (gGame && gGame.isGuessingEnabled) {
+        if (ctx.from.id !== gGame.host.id) {
+            const isCorrect = guessManager.checkGuess(ctx.chat.id, ctx.message.text);
+            if (isCorrect) {
+                gGame.isGuessingEnabled = false;
+                gGame.lastWinnerId = ctx.from.id;
+                gGame.priorityActive = true;
+                
+                // 5 seconds priority for the winner to click "Be Host"
+                gGame.winnerPriorityTimer = setTimeout(() => {
+                    const checkGame = guessManager.getGame(ctx.chat.id);
+                    if (checkGame && !checkGame.isGuessingEnabled) {
+                        checkGame.priorityActive = false;
+                        const kb = new InlineKeyboard().text("🙋 Wanna be a Host?", "guess_be_host");
+                        bot.api.sendMessage(ctx.chat.id, `🕒 5 seconds are up! Anyone can now claim the host position!`, { reply_markup: kb }).catch(()=>{});
+                    }
+                }, 5000);
+
+                const kb = new InlineKeyboard().text("🙋 Wanna be a Host?", "guess_be_host");
+                await ctx.reply(
+                    `🎉 <b>CORRECT!</b>\n\n` +
+                    `🏆 <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a> guessed the word: <b>${gGame.currentWord}</b>!\n\n` +
+                    `You have 5 seconds priority to become the next Host. Click the button below!`,
+                    { reply_markup: kb, parse_mode: 'HTML' }
+                );
+            }
+        }
     }
     return;
   }
@@ -1127,6 +1190,74 @@ bot.on('callback_query:data', async (ctx) => {
       await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, "❌ <b>The Game of Lies challenge was declined.</b>", { parse_mode: 'HTML' });
       return;
   }
+
+  // --- Guess the Word callbacks ---
+  if (data.startsWith('guess_')) {
+      const gGame = guessManager.getGame(chatId);
+      if (!gGame) return ctx.answerCallbackQuery("This game has ended.");
+      
+      if (data === 'guess_see') {
+          if (user.id !== gGame.host.id) return ctx.answerCallbackQuery({ text: "Only the Host can see the word!", show_alert: true });
+          return ctx.answerCallbackQuery({ text: `🔍 The word is: ${gGame.currentWord}`, show_alert: true });
+      }
+      
+      if (data === 'guess_next') {
+          if (user.id !== gGame.host.id) return ctx.answerCallbackQuery({ text: "Only the Host can skip!", show_alert: true });
+          const newWord = guessManager.nextWord(chatId);
+          return ctx.answerCallbackQuery({ text: `⏭️ Skipped! New word is: ${newWord}`, show_alert: true });
+      }
+
+      if (data === 'guess_be_host') {
+          // Check for priority
+          if (gGame.isGuessingEnabled) return ctx.answerCallbackQuery("The word is still being guessed!");
+          
+          const now = Date.now();
+          const priorityExpired = (now - gGame.startTime > 10000000) || true; // Placeholder logic, checking actual timer state
+          
+          // Real check: if someone clicks and they are not the winner, check if 5s passed
+          // But I don't have the timer timestamp easily. I'll use a simple approach:
+          // If the button exists, anyone can click if it's the second broadcast.
+          // Or just check the lastWinnerId.
+          
+          if (gGame.lastWinnerId && user.id !== gGame.lastWinnerId) {
+              // Not the winner. Has 5s passed?
+              // Since I can't easily check the timeout state from here without storing a timestamp,
+              // I'll just check if the winner clicked or if the game state allows it.
+              // For simplicity, I'll assume if the message was sent after the priority msg, it's open.
+          }
+
+          // Let's just make it simple: 
+          // If they click and they are the winner, they get it immediately.
+          // If they are not the winner, they can only get it if the priority is gone.
+          // I'll update gGame to have a priorityActive flag.
+          
+          if (gGame.priorityActive && user.id !== gGame.lastWinnerId) {
+              return ctx.answerCallbackQuery({ text: "⏳ Wait for the winner's priority to expire!", show_alert: true });
+          }
+
+          // Become Host
+          gGame.host = { id: user.id, first_name: user.first_name };
+          gGame.currentWord = guessManager.getRandomWord();
+          gGame.isGuessingEnabled = true;
+          gGame.priorityActive = false;
+          gGame.lastWinnerId = null;
+          if (gGame.winnerPriorityTimer) clearTimeout(gGame.winnerPriorityTimer);
+
+          const kb = new InlineKeyboard()
+              .text("👁️ See Word", "guess_see")
+              .text("⏭️ Next Word", "guess_next");
+
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, 
+              `🎮 <b>Guess the Word!</b>\n\n` +
+              `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is the <b>New Host</b>!\n\n` +
+              `They are explaining a word. Start guessing!`,
+              { reply_markup: kb, parse_mode: 'HTML' }
+          );
+          return ctx.answerCallbackQuery("You are now the Host!");
+      }
+      return;
+  }
+
   
   // --- Regular Game callbacks ---
   const lobby = gameManager.getLobby(chatId);
