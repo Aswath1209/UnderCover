@@ -818,24 +818,12 @@ bot.on('message:text', async (ctx) => {
             const isCorrect = guessManager.checkGuess(ctx.chat.id, ctx.message.text);
             if (isCorrect) {
                 gGame.isGuessingEnabled = false;
-                gGame.lastWinnerId = ctx.from.id;
-                gGame.priorityActive = true;
                 
-                // 5 seconds priority for the winner to click "Be Host"
-                gGame.winnerPriorityTimer = setTimeout(() => {
-                    const checkGame = guessManager.getGame(ctx.chat.id);
-                    if (checkGame && !checkGame.isGuessingEnabled) {
-                        checkGame.priorityActive = false;
-                        const kb = new InlineKeyboard().text("🙋 Wanna be a Host?", "guess_be_host");
-                        bot.api.sendMessage(ctx.chat.id, `🕒 5 seconds are up! Anyone can now claim the host position!`, { reply_markup: kb }).catch(()=>{});
-                    }
-                }, 5000);
-
                 const kb = new InlineKeyboard().text("🙋 Wanna be a Host?", "guess_be_host");
                 await ctx.reply(
                     `🎉 <b>CORRECT!</b>\n\n` +
                     `🏆 <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a> guessed the word: <b>${gGame.currentWord}</b>!\n\n` +
-                    `You have 5 seconds priority to become the next Host. Click the button below!`,
+                    `Click below to become the next Host!`,
                     { reply_markup: kb, parse_mode: 'HTML' }
                 );
             }
@@ -1266,40 +1254,12 @@ bot.on('callback_query:data', async (ctx) => {
       }
 
       if (data === 'guess_be_host') {
-          // Check for priority
-          if (gGame.isGuessingEnabled) return ctx.answerCallbackQuery("The word is still being guessed!");
-          
-          const now = Date.now();
-          const priorityExpired = (now - gGame.startTime > 10000000) || true; // Placeholder logic, checking actual timer state
-          
-          // Real check: if someone clicks and they are not the winner, check if 5s passed
-          // But I don't have the timer timestamp easily. I'll use a simple approach:
-          // If the button exists, anyone can click if it's the second broadcast.
-          // Or just check the lastWinnerId.
-          
-          if (gGame.lastWinnerId && user.id !== gGame.lastWinnerId) {
-              // Not the winner. Has 5s passed?
-              // Since I can't easily check the timeout state from here without storing a timestamp,
-              // I'll just check if the winner clicked or if the game state allows it.
-              // For simplicity, I'll assume if the message was sent after the priority msg, it's open.
-          }
-
-          // Let's just make it simple: 
-          // If they click and they are the winner, they get it immediately.
-          // If they are not the winner, they can only get it if the priority is gone.
-          // I'll update gGame to have a priorityActive flag.
-          
-          if (gGame.priorityActive && user.id !== gGame.lastWinnerId) {
-              return ctx.answerCallbackQuery({ text: "⏳ Wait for the winner's priority to expire!", show_alert: true });
-          }
+          if (gGame.isGuessingEnabled) return ctx.answerCallbackQuery({ text: "Someone already claimed the host position!", show_alert: true });
 
           // Become Host
           gGame.host = { id: user.id, first_name: user.first_name };
           gGame.currentWord = guessManager.getRandomWord();
           gGame.isGuessingEnabled = true;
-          gGame.priorityActive = false;
-          gGame.lastWinnerId = null;
-          if (gGame.winnerPriorityTimer) clearTimeout(gGame.winnerPriorityTimer);
 
           const kb = new InlineKeyboard()
               .text("👁️ See Word", "guess_see")
@@ -1307,11 +1267,12 @@ bot.on('callback_query:data', async (ctx) => {
 
           await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, 
               `🎮 <b>Guess the Word!</b>\n\n` +
-              `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is the <b>New Host</b>!\n\n` +
-              `They are explaining a word. Start guessing!`,
+              `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is now the <b>Host</b>!\n\n` +
+              `Explain your word to the group!`,
               { reply_markup: kb, parse_mode: 'HTML' }
           );
-          return ctx.answerCallbackQuery("You are now the Host!");
+          
+          return ctx.answerCallbackQuery({ text: `🔍 Your word is: ${gGame.currentWord}\n\nStart explaining!`, show_alert: true });
       }
       return;
   }
