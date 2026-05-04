@@ -144,32 +144,58 @@ async function getProfile(userId) {
   return data;
 }
 
-async function getGlobalLeaderboard() {
+async function getGlobalLeaderboard(sortBy = 'wins') {
   if (!supabase) return [];
-  const { data } = await supabase.from('profiles').select('*').order('wins', { ascending: false }).limit(10);
+  const { data } = await supabase.from('profiles').select('*').order(sortBy, { ascending: false }).limit(10);
   return data;
 }
 
-async function getGroupLeaderboard(chatId) {
+async function getGroupLeaderboard(chatId, sortBy = 'wins') {
   if (!supabase) return [];
-  const { data } = await supabase.from('group_stats').select('*').eq('chat_id', chatId).order('wins', { ascending: false }).limit(10);
-  return data;
+  if (sortBy === 'wins') {
+    const { data } = await supabase.from('group_stats').select('*').eq('chat_id', chatId).order('wins', { ascending: false }).limit(10);
+    return data;
+  } else {
+    // For group coins: fetch all user IDs in this group, then get their global coin rankings
+    const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
+    if (!participants || participants.length === 0) return [];
+    
+    const userIds = participants.map(p => p.user_id);
+    const { data: profiles } = await supabase.from('profiles')
+      .select('user_id, first_name, coins')
+      .in('user_id', userIds)
+      .order('coins', { ascending: false })
+      .limit(10);
+      
+    return profiles || [];
+  }
 }
 
-async function getUserGlobalRank(userId) {
+async function getUserGlobalRank(userId, sortBy = 'wins') {
   if (!supabase) return null;
   const profile = await getProfile(userId);
   if (!profile) return null;
-  const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt('wins', profile.wins);
+  const val = profile[sortBy] || 0;
+  const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt(sortBy, val);
   return (count !== null ? count : 0) + 1;
 }
 
-async function getUserGroupRank(chatId, userId) {
+async function getUserGroupRank(chatId, userId, sortBy = 'wins') {
   if (!supabase) return null;
-  const { data: gstat } = await supabase.from('group_stats').select('wins').eq('user_id', userId).eq('chat_id', chatId).single();
-  if (!gstat) return null;
-  const { count } = await supabase.from('group_stats').select('user_id', { count: 'exact', head: true }).eq('chat_id', chatId).gt('wins', gstat.wins);
-  return (count !== null ? count : 0) + 1;
+  if (sortBy === 'wins') {
+    const { data: gstat } = await supabase.from('group_stats').select('wins').eq('user_id', userId).eq('chat_id', chatId).single();
+    if (!gstat) return null;
+    const { count } = await supabase.from('group_stats').select('user_id', { count: 'exact', head: true }).eq('chat_id', chatId).gt('wins', gstat.wins);
+    return (count !== null ? count : 0) + 1;
+  } else {
+    const profile = await getProfile(userId);
+    if (!profile) return null;
+    const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
+    if (!participants || participants.length === 0) return null;
+    const userIds = participants.map(p => p.user_id);
+    const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).gt('coins', profile.coins);
+    return (count !== null ? count : 0) + 1;
+  }
 }
 
 async function getGlobalStats() {

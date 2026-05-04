@@ -453,7 +453,13 @@ async function sendBroadcast(ctx, targetIds, message) {
     let failed = 0;
     const total = targetIds.length;
     
-    const statusMsg = await ctx.reply(`🚀 Broadcasting to ${total} chats... (0/${total})`);
+    let statusMsg;
+    try {
+        statusMsg = await ctx.reply(`🚀 <b>Broadcast Started</b>\n\nTargeting ${total} chats. I will update this message with progress.`, { parse_mode: 'HTML' });
+    } catch (e) {
+        console.error("Failed to send initial broadcast status:", e);
+        return;
+    }
     
     for (let i = 0; i < total; i++) {
         const targetId = targetIds[i];
@@ -464,16 +470,26 @@ async function sendBroadcast(ctx, targetIds, message) {
             failed++;
         }
         
-        // Update status UI every 5 messages or at the end
-        if (i % 5 === 0 || i === total - 1) {
-            try { await bot.api.editMessageText(ctx.chat.id, statusMsg.message_id, `🚀 Broadcasting... (${i + 1}/${total})\n✅ Success: ${success}\n❌ Failed: ${failed}`); } catch (e) {}
+        // Update status UI every 10 messages or at the end (less frequent updates save API calls)
+        if (i % 10 === 0 || i === total - 1) {
+            try { 
+                await bot.api.editMessageText(ctx.chat.id, statusMsg.message_id, 
+                    `🚀 <b>Broadcasting...</b> (${i + 1}/${total})\n\n` +
+                    `✅ Success: ${success}\n` +
+                    `❌ Failed: ${failed}\n\n` +
+                    `<i>Bot remains active for other users during this process.</i>`, 
+                    { parse_mode: 'HTML' }
+                ); 
+            } catch (e) {}
         }
         
-        // Small delay to avoid rate limits
+        // Small delay to avoid rate limits (100ms = 10 msgs/sec)
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    await ctx.reply(`🏁 <b>Broadcast Complete</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
+    try {
+        await bot.api.sendMessage(ctx.chat.id, `🏁 <b>Broadcast Complete</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
+    } catch (e) {}
 }
 
 bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) => {
@@ -502,7 +518,8 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   if (targetIds.length === 0) {
       return ctx.reply("❌ No target chats found in database.");
   }
-    await sendBroadcast(ctx, targetIds, broadcastMsg);
+    sendBroadcast(ctx, targetIds, broadcastMsg).catch(err => console.error("Broadcast Error:", err));
+    await ctx.reply("✅ <b>Broadcast has been moved to background.</b>\n\nYou can continue using the bot while it sends messages.", { parse_mode: 'HTML' });
 });
 
 bot.command(['feedback', 'report'], async (ctx) => {
@@ -571,11 +588,33 @@ bot.command('leaderboard', async (ctx) => {
   if (ctx.chat.type === 'private') return ctx.reply("Leaderboards are best viewed in group chats.");
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   
-  const keyboard = new InlineKeyboard()
-    .text("🌍 Global", "lb_global")
-    .text("🏠 This Group", "lb_group");
-    
-  await ctx.reply("📊 <b>Leaderboards</b>\n\nSelect which leaderboard you want to view:", { reply_markup: keyboard, parse_mode: 'HTML' });
+  const user = ctx.from;
+  const chatId = ctx.chat.id;
+  const sortBy = 'wins';
+  const isGlobal = true;
+
+  const records = await sb.getGlobalLeaderboard(sortBy);
+  
+  let text = `🌍 <b>Global Top 10 — Wins</b> 🌍\n\n`;
+  if (!records || records.length === 0) {
+     text += "<i>No records found yet!</i>\n";
+  } else {
+     records.forEach((r, i) => {
+        const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
+        text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
+     });
+  }
+
+  const userRank = await sb.getUserGlobalRank(user.id, sortBy);
+  if (userRank !== null && userRank !== undefined) {
+      text += `\n📌 <b>Your Position:</b> #${userRank}`;
+  }
+
+  const kb = new InlineKeyboard();
+  kb.text("● Global", "lb_global_wins").text("Group", "lb_group_wins").row();
+  kb.text("● Wins", "lb_global_wins").text("Coins", "lb_global_coins");
+
+  await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
 
 // --- Settings Command ---
@@ -741,9 +780,14 @@ bot.command('lies', async (ctx) => {
 });
 
 bot.command('guessword', async (ctx) => {
+    ensureRegistered(ctx);
     if (ctx.chat.type === 'private') return ctx.reply("❌ Use this command in a group!");
     const chatId = ctx.chat.id;
     const user = ctx.from;
+
+    if (getActiveLobbyForUser(user.id)) {
+        return ctx.reply("❌ You are already in an active game or lobby! Use /quit first.");
+    }
 
     if (gameManager.hasLobby(chatId) || mafiaManager.hasLobby(chatId) || liesManager.getLobby(chatId) || guessManager.getGame(chatId)) {
         return ctx.reply("❌ A game is already active in this chat!");
@@ -997,35 +1041,55 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   // --- Leaderboard callbacks ---
-  if (data === 'lb_global' || data === 'lb_group') {
-     const isGlobal = data === 'lb_global';
-     const records = isGlobal ? await sb.getGlobalLeaderboard() : await sb.getGroupLeaderboard(chatId);
+  if (data.startsWith('lb_')) {
+     const parts = data.split('_'); // lb_scope_sort
+     const scope = parts[1]; // global or group
+     const sortBy = parts[2]; // wins or coins
      
-     let text = isGlobal ? `🌍 <b>Global Top 10 Players</b> 🌍\n\n` : `🏠 <b>Group Top 10 Players</b> 🏠\n\n`;
+     const isGlobal = scope === 'global';
+     const records = isGlobal ? await sb.getGlobalLeaderboard(sortBy) : await sb.getGroupLeaderboard(chatId, sortBy);
+     
+     const title = sortBy === 'wins' ? 'Wins' : 'Coins';
+     const scopeTitle = isGlobal ? 'Global' : 'Group';
+     const icon = sortBy === 'wins' ? '🏆' : '💰';
+     const scopeIcon = isGlobal ? '🌍' : '🏠';
+     
+     let text = `${scopeIcon} <b>${scopeTitle} Top 10 — ${title}</b> ${scopeIcon}\n\n`;
      
      if (!records || records.length === 0) {
-        text += "<i>No records found yet! Play some games!</i>\n";
+        text += "<i>No records found yet!</i>\n";
      } else {
         records.forEach((r, i) => {
-           const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
-           text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
+           if (sortBy === 'wins') {
+               const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
+               text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
+           } else {
+               text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.coins} Coins 💰\n`;
+           }
         });
      }
-
-     const userRank = isGlobal ? await sb.getUserGlobalRank(user.id) : await sb.getUserGroupRank(chatId, user.id);
+ 
+     const userRank = isGlobal ? await sb.getUserGlobalRank(user.id, sortBy) : await sb.getUserGroupRank(chatId, user.id, sortBy);
      if (userRank !== null && userRank !== undefined) {
          text += `\n📌 <b>Your Position:</b> #${userRank}`;
      }
      
-     const keyboard = new InlineKeyboard()
-       .text("🌍 Global", "lb_global")
-       .text("🏠 This Group", "lb_group");
+     const kb = new InlineKeyboard();
+     
+     // Scope Selector Row
+     kb.text(isGlobal ? "● Global" : "Global", `lb_global_${sortBy}`)
+       .text(!isGlobal ? "● Group" : "Group", `lb_group_${sortBy}`).row();
+     
+     // Sort Selector Row
+     kb.text(sortBy === 'wins' ? "● Wins" : "Wins", `lb_${scope}_wins`)
+       .text(sortBy === 'coins' ? "● Coins" : "Coins", `lb_${scope}_coins`);
        
      try {
-       await ctx.editMessageText(text, { reply_markup: keyboard, parse_mode: 'HTML' });
+       await ctx.editMessageText(text, { reply_markup: kb, parse_mode: 'HTML' });
      } catch(e) {}
      return;
   }
+
 
   // --- Settings callbacks ---
   if (data.startsWith('set_')) {
@@ -1151,7 +1215,8 @@ bot.on('callback_query:data', async (ctx) => {
   if (data === 'lies_join') {
       if (!lLobby || lLobby.state !== 'LOBBY') return ctx.answerCallbackQuery("Lobby expired.");
 
-      if (getActiveLobbyForUser(user.id)) {
+      const activeLobby = getActiveLobbyForUser(user.id);
+      if (activeLobby && activeLobby !== lLobby) {
           return ctx.answerCallbackQuery({ text: "❌ You are already in an active game or lobby! Use /quit first.", show_alert: true });
       }
       
@@ -1828,7 +1893,7 @@ if (require.main === module) {
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "guessword", description: "Start a Guess the Word game" },
     { command: "profile", description: "Check your stats" },
-    { command: "top", description: "Global leaderboard" },
+    { command: "leaderboard", description: "Global leaderboard" },
     { command: "cancel", description: "Cancel current game (Admin/Host only)" },
     { command: "quit", description: "Quit current game / Withdraw Hilo coins" },
     { command: "help", description: "Show bot help" }
