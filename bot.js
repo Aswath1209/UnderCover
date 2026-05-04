@@ -70,22 +70,7 @@ bot.use((ctx, next) => {
   return next();
 });
 
-bot.api.setMyCommands([
-  { command: 'play', description: 'Start an Undercover game lobby' },
-  { command: 'mafia', description: 'Start a Mafia mode game (multi-round)' },
-  { command: 'lies', description: 'Challenge someone to a Game of Lies (1v1 Quiz)' },
-  { command: 'hilo', description: 'Play High-Low constraint guessing game' },
-  { command: 'balance', description: 'Check your available coin balance' },
-  { command: 'send', description: 'Send coins to another user (reply to their message)' },
-  { command: 'myword', description: 'Re-send your secret word to DM' },
-  { command: 'cancel', description: 'Cancel an ongoing game (Host or Admin only)' },
-  { command: 'settings', description: 'Configure game settings (Admin only)' },
-  { command: 'profile', description: 'View your stats and win rate' },
-  { command: 'leaderboard', description: 'View top players in this group or globally' },
-  { command: 'quit', description: 'Leave your current match or lobby' },
-  { command: 'start', description: 'Start the bot (required to play)' },
-  { command: 'ping', description: 'Check bot status and global stats' }
-]).catch(console.error);
+
 
 function processGameEnd(lobby, winners) {
   if (!sb.supabase) return;
@@ -779,7 +764,7 @@ bot.command('lies', async (ctx) => {
     await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
 
-bot.command('guessword', async (ctx) => {
+bot.command(['guessword', 'gw'], async (ctx) => {
     ensureRegistered(ctx);
     if (ctx.chat.type === 'private') return ctx.reply("❌ Use this command in a group!");
     const chatId = ctx.chat.id;
@@ -1891,12 +1876,19 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
-    { command: "guessword", description: "Start a Guess the Word game" },
+    { command: "guessword", description: "Start a Guess the Word game (Alias: /gw)" },
+    { command: "gw", description: "Alias for /guessword" },
     { command: "profile", description: "Check your stats" },
     { command: "leaderboard", description: "Global leaderboard" },
-    { command: "cancel", description: "Cancel current game (Admin/Host only)" },
-    { command: "quit", description: "Quit current game / Withdraw Hilo coins" },
-    { command: "help", description: "Show bot help" }
+    { command: "balance", description: "Check your coin balance" },
+    { command: "send", description: "Send coins to another user" },
+    { command: "myword", description: "Re-send your secret word to DM" },
+    { command: "settings", description: "Configure game settings" },
+    { command: "cancel", description: "Cancel current game" },
+    { command: "quit", description: "Quit current game" },
+    { command: "help", description: "Show bot help" },
+    { command: "start", description: "Start the bot" },
+    { command: "ping", description: "Check bot status" }
   ]);
   bot.start(); 
   console.log("Bot started!"); 
