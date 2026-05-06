@@ -21,7 +21,7 @@ function removeUserLobby(userId, chatId) {
 }
 
 class LiesManager {
-  createLobby(chatId, host, challenger = null, rounds = 5) {
+  createLobby(chatId, host, challenger = null, rounds = 5, category = 'Cricket') {
     const lobby = {
       chatId,
       players: [host],
@@ -31,6 +31,7 @@ class LiesManager {
       state: 'LOBBY',
       round: 0,
       totalRounds: rounds,
+      category,
       currentQuestion: null,
       submissions: {}, // userId -> { type, value }
       askedQuestions: [], // Track indices to avoid repetition
@@ -66,6 +67,10 @@ class LiesManager {
   }
   getActiveGamesCount() { return lobbies.size; }
 
+  getCategories() {
+      return Object.keys(quizData.categories);
+  }
+
   joinLobby(chatId, user) {
     const lobby = lobbies.get(chatId);
     if (!lobby || lobby.state !== 'LOBBY') return false;
@@ -91,8 +96,10 @@ class LiesManager {
     lobby.state = 'QUIZ_PHASE';
     lobby.submissions = {};
     
+    const questions = quizData.categories[lobby.category] || [];
+
     // Pick random question that hasn't been asked
-    const availableIndices = quizData.questions
+    const availableIndices = questions
         .map((_, i) => i)
         .filter(i => !lobby.askedQuestions.includes(i));
     
@@ -103,7 +110,7 @@ class LiesManager {
 
     const qIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
     lobby.askedQuestions.push(qIndex);
-    lobby.currentQuestion = quizData.questions[qIndex];
+    lobby.currentQuestion = questions[qIndex];
     
     return { type: 'ROUND', round: lobby.round, question: lobby.currentQuestion.q };
   }

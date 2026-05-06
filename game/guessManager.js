@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { normalizeWord } = require('../utils');
 
 const wordsPath = path.join(__dirname, '../data/guessWords.json');
 const wordsData = JSON.parse(fs.readFileSync(wordsPath, 'utf8')).words;
@@ -47,10 +48,10 @@ function checkGuess(chatId, guess) {
     const game = activeGames.get(chatId);
     if (!game || !game.isGuessingEnabled) return false;
     
-    const normalizedGuess = guess.toLowerCase().trim();
-    const normalizedWord = game.currentWord.toLowerCase().trim();
+    const normalizedGuess = normalizeWord(guess);
+    const normalizedWord = normalizeWord(game.currentWord);
     
-    // Exact match or very close match (handle variations like MS Dhoni vs Dhoni if needed)
+    // Exact match or very close match
     return normalizedGuess === normalizedWord;
 }
 

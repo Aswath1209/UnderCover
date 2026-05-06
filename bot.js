@@ -5,6 +5,8 @@ const mafiaManager = require('./game/mafiaManager');
 const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const guessManager = require('./game/guessManager');
+const crashManager = require('./game/crashManager');
+const { normalizeWord } = require('./utils');
 const sb = require('./db/supabase');
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -348,6 +350,54 @@ bot.command('hilo', async (ctx) => {
   const state = hiloManager.createGame(userId, bet);
   const msg = await sendHiloMsg(ctx, state);
   state.messageId = msg.message_id;
+});
+
+bot.command(['aviator', 'fly'], async (ctx) => {
+    if (!sb.supabase) return ctx.reply("Database disabled.");
+    const userId = ctx.from.id;
+    const args = ctx.message.text.split(' ');
+    
+    const betStr = args[1];
+    const targetStr = args[2];
+    
+    if (!betStr || !targetStr || isNaN(betStr) || isNaN(targetStr)) {
+        return ctx.reply("✈️ <b>Aviator</b>\n\nUsage: /fly &lt;bet&gt; &lt;target_multiplier&gt;\nExample: /fly 100 2.5", { parse_mode: 'HTML' });
+    }
+    
+    const bet = parseInt(betStr);
+    const target = parseFloat(targetStr);
+    
+    if (bet <= 0 || target < 1.1) {
+        return ctx.reply("❌ Minimum bet is 1 and minimum multiplier is 1.1x.");
+    }
+
+    const profile = await sb.getProfile(userId);
+    if (!profile || (profile.coins || 0) < bet) {
+        return ctx.reply(`❌ Not enough coins! Balance: ${profile?.coins || 0}`);
+    }
+
+    // Deduct bet
+    const deduct = await sb.addCoins(userId, -bet);
+    if (deduct === false) return ctx.reply("❌ Error processing bet.");
+
+    const result = crashManager.playAviator(bet, target);
+    
+    if (result.won) {
+        await sb.addCoinsInternal(userId, result.payout);
+        await ctx.reply(
+            `🛫 <b>Plane reached ${result.crashPoint}x!</b>\n\n` +
+            `✅ You WON <b>${result.payout}</b> coins!\n` +
+            `💰 Target was ${target}x.`,
+            { parse_mode: 'HTML' }
+        );
+    } else {
+        await ctx.reply(
+            `💥 <b>CRASHED at ${result.crashPoint}x!</b>\n\n` +
+            `❌ You lost <b>${bet}</b> coins.\n` +
+            `📉 You wanted ${target}x, but it failed.`,
+            { parse_mode: 'HTML' }
+        );
+    }
 });
 
 bot.command('quit', async (ctx) => {
@@ -726,8 +776,10 @@ bot.command('lies', async (ctx) => {
   ensureRegistered(ctx);
     if (ctx.chat.type === 'private') return ctx.reply("Please use this command in a group chat!");
     const chatId = ctx.chat.id;
-    const user = ctx.from;
-    const challenger = ctx.message.reply_to_message?.from;
+    
+    if (liesManager.hasLobby(chatId)) {
+        return ctx.reply("🛑 A Game of Lies is already active in this group!");
+    }
 
     const args = ctx.message.text.split(' ');
     let rounds = 5;
@@ -736,32 +788,52 @@ bot.command('lies', async (ctx) => {
         if (!isNaN(r) && r >= 1 && r <= 10) rounds = r;
     }
 
-    if (liesManager.hasLobby(chatId)) {
-        return ctx.reply("❌ A Game of Lies is already ongoing or forming in this chat!");
-    }
+    const challengerId = ctx.message.reply_to_message?.from?.id || "";
 
-    if (getActiveLobbyForUser(user.id)) {
-        return ctx.reply("❌ You are already in an active game or lobby! Use /quit first.");
-    }
-
-    if (challenger && challenger.id === user.id) return ctx.reply("You can't challenge yourself!");
-    if (challenger && challenger.is_bot) return ctx.reply("You can't challenge a bot!");
-
-    const lobby = liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger ? { id: challenger.id, first_name: challenger.first_name } : null, rounds);
-    
     const kb = new InlineKeyboard();
-    if (!challenger) kb.text("✅ Accept", "lies_join");
-    else kb.text("✅ Accept", "lies_join");
-    kb.text("❌ Decline", "lies_cancel");
+    liesManager.getCategories().forEach(cat => {
+        kb.text(cat, `lcat_${cat}_${rounds}_${challengerId}`).row();
+    });
 
-    let text = `🤥 <b>Game of Lies Challenge!</b> (${rounds} Rounds)\n\nHost: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
-    if (challenger) {
-        text += `Opponent: <a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>\n\n<a href="tg://user?id=${challenger.id}">${challenger.first_name}</a>, you have been challenged! Match starts automatically when you accept.`;
+    await ctx.reply("🤔 <b>Game of Lies</b>\n\nChoose a category to start the game!", { reply_markup: kb, parse_mode: 'HTML' });
+});
+
+bot.callbackQuery(/^lcat_(.+)_(.+)_(.*)$/, async (ctx) => {
+    const category = ctx.match[1];
+    const rounds = parseInt(ctx.match[2]);
+    const challengerId = ctx.match[3] ? parseInt(ctx.match[3]) : null;
+    const chatId = ctx.chat.id;
+    const user = ctx.from;
+
+    if (liesManager.hasLobby(chatId)) {
+        return ctx.answerCallbackQuery("🛑 A game is already active!");
+    }
+
+    let challenger = null;
+    if (challengerId) {
+        if (challengerId === user.id) return ctx.answerCallbackQuery("You can't challenge yourself!");
+        challenger = { id: challengerId, first_name: "Challenged Player" };
+    }
+
+    liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger, rounds, category);
+
+    const kb = new InlineKeyboard()
+        .text("🤝 Join & Accept", "lies_join")
+        .text("❌ Decline", "lies_cancel");
+
+    let text = `🤥 <b>Game of Lies Challenge!</b>\n\n` +
+               `Category: <b>${category}</b>\n` +
+               `Rounds: <b>${rounds}</b>\n` +
+               `Host: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
+    
+    if (challengerId) {
+        text += `\n<a href="tg://user?id=${challengerId}">Targeted Player</a>, you have been challenged! Accept below to start.`;
     } else {
         text += `\nWaiting for someone to accept the 1v1 battle...`;
     }
 
-    await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+    await ctx.editMessageText(text, { reply_markup: kb, parse_mode: 'HTML' });
+    await ctx.answerCallbackQuery();
 });
 
 bot.command(['guessword', 'gw'], async (ctx) => {
@@ -798,11 +870,10 @@ bot.on('message:text', async (ctx) => {
   if (ctx.chat.type !== 'private') {
     const lobby = gameManager.getLobby(ctx.chat.id);
     if (lobby && lobby.state === 'IMPOSTOR_GUESS' && ctx.from.id === lobby.impostorId) {
-      const guess = ctx.message.text.trim().toLowerCase();
-      const actualWordA = lobby.wordA.toLowerCase();
+      const guess = ctx.message.text;
       
       lobby.state = 'END'; 
-      if (guess === actualWordA) {
+      if (normalizeWord(guess) === normalizeWord(lobby.wordA)) {
          processGameEnd(lobby, 'IMPOSTOR');
          await ctx.reply(`🤯 <b>THE IMPOSTOR STOLE THE WIN!</b>\n\n<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a> correctly guessed the majority word: <b>${lobby.wordA}</b>! They pulled off the ultimate bluff!`, { parse_mode: 'HTML' });
       } else {
