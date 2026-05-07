@@ -218,6 +218,44 @@ bot.command('profile', async (ctx) => {
   );
 });
 
+const OFFICIAL_GC_ID = -1003906592838;
+const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
+
+bot.command('daily', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  
+  const userId = ctx.from.id;
+  let isMember = false;
+  
+  try {
+      const member = await ctx.api.getChatMember(OFFICIAL_GC_ID, userId);
+      isMember = ['member', 'administrator', 'creator'].includes(member.status);
+  } catch (e) {
+      isMember = false;
+  }
+  
+  const amount = isMember ? 1000 : 500;
+  const result = await sb.claimDaily(userId, amount);
+  
+  if (result.success) {
+      let msg = `💰 <b>Daily Reward Claimed!</b>\n\n`;
+      msg += `You received <b>${amount}</b> coins.\n`;
+      msg += `New Balance: <b>${result.newBalance}</b> coins.\n\n`;
+      
+      if (!isMember) {
+          msg += `💡 <b>Tip:</b> Join our ${OFFICIAL_GC_USER} to get <b>1000 coins</b> every day!`;
+      } else {
+          msg += `✨ Thanks for being a member of our official group!`;
+      }
+      
+      await ctx.reply(msg, { parse_mode: 'HTML' });
+  } else if (result.remaining) {
+      await ctx.reply(`⏳ <b>Cooldown</b>\n\nYou've already claimed your daily reward. Please wait <b>${result.remaining}</b> before claiming again.`, { parse_mode: 'HTML' });
+  } else {
+      await ctx.reply(`❌ ${result.error}`);
+  }
+});
+
 bot.command('balance', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   const user = ctx.message.reply_to_message?.from || ctx.from;
@@ -352,8 +390,8 @@ bot.command('hilo', async (ctx) => {
   state.messageId = msg.message_id;
 });
 
-bot.command(['aviator', 'fly'], async (ctx) => {
-    if (!sb.supabase) return ctx.reply("Database disabled.");
+bot.command('fly', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database disabled.");
     const userId = ctx.from.id;
     const args = ctx.message.text.split(' ');
     
@@ -367,8 +405,8 @@ bot.command(['aviator', 'fly'], async (ctx) => {
     const bet = parseInt(betStr);
     const target = parseFloat(targetStr);
     
-    if (bet <= 0 || target < 1.1) {
-        return ctx.reply("❌ Minimum bet is 1 and minimum multiplier is 1.1x.");
+    if (bet <= 0 || target < 1) {
+        return ctx.reply("❌ Minimum bet is 1 and minimum multiplier is 1x.");
     }
 
     const profile = await sb.getProfile(userId);
@@ -1908,6 +1946,8 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
+    { command: "fly", description: "Bet on the crashing plane" },
+    { command: "daily", description: "Claim your daily coin reward" },
     { command: "guessword", description: "Start a Guess the Word game (Alias: /gw)" },
     { command: "gw", description: "Alias for /guessword" },
     { command: "profile", description: "Check your stats" },

@@ -11,3 +11,6 @@ CREATE TABLE IF NOT EXISTS hilo_games (
     chat_id BIGINT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Profiles Update for Daily Rewards
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_daily TIMESTAMPTZ;

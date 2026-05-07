@@ -327,6 +327,36 @@ async function cleanupStaleHiloGames() {
   await supabase.from('hilo_games').delete().lt('created_at', yesterday);
 }
 
+async function claimDaily(userId, amount) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    const { data: profile } = await supabase.from('profiles').select('coins, last_daily').eq('user_id', userId).single();
+    if (!profile) return { success: false, error: 'User not found. Please use /start first.' };
+
+    const now = Date.now();
+    const lastDaily = profile.last_daily ? new Date(profile.last_daily).getTime() : 0;
+    const cooldown = 24 * 60 * 60 * 1000;
+
+    if (now - lastDaily < cooldown) {
+      const remaining = cooldown - (now - lastDaily);
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+      return { success: false, remaining: `${hours}h ${minutes}m` };
+    }
+
+    const newCoins = (profile.coins || 0) + amount;
+    await supabase.from('profiles').update({ 
+      coins: newCoins, 
+      last_daily: new Date().toISOString() 
+    }).eq('user_id', userId);
+
+    return { success: true, amount, newBalance: newCoins };
+  } finally {
+    releaseLock(release);
+  }
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -352,5 +382,6 @@ module.exports = {
   getHiloGame,
   deleteHiloGame,
   cleanupStaleHiloGames,
+  claimDaily,
   DEFAULT_SETTINGS
 };
