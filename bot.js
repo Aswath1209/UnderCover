@@ -244,8 +244,6 @@ bot.command('daily', async (ctx) => {
       
       if (!isMember) {
           msg += `💡 <b>Tip:</b> Join our ${OFFICIAL_GC_USER} to get <b>1000 coins</b> every day!`;
-      } else {
-          msg += `✨ Thanks for being a member of our official group!`;
       }
       
       await ctx.reply(msg, { parse_mode: 'HTML' });
