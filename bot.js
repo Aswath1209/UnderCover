@@ -205,6 +205,7 @@ bot.command('cancel', async (ctx) => {
 bot.command('profile', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   const user = ctx.message.reply_to_message?.from || ctx.from;
+  await sb.ensureUser(user.id, user.first_name).catch(() => {});
   const profile = await sb.getProfile(user.id);
   
   if (!profile) {
@@ -257,6 +258,7 @@ bot.command('daily', async (ctx) => {
 bot.command('balance', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   const user = ctx.message.reply_to_message?.from || ctx.from;
+  await sb.ensureUser(user.id, user.first_name).catch(() => {});
   const profile = await sb.getProfile(user.id);
   if (!profile) return ctx.reply("You have not registered yet.");
   await ctx.reply(`💰 <b>Balance for <a href="tg://user?id=${user.id}">${profile.first_name}</a>:</b> ${profile.coins || 0} Coins`, { parse_mode: 'HTML' });

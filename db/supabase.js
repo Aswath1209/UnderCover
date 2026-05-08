@@ -267,15 +267,16 @@ async function getAllUserIds() {
 
 const userCache = new Set();
 async function ensureUser(userId, firstName) {
-  if (!supabase || !userId || userCache.has(userId)) return;
+  if (!supabase || !userId) return;
   const release = await acquireLock(userId);
   try {
-    if (userCache.has(userId)) return;
-    const { data: existing } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single();
-    if (!existing) {
+    const { data: profile } = await supabase.from('profiles').select('first_name').eq('user_id', userId).single();
+    if (!profile) {
       await supabase.from('profiles').insert({ user_id: userId, first_name: firstName || 'User', wins: 0, matches_played: 0, coins: 2000 });
+    } else if (firstName && (profile.first_name === 'Challenged Player' || profile.first_name === 'Targeted Player' || profile.first_name === 'User' || profile.first_name !== firstName)) {
+        // Update name if it's one of the placeholders or if it has changed
+        await supabase.from('profiles').update({ first_name: firstName }).eq('user_id', userId);
     }
-    userCache.add(userId);
   } catch (e) {} finally {
     releaseLock(release);
   }
