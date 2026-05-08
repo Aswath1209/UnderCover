@@ -828,27 +828,40 @@ bot.command('lies', async (ctx) => {
 
     const kb = new InlineKeyboard();
     liesManager.getCategories().forEach(cat => {
-        kb.text(cat, `lcat_${cat}_${rounds}_${challengerId}`).row();
+        kb.text(cat, `lcat_${cat}_${rounds}_${challengerId}_${ctx.from.id}`).row();
     });
 
     await ctx.reply("🤔 <b>Game of Lies</b>\n\nChoose a category to start the game!", { reply_markup: kb, parse_mode: 'HTML' });
 });
 
-bot.callbackQuery(/^lcat_(.+)_(.+)_(.*)$/, async (ctx) => {
+bot.callbackQuery(/^lcat_(.+)_(.+)_(.*)_(.*)$/, async (ctx) => {
     const category = ctx.match[1];
     const rounds = parseInt(ctx.match[2]);
     const challengerId = ctx.match[3] ? parseInt(ctx.match[3]) : null;
+    const hostId = parseInt(ctx.match[4]);
     const chatId = ctx.chat.id;
     const user = ctx.from;
+
+    if (user.id !== hostId) {
+        return ctx.answerCallbackQuery({ text: "❌ Only the person who started /lies can choose!", show_alert: true });
+    }
 
     if (liesManager.hasLobby(chatId)) {
         return ctx.answerCallbackQuery("🛑 A game is already active!");
     }
 
     let challenger = null;
+    let challengerName = "Opponent";
     if (challengerId) {
         if (challengerId === user.id) return ctx.answerCallbackQuery("You can't challenge yourself!");
-        challenger = { id: challengerId, first_name: "Challenged Player" };
+        
+        try {
+            const member = await ctx.api.getChatMember(chatId, challengerId);
+            challengerName = member.user.first_name;
+        } catch (e) {
+            challengerName = "Player";
+        }
+        challenger = { id: challengerId, first_name: challengerName };
     }
 
     liesManager.createLobby(chatId, { id: user.id, first_name: user.first_name }, challenger, rounds, category);
@@ -863,7 +876,7 @@ bot.callbackQuery(/^lcat_(.+)_(.+)_(.*)$/, async (ctx) => {
                `Host: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
     
     if (challengerId) {
-        text += `\n<a href="tg://user?id=${challengerId}">Targeted Player</a>, you have been challenged! Accept below to start.`;
+        text += `\n<a href="tg://user?id=${challengerId}">${challengerName}</a>, you have been challenged! Accept below to start.`;
     } else {
         text += `\nWaiting for someone to accept the 1v1 battle...`;
     }
