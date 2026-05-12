@@ -12,6 +12,7 @@ const path = require('path');
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
+const bonusCooldowns = new Map();
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
@@ -227,6 +228,16 @@ const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
 bot.command('bonus', async (ctx) => {
   if (ctx.chat.type !== 'private') {
     return ctx.reply("💰 <b>The /bonus command is only available in private messages.</b>\n\nTap my profile and send /bonus there to earn coins!", { parse_mode: 'HTML' });
+  }
+
+  const userId = ctx.from.id;
+  const now = Date.now();
+  const lastClaim = bonusCooldowns.get(userId) || 0;
+  const cooldown = 60 * 60 * 1000; // 1 hour
+
+  if (now - lastClaim < cooldown) {
+    const remainingMin = Math.ceil((cooldown - (now - lastClaim)) / (60 * 1000));
+    return ctx.reply(`⏳ <b>Please wait!</b>\n\nYou can claim another bonus in <b>${remainingMin} minutes</b>.`, { parse_mode: 'HTML' });
   }
 
   // We send a temporary message so we can get its ID to edit later
@@ -1982,10 +1993,13 @@ app.get('/api/reward', async (req, res) => {
     if (!user_id || !msg_id) return res.status(400).send('Missing params');
 
     try {
-        // 1. Give Coins
+        // 1. Update Cooldown
+        bonusCooldowns.set(parseInt(user_id), Date.now());
+
+        // 2. Give Coins
         const newBal = await sb.addCoins(parseInt(user_id), 500);
         
-        // 2. Edit Bot Message automatically
+        // 3. Edit Bot Message automatically (Removes the button)
         await bot.api.editMessageText(parseInt(user_id), parseInt(msg_id), 
             `✅ <b>Reward Claimed!</b>\n\nYou earned <b>500</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
             { parse_mode: 'HTML' }
