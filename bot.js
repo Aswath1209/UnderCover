@@ -240,6 +240,9 @@ bot.command('bonus', async (ctx) => {
     return ctx.reply(`⏳ <b>Please wait!</b>\n\nYou can claim another bonus in <b>${remainingMin} minutes</b>.`, { parse_mode: 'HTML' });
   }
 
+  // SET COOLDOWN IMMEDIATELY to prevent spamming the command
+  bonusCooldowns.set(userId, now);
+
   // We send a temporary message so we can get its ID to edit later
   const msg = await ctx.reply("🔄 <i>Preparing your reward...</i>", { parse_mode: 'HTML' });
 
