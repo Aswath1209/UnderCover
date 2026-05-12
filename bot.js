@@ -223,6 +223,25 @@ bot.command('profile', async (ctx) => {
 const OFFICIAL_GC_ID = -1003906592838;
 const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
 
+bot.command('bonus', async (ctx) => {
+  if (ctx.chat.type !== 'private') {
+    return ctx.reply("💰 <b>The /bonus command is only available in private messages.</b>\n\nTap my profile and send /bonus there to earn coins!", { parse_mode: 'HTML' });
+  }
+
+  // We send a temporary message so we can get its ID to edit later
+  const msg = await ctx.reply("🔄 <i>Preparing your reward...</i>", { parse_mode: 'HTML' });
+
+  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/miniapp?msg_id=${msg.message_id}`;
+  
+  const kb = new InlineKeyboard()
+    .webApp("📺 Watch & Earn 500 Coins", miniAppUrl);
+
+  await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
+    "🚀 <b>Want free coins?</b>\n\nWatch a short video ad to claim <b>500 coins</b> instantly! The reward will be added as soon as the video finishes.",
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
 bot.command('daily', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   
@@ -1950,6 +1969,33 @@ bot.catch((err) => {
 const express = require('express');
 const app = express();
 app.get('/', (req, res) => res.send('Bot is safely running!'));
+
+// Serve Mini App
+app.get('/miniapp', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Reward Endpoint
+app.get('/api/reward', async (req, res) => {
+    const { user_id, msg_id } = req.query;
+    if (!user_id || !msg_id) return res.status(400).send('Missing params');
+
+    try {
+        // 1. Give Coins
+        const newBal = await sb.addCoins(parseInt(user_id), 500);
+        
+        // 2. Edit Bot Message automatically
+        await bot.api.editMessageText(parseInt(user_id), parseInt(msg_id), 
+            `✅ <b>Reward Claimed!</b>\n\nYou earned <b>500</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
+            { parse_mode: 'HTML' }
+        ).catch(e => console.error("Edit failed:", e));
+
+        res.send('ok');
+    } catch (error) {
+        console.error('Reward error:', error);
+        res.status(500).send('error');
+    }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
