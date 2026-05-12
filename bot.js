@@ -8,6 +8,7 @@ const guessManager = require('./game/guessManager');
 const crashManager = require('./game/crashManager');
 const { normalizeWord } = require('./utils');
 const sb = require('./db/supabase');
+const path = require('path');
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
