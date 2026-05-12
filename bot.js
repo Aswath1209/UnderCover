@@ -46,11 +46,9 @@ setInterval(() => {
     }
 }, 60 * 60 * 1000);
 
-// Cleanup task for stale games (every 1 hour)
+// Cleanup task for stale Hilo games (every 1 hour)
 setInterval(() => {
-    console.log("[CLEANUP] Running stale game cleanup...");
-    gameManager.cleanupStaleLobbies();
-    mafiaManager.cleanupStaleLobbies();
+    console.log("[CLEANUP] Running stale Hilo game cleanup...");
     sb.cleanupStaleHiloGames();
 }, 60 * 60 * 1000);
 
