@@ -8,9 +8,6 @@ const guessManager = require('./game/guessManager');
 const crashManager = require('./game/crashManager');
 const { normalizeWord } = require('./utils');
 const sb = require('./db/supabase');
-const Adsgram = require('./adsgram');
-
-const adsgram = new Adsgram(process.env.ADSGRAM_BLOCK_ID, process.env.ADSGRAM_TOKEN);
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -225,34 +222,6 @@ bot.command('profile', async (ctx) => {
 
 const OFFICIAL_GC_ID = -1003906592838;
 const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
-
-bot.command('bonus', async (ctx) => {
-  if (ctx.chat.type !== 'private') {
-    return ctx.reply("💰 <b>The /bonus command is only available in private messages.</b>\n\nTap my profile and send /bonus there to earn coins!", { parse_mode: 'HTML' });
-  }
-
-  await ctx.reply("🔄 <i>Fetching a personalized ad for you...</i>", { parse_mode: 'HTML' });
-
-  const ad = await adsgram.getAd(ctx.from.id);
-
-  if (!ad) {
-    return ctx.reply("❌ Sorry, no ads available right now. Try again later!");
-  }
-
-  const kb = new InlineKeyboard()
-    .url(ad.button_name, ad.click_url)
-    .row()
-    .text(ad.button_reward_name || "Claim Reward", "claim_ad_reward");
-
-  const messageText = ad.text_html + "\n\n⚠️ <i>Click the button above to visit, then claim your reward!</i>";
-  
-  await ctx.replyWithPhoto(ad.image_url, {
-    caption: messageText,
-    reply_markup: kb,
-    parse_mode: 'HTML',
-    protect_content: true
-  });
-});
 
 bot.command('daily', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
@@ -1099,28 +1068,6 @@ bot.on('callback_query:data', async (ctx) => {
   const data = ctx.callbackQuery.data;
   const chatId = ctx.chat.id;
   const user = ctx.from;
-
-  if (data === 'claim_ad_reward') {
-    const userId = user.id;
-    const now = Date.now();
-    const lastClaim = adCooldowns.get(userId) || 0;
-    const cooldown = 5 * 1000; 
-
-    if (now - lastClaim < cooldown) {
-      return ctx.answerCallbackQuery({ text: "Please wait a moment...", show_alert: false }).catch(()=>{});
-    }
-    adCooldowns.set(userId, now);
-
-    const reward = 500;
-    const newBal = await sb.addCoins(userId, reward);
-
-    await ctx.answerCallbackQuery({ text: `✅ ${reward} coins added!`, show_alert: true }).catch(()=>{});
-    await ctx.editMessageCaption({
-      caption: `✅ <b>Reward Claimed!</b>\n\nYou earned <b>${reward}</b> coins.\nNew Balance: <b>${newBal}</b> 💰`,
-      parse_mode: 'HTML'
-    }).catch(()=>{});
-    return;
-  }
 
   if (data.startsWith('hilo_')) {
     const action = data.replace('hilo_', '');
@@ -2003,25 +1950,6 @@ bot.catch((err) => {
 const express = require('express');
 const app = express();
 app.get('/', (req, res) => res.send('Bot is safely running!'));
-
-// Adsgram S2S Reward Endpoint
-app.get('/adsgram-reward', async (req, res) => {
-    const { user_id } = req.query;
-    
-    if (!user_id) {
-        return res.status(400).send('Missing user_id');
-    }
-
-    try {
-        const rewardAmount = 500;
-        await sb.addCoins(parseInt(user_id), rewardAmount);
-        console.log(`[ADSGRAM S2S] Rewarded ${user_id} with ${rewardAmount} coins.`);
-        res.send('ok');
-    } catch (error) {
-        console.error('[ADSGRAM S2S] Error rewarding user:', error);
-        res.status(500).send('Internal Server Error');
-    }
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
