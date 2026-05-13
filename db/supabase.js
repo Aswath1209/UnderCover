@@ -199,11 +199,29 @@ async function getUserGroupRank(chatId, userId, sortBy = 'wins') {
 }
 
 async function getGlobalStats() {
-  if (!supabase) return { totalUsers: 0, totalGroups: 0 };
+  if (!supabase) return { totalUsers: 0, totalGroups: 0, totalBonusClaims: 0, uniqueBonusClaimers: 0 };
+  
   const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
   const { data: groupData } = await supabase.from('group_stats').select('chat_id');
   const uniqueGroups = new Set((groupData || []).map(g => g.chat_id)).size;
-  return { totalUsers: userCount || 0, totalGroups: uniqueGroups };
+
+  // Fetch Bonus Stats
+  const { count: totalBonusClaims } = await supabase.from('bonus_claims').select('*', { count: 'exact', head: true });
+  const { data: bonusData } = await supabase.from('bonus_claims').select('user_id');
+  const uniqueBonusClaimers = new Set((bonusData || []).map(b => b.user_id)).size;
+
+  return { 
+    totalUsers: userCount || 0, 
+    totalGroups: uniqueGroups,
+    totalBonusClaims: totalBonusClaims || 0,
+    uniqueBonusClaimers: uniqueBonusClaimers || 0
+  };
+}
+
+async function recordBonusClaim(userId) {
+  if (!supabase) return;
+  const { error } = await supabase.from('bonus_claims').insert({ user_id: userId });
+  if (error) console.error("Error recording bonus claim:", error);
 }
 
 // --- Group Settings ---
@@ -384,5 +402,6 @@ module.exports = {
   deleteHiloGame,
   cleanupStaleHiloGames,
   claimDaily,
+  recordBonusClaim,
   DEFAULT_SETTINGS
 };

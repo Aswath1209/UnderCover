@@ -136,7 +136,12 @@ bot.command('admin_stats', async (ctx) => {
   const mafCount = mafiaManager.getActiveGamesCount();
   const liesCount = liesManager.getActiveGamesCount();
   const hiloCount = hiloManager.getActiveGamesCount();
-  const stats = await sb.getGlobalStats().catch(() => ({ totalUsers: "Error", totalGroups: "Error" }));
+  const stats = await sb.getGlobalStats().catch(() => ({ 
+      totalUsers: "Error", 
+      totalGroups: "Error", 
+      totalBonusClaims: 0, 
+      uniqueBonusClaimers: 0 
+  }));
   
   // Build 24h stats
   const active24 = Array.from(activity24h.values());
@@ -152,6 +157,9 @@ bot.command('admin_stats', async (ctx) => {
   const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
                `👥 <b>Total Users (DB):</b> ${stats.totalUsers}\n` +
                `🏘️ <b>Total Groups (DB):</b> ${stats.totalGroups}\n\n` +
+               `💰 <b>Bonus Rewards:</b>\n` +
+               `  Total Claims: ${stats.totalBonusClaims}\n` +
+               `  Unique Claimers: ${stats.uniqueBonusClaimers}\n\n` +
                `🔥 <b>24-Hour Activity:</b>\n` +
                `  Active Players: ${activeUsers24Count}\n` +
                `  <b>Most Active:</b>\n${topPlayersStr}\n` +
@@ -161,7 +169,7 @@ bot.command('admin_stats', async (ctx) => {
                `- Lies: ${liesCount}\n` +
                `- Hilo: ${hiloCount}\n\n` +
                `⏳ <i>Cleanup interval: 30m</i>`;
-                
+                 
   await ctx.reply(text, { parse_mode: 'HTML' });
 });
 
@@ -1996,14 +2004,20 @@ app.get('/api/reward', async (req, res) => {
     if (!user_id || !msg_id) return res.status(400).send('Missing params');
 
     try {
-        // 1. Update Cooldown
-        bonusCooldowns.set(parseInt(user_id), Date.now());
+        const userId = parseInt(user_id);
+        const msgId = parseInt(msg_id);
 
-        // 2. Give Coins
-        const newBal = await sb.addCoins(parseInt(user_id), 500);
+        // 1. Update Cooldown
+        bonusCooldowns.set(userId, Date.now());
+
+        // 2. Record Claim in DB
+        await sb.recordBonusClaim(userId).catch(e => console.error("Failed to record claim:", e));
+
+        // 3. Give Coins
+        const newBal = await sb.addCoins(userId, 500);
         
-        // 3. Edit Bot Message automatically (Removes the button)
-        await bot.api.editMessageText(parseInt(user_id), parseInt(msg_id), 
+        // 4. Edit Bot Message automatically (Removes the button)
+        await bot.api.editMessageText(userId, msgId, 
             `✅ <b>Reward Claimed!</b>\n\nYou earned <b>500</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
             { parse_mode: 'HTML' }
         ).catch(e => console.error("Edit failed:", e));
