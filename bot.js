@@ -12,7 +12,15 @@ const path = require('path');
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
-const bonusCooldowns = new Map();
+const dropCooldowns = new Map();
+
+function getRandomReward() {
+  const rand = Math.random() * 100;
+  if (rand < 70) return Math.floor(Math.random() * (600 - 300 + 1)) + 300; // 300 - 600 (70%)
+  if (rand < 90) return Math.floor(Math.random() * (1500 - 601 + 1)) + 601; // 601 - 1500 (20%)
+  if (rand < 98) return Math.floor(Math.random() * (3000 - 1501 + 1)) + 1501; // 1501 - 3000 (8%)
+  return Math.floor(Math.random() * (5000 - 3001 + 1)) + 3001; // 3001 - 5000 (2%)
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error("Ignored Unhandled Rejection:", reason.description || reason.message || reason);
@@ -52,6 +60,8 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 const bot = new Bot(process.env.BOT_TOKEN);
+let botInfo = null;
+const pendingReminders = new Map();
 
 function getActiveLobbyForUser(userId) {
     const regular = gameManager.getLobbyByUserId(userId);
@@ -104,6 +114,12 @@ async function ensureRegistered(ctx) {
 
 bot.command('start', async (ctx) => {
   ensureRegistered(ctx);
+  
+  // Handle Deep Links
+  if (ctx.match === 'drop') {
+    return handleDropCommand(ctx);
+  }
+
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
   } else {
@@ -157,7 +173,7 @@ bot.command('admin_stats', async (ctx) => {
   const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
                `👥 <b>Total Users (DB):</b> ${stats.totalUsers}\n` +
                `🏘️ <b>Total Groups (DB):</b> ${stats.totalGroups}\n\n` +
-               `💰 <b>Bonus Rewards:</b>\n` +
+               `💰 <b>Drop Rewards:</b>\n` +
                `  Total Claims: ${stats.totalBonusClaims}\n` +
                `  Unique Claimers: ${stats.uniqueBonusClaimers}\n\n` +
                `🔥 <b>24-Hour Activity:</b>\n` +
@@ -233,36 +249,48 @@ bot.command('profile', async (ctx) => {
 const OFFICIAL_GC_ID = -1003906592838;
 const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
 
-bot.command('bonus', async (ctx) => {
+async function handleDropCommand(ctx) {
   if (ctx.chat.type !== 'private') {
-    return ctx.reply("💰 <b>The /bonus command is only available in private messages.</b>\n\nTap my profile and send /bonus there to earn coins!", { parse_mode: 'HTML' });
+    const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/${botInfo?.username || 'bot'}?start=drop`);
+    return ctx.reply("🎁 <b>Claim your mystery drop in private!</b>", { 
+        reply_markup: kb,
+        parse_mode: 'HTML' 
+    });
   }
 
   const userId = ctx.from.id;
+  
+  // If they manually claim, remove any pending reminder
+  pendingReminders.delete(userId);
+
   const now = Date.now();
-  const lastClaim = bonusCooldowns.get(userId) || 0;
+  const lastClaim = dropCooldowns.get(userId) || 0;
   const cooldown = 60 * 60 * 1000; // 1 hour
 
   if (now - lastClaim < cooldown) {
     const remainingMin = Math.ceil((cooldown - (now - lastClaim)) / (60 * 1000));
-    return ctx.reply(`⏳ <b>Please wait!</b>\n\nYou can claim another bonus in <b>${remainingMin} minutes</b>.`, { parse_mode: 'HTML' });
+    return ctx.reply(`⏳ <b>Please wait!</b>\n\nYou can claim another drop in <b>${remainingMin} minutes</b>.`, { parse_mode: 'HTML' });
   }
 
   // SET COOLDOWN IMMEDIATELY to prevent spamming the command
-  bonusCooldowns.set(userId, now);
+  dropCooldowns.set(userId, now);
 
   // We send a temporary message so we can get its ID to edit later
-  const msg = await ctx.reply("🔄 <i>Preparing your reward...</i>", { parse_mode: 'HTML' });
+  const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
 
   const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/miniapp?msg_id=${msg.message_id}`;
   
   const kb = new InlineKeyboard()
-    .webApp("📺 Watch & Earn 500 Coins", miniAppUrl);
+    .webApp("📺 Watch & Claim Mystery Drop", miniAppUrl);
 
   await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-    "🚀 <b>Want free coins?</b>\n\nWatch a short video ad to claim <b>500 coins</b> instantly! The reward will be added as soon as the video finishes.",
+    "🚀 <b>Mystery Drop is here!</b>\n\nWatch a short video ad to claim a random reward between <b>300 to 5,000 coins</b>! Luck is on your side today.",
     { parse_mode: 'HTML', reply_markup: kb }
   );
+}
+
+bot.command('drop', async (ctx) => {
+  await handleDropCommand(ctx);
 });
 
 bot.command('daily', async (ctx) => {
@@ -580,7 +608,9 @@ async function sendBroadcast(ctx, targetIds, message) {
     for (let i = 0; i < total; i++) {
         const targetId = targetIds[i];
         try {
-            await bot.api.sendMessage(targetId, `📢 <b>ANNOUNCEMENT</b>\n\n${message}`, { parse_mode: 'HTML' });
+            const sentMsg = await bot.api.sendMessage(targetId, `📢 <b>ANNOUNCEMENT</b>\n\n${message}`, { parse_mode: 'HTML' });
+            // Pin the message in both groups and private chats
+            await bot.api.pinChatMessage(targetId, sentMsg.message_id).catch(() => {});
             success++;
         } catch (e) {
             failed++;
@@ -2008,17 +2038,21 @@ app.get('/api/reward', async (req, res) => {
         const msgId = parseInt(msg_id);
 
         // 1. Update Cooldown
-        bonusCooldowns.set(userId, Date.now());
+        dropCooldowns.set(userId, Date.now());
 
         // 2. Record Claim in DB
         await sb.recordBonusClaim(userId).catch(e => console.error("Failed to record claim:", e));
 
-        // 3. Give Coins
-        const newBal = await sb.addCoins(userId, 500);
+        // 3. Give Random Coins
+        const amount = getRandomReward();
+        const newBal = await sb.addCoins(userId, amount);
         
-        // 4. Edit Bot Message automatically (Removes the button)
+        // 4. Schedule Reminder (1 hour from now)
+        pendingReminders.set(userId, Date.now() + (60 * 60 * 1000));
+        
+        // 5. Edit Bot Message automatically (Removes the button)
         await bot.api.editMessageText(userId, msgId, 
-            `✅ <b>Reward Claimed!</b>\n\nYou earned <b>500</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
+            `✅ <b>Mystery Drop Claimed!</b>\n\nYou earned <b>${amount}</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
             { parse_mode: 'HTML' }
         ).catch(e => console.error("Edit failed:", e));
 
@@ -2038,6 +2072,7 @@ if (require.main === module) {
     { command: "play", description: "Start an Undercover lobby" },
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
+    { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "daily", description: "Claim your daily coin reward" },
@@ -2055,8 +2090,11 @@ if (require.main === module) {
     { command: "start", description: "Start the bot" },
     { command: "ping", description: "Check bot status" }
   ]);
+  bot.api.getMe().then(info => {
+    botInfo = info;
+    console.log(`Bot started as @${info.username}`);
+  });
   bot.start(); 
-  console.log("Bot started!"); 
 
   // --- Stale Game Cleanup (1 Hour) ---
   setInterval(async () => {
@@ -2090,4 +2128,23 @@ if (require.main === module) {
       }
     }
   }, 30 * 60 * 1000); // Run every 30 minutes
+
+  // --- Mystery Drop Reminders (Every 1 Minute) ---
+  setInterval(async () => {
+    const now = Date.now();
+    for (const [userId, reminderTime] of pendingReminders.entries()) {
+      if (now >= reminderTime) {
+        pendingReminders.delete(userId);
+        try {
+          const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/${botInfo?.username || 'bot'}?start=drop`);
+          await bot.api.sendMessage(userId, 
+            "🎁 <b>Your Mystery Drop is available again!</b>\n\nYou can now claim another reward. Will you hit the 5,000 coin jackpot this time? 🍀", 
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        } catch (e) {
+          console.error(`Failed to send reminder to ${userId}:`, e.message);
+        }
+      }
+    }
+  }, 60 * 1000);
 }
