@@ -251,7 +251,7 @@ const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
 
 async function handleDropCommand(ctx) {
   if (ctx.chat.type !== 'private') {
-    const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/${botInfo?.username || 'bot'}?start=drop`);
+    const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/Imposter0_bot/bonus?startapp=drop`);
     return ctx.reply("🎁 <b>Claim your mystery drop in private!</b>", { 
         reply_markup: kb,
         parse_mode: 'HTML' 
@@ -278,7 +278,7 @@ async function handleDropCommand(ctx) {
   // We send a temporary message so we can get its ID to edit later
   const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
 
-  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/miniapp?msg_id=${msg.message_id}`;
+  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}`;
   
   const kb = new InlineKeyboard()
     .webApp("📺 Watch & Claim Mystery Drop", miniAppUrl);
@@ -2023,8 +2023,8 @@ const express = require('express');
 const app = express();
 app.get('/', (req, res) => res.send('Bot is safely running!'));
 
-// Serve Mini App
-app.get('/miniapp', (req, res) => {
+// Serve Mini App (Adsgram)
+app.get('/bonus-app', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
