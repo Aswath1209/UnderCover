@@ -119,11 +119,6 @@ bot.command('start', async (ctx) => {
   if (ctx.match === 'drop') {
     return handleDropCommand(ctx);
   }
-  if (ctx.match === 'bonus') {
-    return ctx.reply("Click below to claim your Adsgram bonus!", { 
-        reply_markup: new InlineKeyboard().webApp("📺 Watch & Claim Bonus", `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app`)
-    });
-  }
 
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
@@ -296,25 +291,6 @@ async function handleDropCommand(ctx) {
 
 bot.command('drop', async (ctx) => {
   await handleDropCommand(ctx);
-});
-
-bot.command('bonus', async (ctx) => {
-    if (ctx.chat.type !== 'private') {
-        return ctx.reply("🎁 <b>Claim your Adsgram bonus in private!</b>", { 
-            reply_markup: new InlineKeyboard().url("🎁 Claim Bonus", `https://t.me/${bot.botInfo?.username || 'bot'}?start=bonus`),
-            parse_mode: 'HTML' 
-        });
-    }
-
-    const msg = await ctx.reply("🔄 <i>Preparing your Adsgram bonus...</i>", { parse_mode: 'HTML' });
-    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}`;
-    
-    const kb = new InlineKeyboard().webApp("📺 Watch Video & Claim Bonus", miniAppUrl);
-
-    await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-        `💰 <b>Adsgram Video Bonus!</b>\n\nWatch a short video ad to claim <b>500 coins</b> instantly.\n\n<i>This is a test command for Adsgram.</i>`,
-        { reply_markup: kb, parse_mode: 'HTML' }
-    );
 });
 
 bot.command('daily', async (ctx) => {
@@ -2052,11 +2028,6 @@ app.get('/miniapp', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Serve Adsgram Bonus App
-app.get('/bonus-app', (req, res) => {
-    res.sendFile(path.join(__dirname, 'bonus.html'));
-});
-
 // Reward Endpoint
 app.get('/api/reward', async (req, res) => {
     const { user_id, msg_id } = req.query;
@@ -2101,8 +2072,7 @@ if (require.main === module) {
     { command: "play", description: "Start an Undercover lobby" },
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
-    { command: "drop", description: "🎁 Mystery Drop (OnClicka)" },
-    { command: "bonus", description: "💰 Video Bonus (Adsgram)" },
+    { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "daily", description: "Claim your daily coin reward" },

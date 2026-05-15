@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Undercover Rewards</title>
+    <title>Mystery Drop</title>
+    <!-- Telegram SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
+    <!-- Adsgram SDK -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -19,17 +21,14 @@
             margin: 0;
             text-align: center;
         }
-        .loader {
-            border: 4px solid var(--tg-theme-secondary-bg-color, #f3f3f3);
-            border-top: 4px solid var(--tg-theme-button-color, #248bfe);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 15px;
+            padding: 30px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .hidden { display: none; }
         .btn {
             background-color: var(--tg-theme-button-color, #248bfe);
             color: var(--tg-theme-button-text-color, #ffffff);
@@ -39,19 +38,26 @@
             font-weight: bold;
             font-size: 18px;
             cursor: pointer;
+            width: 100%;
         }
+        .hidden { display: none; }
+        .status { font-size: 14px; opacity: 0.7; margin-top: 15px; }
     </style>
 </head>
 <body>
-    <div id="loading-box">
-        <div class="loader"></div>
-        <p>Loading your ad...</p>
-    </div>
+    <div class="container">
+        <div id="ad-prompt">
+            <h2>🎁 Mystery Drop</h2>
+            <p>Watch a short video to open your mystery crate!</p>
+            <button class="btn" id="watch-btn">📦 Open Crate</button>
+            <div class="status" id="status">Ready to open!</div>
+        </div>
 
-    <div id="ad-box" class="hidden">
-        <h2>Ad Ready!</h2>
-        <p>Watch to claim your mystery reward.</p>
-        <button class="btn" id="play-btn">📺 Watch Now</button>
+        <div id="reward-box" class="hidden">
+            <h2 style="color: #4caf50;">✅ Crate Unlocked!</h2>
+            <p>Your reward is ready.</p>
+            <button class="btn" id="claim-btn">💰 Claim Coins</button>
+        </div>
     </div>
 
     <script>
@@ -62,26 +68,33 @@
         const urlParams = new URLSearchParams(window.location.search);
         const msgId = urlParams.get('msg_id');
 
-        window.initCdTma?.({ id: 6119106 })
-            .then(show => {
-                document.getElementById('loading-box').classList.add('hidden');
-                document.getElementById('ad-box').classList.remove('hidden');
-                
-                document.getElementById('play-btn').onclick = () => {
-                    show().then(() => {
-                        // Notify the server to give reward and edit message
-                        fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}`)
-                            .then(() => tg.close())
-                            .catch(() => tg.close());
-                    }).catch(() => {
-                        alert("Ad interrupted. Please try again!");
-                    });
-                };
-            })
-            .catch(() => {
-                alert("Could not load ad. Please try again later!");
-                tg.close();
+        // Initialize Adsgram with your Block ID
+        const AdController = window.Adsgram.init({ blockId: "30300" });
+        
+        document.getElementById('watch-btn').onclick = () => {
+            const status = document.getElementById('status');
+            const btn = document.getElementById('watch-btn');
+            
+            btn.disabled = true;
+            status.innerText = "Opening crate...";
+
+            AdController.show().then((result) => {
+                // Success
+                document.getElementById('ad-prompt').classList.add('hidden');
+                document.getElementById('reward-box').classList.remove('hidden');
+            }).catch((result) => {
+                // Error/Closed
+                btn.disabled = false;
+                status.innerText = "Please watch the full video to unlock!";
+                alert("Watch the full video to claim your coins!");
             });
+        };
+
+        document.getElementById('claim-btn').onclick = () => {
+            fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}`)
+                .then(() => tg.close())
+                .catch(() => tg.close());
+        };
     </script>
 </body>
 </html>
