@@ -15,6 +15,19 @@ function normalizeWord(word) {
         .trim();
 }
 
+/**
+ * Escapes HTML special characters to prevent Telegram parsing errors.
+ */
+function escapeHTML(text) {
+    if (!text) return "";
+    return text
+        .toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
 module.exports = {
-    normalizeWord
+    normalizeWord,
+    escapeHTML
 };

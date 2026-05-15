@@ -6,7 +6,7 @@ const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const guessManager = require('./game/guessManager');
 const crashManager = require('./game/crashManager');
-const { normalizeWord } = require('./utils');
+const { normalizeWord, escapeHTML } = require('./utils');
 const sb = require('./db/supabase');
 const path = require('path');
 
@@ -119,6 +119,11 @@ bot.command('start', async (ctx) => {
   if (ctx.match === 'drop') {
     return handleDropCommand(ctx);
   }
+  if (ctx.match === 'bonus') {
+    return ctx.reply("Click below to claim your Adsgram bonus!", { 
+        reply_markup: new InlineKeyboard().webApp("📺 Watch & Claim Bonus", `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app`)
+    });
+  }
 
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
@@ -165,7 +170,7 @@ bot.command('admin_stats', async (ctx) => {
   active24.sort((a, b) => b.cmds - a.cmds);
   let topPlayersStr = "";
   for (let i = 0; i < Math.min(3, active24.length); i++) {
-     const safeName = (active24[i].name || 'Unknown').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const safeName = escapeHTML(active24[i].name || 'Unknown');
      topPlayersStr += `  ${i+1}. ${safeName} (${active24[i].cmds} interactions)\n`;
   }
   if (!topPlayersStr) topPlayersStr = "  None yet\n";
@@ -236,12 +241,12 @@ bot.command('profile', async (ctx) => {
   const profile = await sb.getProfile(user.id);
   
   if (!profile) {
-     return ctx.reply(`👤 <b><a href="tg://user?id=${user.id}">${user.first_name}</a></b> has not played any games yet!`, { parse_mode: 'HTML' });
+     return ctx.reply(`👤 <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b> has not played any games yet!`, { parse_mode: 'HTML' });
   }
   
   const winRate = profile.matches_played > 0 ? Math.round((profile.wins / profile.matches_played) * 100) : 0;
   await ctx.reply(
-    `👤 <b>Profile: <a href="tg://user?id=${user.id}">${profile.first_name}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%\n💰 <b>Coins:</b> ${profile.coins || 0}`,
+    `👤 <b>Profile: <a href="tg://user?id=${user.id}">${escapeHTML(profile.first_name)}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%\n💰 <b>Coins:</b> ${profile.coins || 0}`,
     { parse_mode: 'HTML' }
   );
 });
@@ -293,6 +298,25 @@ bot.command('drop', async (ctx) => {
   await handleDropCommand(ctx);
 });
 
+bot.command('bonus', async (ctx) => {
+    if (ctx.chat.type !== 'private') {
+        return ctx.reply("🎁 <b>Claim your Adsgram bonus in private!</b>", { 
+            reply_markup: new InlineKeyboard().url("🎁 Claim Bonus", `https://t.me/${bot.botInfo?.username || 'bot'}?start=bonus`),
+            parse_mode: 'HTML' 
+        });
+    }
+
+    const msg = await ctx.reply("🔄 <i>Preparing your Adsgram bonus...</i>", { parse_mode: 'HTML' });
+    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}`;
+    
+    const kb = new InlineKeyboard().webApp("📺 Watch Video & Claim Bonus", miniAppUrl);
+
+    await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
+        `💰 <b>Adsgram Video Bonus!</b>\n\nWatch a short video ad to claim <b>500 coins</b> instantly.\n\n<i>This is a test command for Adsgram.</i>`,
+        { reply_markup: kb, parse_mode: 'HTML' }
+    );
+});
+
 bot.command('daily', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   
@@ -332,7 +356,7 @@ bot.command('balance', async (ctx) => {
   await sb.ensureUser(user.id, user.first_name).catch(() => {});
   const profile = await sb.getProfile(user.id);
   if (!profile) return ctx.reply("You have not registered yet.");
-  await ctx.reply(`💰 <b>Balance for <a href="tg://user?id=${user.id}">${profile.first_name}</a>:</b> ${profile.coins || 0} Coins`, { parse_mode: 'HTML' });
+  await ctx.reply(`💰 <b>Balance for <a href="tg://user?id=${user.id}">${escapeHTML(profile.first_name)}</a>:</b> ${profile.coins || 0} Coins`, { parse_mode: 'HTML' });
 });
 
 bot.command('addcoins', async (ctx) => {
@@ -405,7 +429,7 @@ bot.command('send', async (ctx) => {
   const result = await sb.transferCoins(senderId, receiverId, amount);
   
   if (result.success) {
-      await ctx.reply(`💸 <b>Transfer Successful!</b>\n\n<a href="tg://user?id=${senderId}">${ctx.from.first_name}</a> sent <b>${amount}</b> coins to <a href="tg://user?id=${receiverId}">${replyTo.from.first_name}</a>!`, { parse_mode: 'HTML' });
+      await ctx.reply(`💸 <b>Transfer Successful!</b>\n\n<a href="tg://user?id=${senderId}">${escapeHTML(ctx.from.first_name)}</a> sent <b>${amount}</b> coins to <a href="tg://user?id=${receiverId}">${escapeHTML(replyTo.from.first_name)}</a>!`, { parse_mode: 'HTML' });
   } else {
       await ctx.reply(`❌ ${result.error}`);
   }
@@ -521,7 +545,7 @@ bot.command('quit', async (ctx) => {
           await ctx.reply("✅ You have left the Undercover lobby.");
       } else {
           gameManager.deleteLobby(chatId);
-          await bot.api.sendMessage(chatId, `🛑 <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has quit. The game has been cancelled.`, { parse_mode: 'HTML' });
+          await bot.api.sendMessage(chatId, `🛑 <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a> has quit. The game has been cancelled.`, { parse_mode: 'HTML' });
           await ctx.reply("✅ You quit the match. The game was cancelled.");
       }
       return;
@@ -537,7 +561,7 @@ bot.command('quit', async (ctx) => {
       } else {
           const { player, role } = mafiaManager.eliminatePlayer(chatId, userId);
           const RE = { CIVILIAN: '👤', IMPOSTOR: '🔫', JOKER: '🃏' };
-          let msg = `🏳️ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has <b>QUIT</b> the game!\n\nThey were a <b>${role}</b> ${RE[role]}.`;
+          let msg = `🏳️ <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a> has <b>QUIT</b> the game!\n\nThey were a <b>${role}</b> ${RE[role]}.`;
           if (role === 'IMPOSTOR') msg += `\n🔑 Their word was: <tg-spoiler>${mafiaLobby.wordB}</tg-spoiler>`;
           
           await bot.api.sendMessage(chatId, msg, { parse_mode: 'HTML' });
@@ -557,10 +581,10 @@ bot.command('quit', async (ctx) => {
       
       liesManager.deleteLobby(chatId);
       
-      let msg = `🛑 <a href="tg://user?id=${userId}">${ctx.from.first_name}</a> has quit.`;
+      let msg = `🛑 <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a> has quit.`;
       if (opponent) {
           await sb.recordWin(opponent.id, opponent.first_name, chatId).catch(()=>{});
-          msg += `\n🏆 <a href="tg://user?id=${opponent.id}">${opponent.first_name}</a> has been awarded the <b>WIN</b>!`;
+          msg += `\n🏆 <a href="tg://user?id=${opponent.id}">${escapeHTML(opponent.first_name)}</a> has been awarded the <b>WIN</b>!`;
       }
       
       await bot.api.sendMessage(chatId, msg, { parse_mode: 'HTML' });
@@ -673,7 +697,7 @@ bot.command(['feedback', 'report'], async (ctx) => {
     if (!text) return ctx.reply("💬 <b>Feedback System</b>\n\nYou can send feedback or report bugs directly to the admin by typing:\n/feedback Your message here...", { parse_mode: 'HTML' });
     
     try {
-        await bot.api.sendMessage(ADMIN_IDS[0], `🚨 <b>FEEDBACK RECEIVED</b>\n\nFrom: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\nGroup: ${ctx.chat.title || 'Private'}\nMessage: ${text}`, { parse_mode: 'HTML' });
+        await bot.api.sendMessage(ADMIN_IDS[0], `🚨 <b>FEEDBACK RECEIVED</b>\n\nFrom: <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>\nGroup: ${escapeHTML(ctx.chat.title || 'Private')}\nMessage: ${escapeHTML(text)}`, { parse_mode: 'HTML' });
         await ctx.reply("✅ <b>Thank you!</b> Your feedback has been delivered to the admin.", { parse_mode: 'HTML' });
     } catch(e) {
         await ctx.reply("❌ Failed to send feedback. Please try again later.");
@@ -717,13 +741,13 @@ bot.command('myword', async (ctx) => {
       
       await bot.api.sendMessage(userId, msg, { parse_mode: 'HTML' });
       if (!isPrivate) {
-          await ctx.reply(`✅ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a>, I've re-sent your word to your DMs!`, { parse_mode: 'HTML' });
+          await ctx.reply(`✅ <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a>, I've re-sent your word to your DMs!`, { parse_mode: 'HTML' });
       } else {
           await ctx.reply("✅ Word re-sent!");
       }
   } catch (e) {
       if (!isPrivate) {
-          await ctx.reply(`⚠️ <a href="tg://user?id=${userId}">${ctx.from.first_name}</a>, I couldn't DM you. Please make sure you have started the bot in private and haven't blocked me!`, { parse_mode: 'HTML' });
+          await ctx.reply(`⚠️ <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a>, I couldn't DM you. Please make sure you have started the bot in private and haven't blocked me!`, { parse_mode: 'HTML' });
       } else {
           await ctx.reply("⚠️ I couldn't send the DM. Please check your privacy settings.");
       }
@@ -802,7 +826,7 @@ bot.command('play', async (ctx) => {
   try {
      await ctx.api.sendChatAction(ctx.from.id, 'typing');
   } catch (e) {
-     return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>, you MUST start the bot in private messages first before hosting! Tap my profile picture, hit Start, and come back.`, { parse_mode: 'HTML' });
+     return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>, you MUST start the bot in private messages first before hosting! Tap my profile picture, hit Start, and come back.`, { parse_mode: 'HTML' });
   }
   
   const chatId = ctx.chat.id;
@@ -823,7 +847,7 @@ bot.command('play', async (ctx) => {
     .text("▶️ Start (Host only)", "start_game");
     
   const sentMsg = await ctx.reply(
-    `🕵️‍♂️ <b>Undercover Lobby</b> 🕵️‍♂️\n\nHost: <a href="tg://user?id=${creator.id}">${creator.first_name}</a>\nPlayers joined: 1 (Minimum 3 required)\n\n1. <a href="tg://user?id=${creator.id}">${creator.first_name}</a>`, 
+    `🕵️‍♂️ <b>Undercover Lobby</b> 🕵️‍♂️\n\nHost: <a href="tg://user?id=${creator.id}">${escapeHTML(creator.first_name)}</a>\nPlayers joined: 1 (Minimum 3 required)\n\n1. <a href="tg://user?id=${creator.id}">${escapeHTML(creator.first_name)}</a>`, 
     { reply_markup: keyboard, parse_mode: 'HTML' }
   );
   
@@ -844,7 +868,7 @@ bot.command('mafia', async (ctx) => {
   ensureRegistered(ctx);
   if (ctx.chat.type === 'private') return ctx.reply("You can only play Mafia in a group chat.");
   try { await ctx.api.sendChatAction(ctx.from.id, 'typing'); }
-  catch (e) { return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>, you MUST start the bot first!`, { parse_mode: 'HTML' }); }
+  catch (e) { return ctx.reply(`⚠️ <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>, you MUST start the bot first!`, { parse_mode: 'HTML' }); }
 
   const chatId = ctx.chat.id;
   if (getActiveLobbyForUser(ctx.from.id)) {
@@ -859,7 +883,7 @@ bot.command('mafia', async (ctx) => {
     .text("▶️ Start (Host only)", "maf_start");
 
   const sentMsg = await ctx.reply(
-    `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\nPlayers: 1 (Minimum 3 required)\nRoles: ${dist.impostors} Impostor | ${dist.joker} Joker\n\n👤 Civilians don't know who the Impostors are\n🔫 Impostors don't know they're Impostors!\n🃏 Joker wins by getting voted out — game ends!\n\n1. <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`,
+    `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>\nPlayers: 1 (Minimum 3 required)\nRoles: ${dist.impostors} Impostor | ${dist.joker} Joker\n\n👤 Civilians don't know who the Impostors are\n🔫 Impostors don't know they're Impostors!\n🃏 Joker wins by getting voted out — game ends!\n\n1. <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>`,
     { reply_markup: keyboard, parse_mode: 'HTML' }
   );
 
@@ -946,12 +970,12 @@ bot.callbackQuery(/^lcat_(.+)_(.+)_(.*)_(.*)$/, async (ctx) => {
         .text("❌ Decline", "lies_cancel");
 
     let text = `🤥 <b>Game of Lies Challenge!</b>\n\n` +
-               `Category: <b>${category}</b>\n` +
+               `Category: <b>${escapeHTML(category)}</b>\n` +
                `Rounds: <b>${rounds}</b>\n` +
-               `Host: <a href="tg://user?id=${user.id}">${user.first_name}</a>\n`;
+               `Host: <a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a>\n`;
     
     if (challengerId) {
-        text += `\n<a href="tg://user?id=${challengerId}">${challengerName}</a>, you have been challenged! Accept below to start.`;
+        text += `\n<a href="tg://user?id=${challengerId}">${escapeHTML(challengerName)}</a>, you have been challenged! Accept below to start.`;
     } else {
         text += `\nWaiting for someone to accept the 1v1 battle...`;
     }
@@ -982,7 +1006,7 @@ bot.command(['guessword', 'gw'], async (ctx) => {
 
     await ctx.reply(
         `🎮 <b>Guess the Word!</b>\n\n` +
-        `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is the <b>Host</b>!\n\n` +
+        `👤 <a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a> is the <b>Host</b>!\n\n` +
         `They are explaining a word. Everyone else, start guessing in the chat!`,
         { reply_markup: kb, parse_mode: 'HTML' }
     );
@@ -999,10 +1023,10 @@ bot.on('message:text', async (ctx) => {
       lobby.state = 'END'; 
       if (normalizeWord(guess) === normalizeWord(lobby.wordA)) {
          processGameEnd(lobby, 'IMPOSTOR');
-         await ctx.reply(`🤯 <b>THE IMPOSTOR STOLE THE WIN!</b>\n\n<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a> correctly guessed the majority word: <b>${lobby.wordA}</b>! They pulled off the ultimate bluff!`, { parse_mode: 'HTML' });
+         await ctx.reply(`🤯 <b>THE IMPOSTOR STOLE THE WIN!</b>\n\n<a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a> correctly guessed the majority word: <b>${escapeHTML(lobby.wordA)}</b>! They pulled off the ultimate bluff!`, { parse_mode: 'HTML' });
       } else {
          processGameEnd(lobby, 'MAJORITY');
-         await ctx.reply(`🎉 <b>THE MAJORITY WINS!</b>\n\nThe Impostor was <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>. They guessed "${guess}", but the real group word was <b>${lobby.wordA}</b>!`, { parse_mode: 'HTML' });
+         await ctx.reply(`🎉 <b>THE MAJORITY WINS!</b>\n\nThe Impostor was <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>. They guessed "${escapeHTML(guess)}", but the real group word was <b>${escapeHTML(lobby.wordA)}</b>!`, { parse_mode: 'HTML' });
       }
       gameManager.deleteLobby(ctx.chat.id);
     }
@@ -1017,7 +1041,7 @@ bot.on('message:text', async (ctx) => {
                 const kb = new InlineKeyboard().text("🙋 Wanna be a Host?", "guess_be_host");
                 await ctx.reply(
                     `🎉 <b>CORRECT!</b>\n\n` +
-                    `🏆 <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a> guessed the word: <b>${gGame.currentWord}</b>!\n\n` +
+                    `🏆 <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a> guessed the word: <b>${escapeHTML(gGame.currentWord)}</b>!\n\n` +
                     `Click below to become the next Host!`,
                     { reply_markup: kb, parse_mode: 'HTML' }
                 );
@@ -1061,7 +1085,7 @@ bot.on('message:text', async (ctx) => {
          let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your 1-word clue!\n\n<b>Status:</b>\n`;
          lobby.players.forEach(p => { 
             const mark = lobby.cluesReceived[p.id] ? '✅' : '⏳';
-            text += `${mark} <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; 
+            text += `${mark} <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; 
          });
          try { await bot.api.editMessageText(chatId, lobby.clueStatusMessageId, text, { parse_mode: 'HTML' }); } catch(e) {}
       }
@@ -1069,7 +1093,7 @@ bot.on('message:text', async (ctx) => {
         lobby.state = 'DISCUSSION';
         let clueText = `🕵️‍♂️ <b>All Clues Revealed!</b>\n\nLook closely... One of these players is the Impostor with a slightly different word!\n\n`;
         lobby.players.forEach(p => {
-          clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id]}</b>\n`;
+          clueText += `- <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>: <b>${escapeHTML(lobby.cluesReceived[p.id])}</b>\n`;
         });
         const gSettings = await sb.getGroupSettings(chatId);
         clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly ${gSettings.discussion_time} seconds to discuss!`;
@@ -1094,7 +1118,7 @@ bot.on('message:text', async (ctx) => {
          let text = `🔫 <b>Round ${lobby.round} — Clue Phase</b>\n\nCheck your DMs and reply with your clue!\n\n<b>Status:</b>\n`;
          lobby.alivePlayers.forEach(p => {
             const mark = lobby.cluesReceived[p.id] ? '✅' : '⏳';
-            text += `${mark} <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`;
+            text += `${mark} <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`;
          });
          try { await bot.api.editMessageText(chatId, lobby.clueStatusMessageId, text, { parse_mode: 'HTML' }); } catch(e) {}
       }
@@ -1103,7 +1127,7 @@ bot.on('message:text', async (ctx) => {
         lobby.state = 'DISCUSSION';
         let clueText = `🔫 <b>Round ${lobby.round} — All Clues Revealed!</b>\n\nSomeone might have a different word... find them!\n\n`;
         lobby.alivePlayers.forEach(p => {
-          clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id]}</b>\n`;
+          clueText += `- <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>: <b>${escapeHTML(lobby.cluesReceived[p.id])}</b>\n`;
         });
         const dt = lobby.settings.discussion_time || 90;
         clueText += `\n💬 <b>DISCUSSION:</b> ${dt} seconds to discuss!`;
@@ -1317,7 +1341,7 @@ bot.on('callback_query:data', async (ctx) => {
       const themes = mafiaManager.getAvailableThemes();
       const kb = new InlineKeyboard();
       themes.forEach(t => kb.text(t, `maft_${t}`).row());
-      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🔫 Host <b>${mLobby.host.first_name}</b>, choose a theme:`, { reply_markup: kb, parse_mode: 'HTML' });
+      await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🔫 Host <b>${escapeHTML(mLobby.host.first_name)}</b>, choose a theme:`, { reply_markup: kb, parse_mode: 'HTML' });
     }
     else if (data.startsWith('maft_')) {
       if (!mIsHost) return ctx.answerCallbackQuery({ text: "Only the host!", show_alert: true });
@@ -1341,7 +1365,7 @@ bot.on('callback_query:data', async (ctx) => {
       const me = bot.botInfo || await bot.api.getMe();
       const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
       let text = `🔫 <b>Round 1 — Clue Phase</b>\n\nCheck your DMs and reply with your clue! ⏰ <b>60 seconds!</b>\n\n<b>Status:</b>\n`;
-      mLobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
+      mLobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; });
       try { const msg = await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: dmKb }); mLobby.clueStatusMessageId = msg.message_id; } catch(e) {}
       mLobby.clueTimer = setTimeout(() => handleClueTimeout(chatId), 60000);
     }
@@ -1354,7 +1378,7 @@ bot.on('callback_query:data', async (ctx) => {
       const vr = mafiaManager.vote(chatId, user.id, targetId);
       if (vr) {
         ctx.answerCallbackQuery("Vote recorded!");
-        if (!mLobby.anonymousVoting) await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${user.first_name}</a> voted for <a href="tg://user?id=${targetP.id}">${targetP.first_name}</a>!`, { parse_mode: 'HTML' });
+        if (!mLobby.anonymousVoting) await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a> voted for <a href="tg://user?id=${targetP.id}">${escapeHTML(targetP.first_name)}</a>!`, { parse_mode: 'HTML' });
         else await bot.api.sendMessage(chatId, `🗳️ A vote has been cast! (${Object.keys(mLobby.votes).length}/${mLobby.alivePlayers.length})`, { parse_mode: 'HTML' });
         if (vr.allVoted) await tallyMafiaVotes(chatId);
       }
@@ -1395,7 +1419,7 @@ bot.on('callback_query:data', async (ctx) => {
           
           ctx.answerCallbackQuery("Accepted!");
           const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
-          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${escapeHTML(lLobby.players[0].first_name)}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${escapeHTML(lLobby.players[1].first_name)}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
           await startLiesRound(chatId);
           return;
       }
@@ -1407,7 +1431,7 @@ bot.on('callback_query:data', async (ctx) => {
           if (!joined) return ctx.answerCallbackQuery("You cannot join this lobby.");
           ctx.answerCallbackQuery("Joined!");
           const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
-          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${lLobby.players[0].first_name}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${lLobby.players[1].first_name}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
+          await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🎮 <b>Match Started!</b>\n\n<a href="tg://user?id=${lLobby.players[0].id}">${escapeHTML(lLobby.players[0].first_name)}</a> vs <a href="tg://user?id=${lLobby.players[1].id}">${escapeHTML(lLobby.players[1].first_name)}</a>\n\nCheck your DMs for the first question!`, { parse_mode: 'HTML', reply_markup: dmKb });
           await startLiesRound(chatId);
           return;
       } else {
@@ -1462,8 +1486,8 @@ bot.on('callback_query:data', async (ctx) => {
 
           await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, 
               `🎮 <b>Guess the Word!</b>\n\n` +
-              `👤 <a href="tg://user?id=${user.id}">${user.first_name}</a> is now the <b>Host</b>!\n\n` +
-              `Explain your word to the group!`,
+              `👤 <a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a> is now the <b>Host</b>!\n\n` +
+              `They are explaining a word. Everyone else, start guessing in the chat!`,
               { reply_markup: kb, parse_mode: 'HTML' }
           );
           
@@ -1525,7 +1549,7 @@ bot.on('callback_query:data', async (ctx) => {
     const keyboard = new InlineKeyboard();
     themes.forEach(theme => keyboard.text(theme, `theme_${theme}`).row());
     
-    await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🕵️‍♂️ Host <b>${lobby.host.first_name}</b>, please choose a theme for this match:`, { reply_markup: keyboard, parse_mode: 'HTML' });
+    await bot.api.editMessageText(chatId, ctx.callbackQuery.message.message_id, `🕵️‍♂️ Host <b>${escapeHTML(lobby.host.first_name)}</b>, please choose a theme for this match:`, { reply_markup: keyboard, parse_mode: 'HTML' });
   }
   else if (data.startsWith('theme_')) {
     if (!isHost) return ctx.answerCallbackQuery({ text: "Only the host can select the theme!", show_alert: true });
@@ -1545,7 +1569,7 @@ bot.on('callback_query:data', async (ctx) => {
     }
     
     let text = `🕵️‍♂️ <b>Clue Phase Started!</b> 🕵️‍♂️\n\nCheck your DMs to see your secret word and reply with your ${gSettings.clue_words === 1 ? '1-word' : `1-${gSettings.clue_words} word`} clue!\n⏳ <b>Time: 60s</b>\n\n<b>Status:</b>\n`;
-    lobby.players.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
+    lobby.players.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; });
     
     try {
         const msg = await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML' });
@@ -1564,7 +1588,7 @@ bot.on('callback_query:data', async (ctx) => {
     if (voteResult) {
       ctx.answerCallbackQuery("Your vote is recorded!");
       if (!lobby.anonymousVoting) {
-        await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${user.first_name}</a> publicly voted for <a href="tg://user?id=${targetPlayer.id}">${targetPlayer.first_name}</a>!`, { parse_mode: 'HTML' });
+        await bot.api.sendMessage(chatId, `🗳️ <a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a> publicly voted for <a href="tg://user?id=${targetPlayer.id}">${escapeHTML(targetPlayer.first_name)}</a>!`, { parse_mode: 'HTML' });
       } else {
         await bot.api.sendMessage(chatId, `🗳️ A vote has been cast! (${Object.keys(lobby.votes).length}/${lobby.players.length})`, { parse_mode: 'HTML' });
       }
@@ -1591,7 +1615,7 @@ async function startLiesRound(chatId) {
     for (const p of lobby.players) {
         try {
             let msg = `🤥 <b>Round ${lobby.round}/${lobby.totalRounds} — Game of Lies</b>\n\n` +
-                      `❓ <b>Question:</b> ${next.question}\n\n`;
+                      `❓ <b>Question:</b> ${escapeHTML(next.question)}\n\n`;
             
             if (lobby.round === 1) {
                 msg += `<b>Quick Rules:</b>\n- Reply with <b>Correct Answer</b> for +1 pt.\n- Reply with a <b>Wrong Answer</b> to bait a steal.\n- Type <b>'steal'</b> to take points (+2 if they are right, -2 if not).\n\n`;
@@ -1601,7 +1625,7 @@ async function startLiesRound(chatId) {
             
             await bot.api.sendMessage(p.id, msg, { parse_mode: 'HTML' });
         } catch(e) {
-            await bot.api.sendMessage(chatId, `⚠️ Could not DM <a href="tg://user?id=${p.id}">${p.first_name}</a>. Match cancelled.`, { parse_mode: 'HTML' });
+            await bot.api.sendMessage(chatId, `⚠️ Could not DM <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>. Match cancelled.`, { parse_mode: 'HTML' });
             liesManager.deleteLobby(chatId);
             return;
         }
@@ -1638,38 +1662,38 @@ async function processLiesResults(chatId) {
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     // 1. Reveal Question
-    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Reveal!</b>\n\n❓ Question: <i>${lobby.currentQuestion.q}</i>`, { parse_mode: 'HTML' });
+    await bot.api.sendMessage(chatId, `🤥 <b>Round ${lobby.round} Reveal!</b>\n\n❓ Question: <i>${escapeHTML(lobby.currentQuestion.q)}</i>`, { parse_mode: 'HTML' });
     await sleep(2500);
 
     // 2. Reveal P1 Response
-    const v1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${r1.value}"`);
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${p1.first_name}</a> sent: <b>${v1}</b>`, { parse_mode: 'HTML' });
+    const v1 = r1.action === 'steal' ? 'STEAL 😈' : (r1.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${escapeHTML(r1.value)}"`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p1.id}">${escapeHTML(p1.first_name)}</a> sent: <b>${v1}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
     // 3. Reveal P2 Response
-    const v2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${r2.value}"`);
-    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${p2.first_name}</a> sent: <b>${v2}</b>`, { parse_mode: 'HTML' });
+    const v2 = r2.action === 'steal' ? 'STEAL 😈' : (r2.value === 'timeout_afk' ? 'NO RESPONSE ⏳' : `"${escapeHTML(r2.value)}"`);
+    await bot.api.sendMessage(chatId, `👤 <a href="tg://user?id=${p2.id}">${escapeHTML(p2.first_name)}</a> sent: <b>${v2}</b>`, { parse_mode: 'HTML' });
     await sleep(2000);
 
     // 4. Reveal Answer and Verdict
     let verdict = "";
     if (r1.points === 1 && r2.points === 1) verdict = "Both correct! +1 each.";
-    else if (r1.points === 2) verdict = `🔥 ${p1.first_name} STOLE the points! +2`;
-    else if (r2.points === 2) verdict = `🔥 ${p2.first_name} STOLE the points! +2`;
+    else if (r1.points === 2) verdict = `🔥 ${escapeHTML(p1.first_name)} STOLE the points! +2`;
+    else if (r2.points === 2) verdict = `🔥 ${escapeHTML(p2.first_name)} STOLE the points! +2`;
     else if (r1.points === -2 && r2.points === -2) verdict = "Both failed to steal! -2 each.";
-    else if (r1.points === -2) verdict = `❌ ${p1.first_name} failed to steal! -2`;
-    else if (r2.points === -2) verdict = `❌ ${p2.first_name} failed to steal! -2`;
-    else if (r1.points === 1) verdict = `✅ ${p1.first_name} got it right! +1`;
-    else if (r2.points === 1) verdict = `✅ ${p2.first_name} got it right! +1`;
+    else if (r1.points === -2) verdict = `❌ ${escapeHTML(p1.first_name)} failed to steal! -2`;
+    else if (r2.points === -2) verdict = `❌ ${escapeHTML(p2.first_name)} failed to steal! -2`;
+    else if (r1.points === 1) verdict = `✅ ${escapeHTML(p1.first_name)} got it right! +1`;
+    else if (r2.points === 1) verdict = `✅ ${escapeHTML(p2.first_name)} got it right! +1`;
     else verdict = "Both wrong! 0 points.";
 
-    await bot.api.sendMessage(chatId, `🏏 <b>Answer:</b> ${data.question}\n\n📝 <b>Verdict:</b> ${verdict}`, { parse_mode: 'HTML' });
+    await bot.api.sendMessage(chatId, `🏏 <b>Answer:</b> ${escapeHTML(data.question)}\n\n📝 <b>Verdict:</b> ${verdict}`, { parse_mode: 'HTML' });
     await sleep(2000);
 
     // 5. Scoreboard
     let scoreboard = `📊 <b>Current Scores:</b>\n` +
-                    `🏏 ${p1.first_name}: <b>${data.scores[p1.id]}</b>\n` +
-                    `🏏 ${p2.first_name}: <b>${data.scores[p2.id]}</b>`;
+                    `🏏 ${escapeHTML(p1.first_name)}: <b>${data.scores[p1.id]}</b>\n` +
+                    `🏏 ${escapeHTML(p2.first_name)}: <b>${data.scores[p2.id]}</b>`;
     
     const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${bot.botInfo.username}`);
     if (lobby.round < lobby.totalRounds) {
@@ -1691,11 +1715,11 @@ async function endLiesGame(chatId) {
     const s2 = lobby.scores[p2.id];
 
     let winnerText = "";
-    if (s1 > s2) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p1.id}">${p1.first_name}</a>!</b>`;
-    else if (s2 > s1) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p2.id}">${p2.first_name}</a>!</b>`;
+    if (s1 > s2) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p1.id}">${escapeHTML(p1.first_name)}</a>!</b>`;
+    else if (s2 > s1) winnerText = `🏆 <b>WINNER: <a href="tg://user?id=${p2.id}">${escapeHTML(p2.first_name)}</a>!</b>`;
     else winnerText = `⚖️ <b>IT'S A DRAW!</b>`;
 
-    await bot.api.sendMessage(chatId, `🏁 <b>Game of Lies Finished!</b>\n\nFinal Scores:\n- ${p1.first_name}: ${s1}\n- ${p2.first_name}: ${s2}\n\n${winnerText}`, { parse_mode: 'HTML' });
+    await bot.api.sendMessage(chatId, `🏁 <b>Game of Lies Finished!</b>\n\nFinal Scores:\n- ${escapeHTML(p1.first_name)}: ${s1}\n- ${escapeHTML(p2.first_name)}: ${s2}\n\n${winnerText}`, { parse_mode: 'HTML' });
     
     // Record stats
     if (sb.supabase) {
@@ -1743,7 +1767,7 @@ async function handleStandardClueTimeout(chatId) {
     for (const p of afkPlayers) {
         const isImpostor = p.id === lobby.impostorId;
         gameManager.eliminatePlayer(chatId, p.id);
-        elimText += `💤 <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${isImpostor ? '🔫 Impostor' : '👤 Civilian'}\n`;
+        elimText += `💤 <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a> — ${isImpostor ? '🔫 Impostor' : '👤 Civilian'}\n`;
     }
 
     await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
@@ -1765,7 +1789,7 @@ async function handleStandardClueTimeout(chatId) {
     lobby.state = 'DISCUSSION';
     let clueText = `🕵️‍♂️ <b>Clues Revealed!</b>\n\n`;
     lobby.players.forEach(p => {
-        clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id] || '—'}</b>\n`;
+        clueText += `- <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>: <b>${escapeHTML(lobby.cluesReceived[p.id] || '—')}</b>\n`;
     });
     const gSettings = await sb.getGroupSettings(chatId);
     clueText += `\n💬 <b>DISCUSSION PHASE:</b> You now have exactly ${gSettings.discussion_time} seconds to discuss!`;
@@ -1784,12 +1808,12 @@ async function tallyVotes(chatId) {
     lobby.state = 'TALLY'; 
     const results = gameManager.getVotingResults(chatId);
     const impostorPlayer = lobby.players.find(p => p.id === lobby.impostorId);
-    const impostorName = impostorPlayer ? `<a href="tg://user?id=${impostorPlayer.id}">${impostorPlayer.first_name}</a>` : 'The Impostor';
+    const impostorName = impostorPlayer ? `<a href="tg://user?id=${impostorPlayer.id}">${escapeHTML(impostorPlayer.first_name)}</a>` : 'The Impostor';
     
     if (Object.keys(lobby.votes).length === 0 || results.tie) {
         processGameEnd(lobby, 'IMPOSTOR');
         let msg = Object.keys(lobby.votes).length === 0 ? "⚖️ <b>NO ONE VOTED!</b>" : "⚖️ <b>IT'S A TIE VOTE!</b>";
-        await bot.api.sendMessage(chatId, `${msg}\n\nSince the group couldn't agree, the Impostor survives and perfectly blended in!\n\n(The Impostor was actually ${impostorName} with the word: <i>${lobby.wordB}</i>!)\n\n<b>THE IMPOSTOR WINS!</b>`, { parse_mode: 'HTML' });
+        await bot.api.sendMessage(chatId, `${msg}\n\nSince the group couldn't agree, the Impostor survives and perfectly blended in!\n\n(The Impostor was actually ${impostorName} with the word: <i>${escapeHTML(lobby.wordB)}</i>!)\n\n<b>THE IMPOSTOR WINS!</b>`, { parse_mode: 'HTML' });
         gameManager.deleteLobby(chatId);
         return;
     } 
@@ -1799,19 +1823,19 @@ async function tallyVotes(chatId) {
     
     if (!isImpostorEliminated) {
        processGameEnd(lobby, 'IMPOSTOR');
-       await bot.api.sendMessage(chatId, `❌ <b>WRONG VOTE!</b>\n\nThe group voted out <a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>, but they were innocent! Their word was <b>${lobby.wordA}</b> just like everyone else!\n\n<b>THE IMPOSTOR SURVIVES AND WINS!</b>\n(The Impostor was actually ${impostorName} with the word: <i>${lobby.wordB}</i>)`, { parse_mode: 'HTML' });
+       await bot.api.sendMessage(chatId, `❌ <b>WRONG VOTE!</b>\n\nThe group voted out <a href="tg://user?id=${votedPlayer.id}">${escapeHTML(votedPlayer.first_name)}</a>, but they were innocent! Their word was <b>${escapeHTML(lobby.wordA)}</b> just like everyone else!\n\n<b>THE IMPOSTOR SURVIVES AND WINS!</b>\n(The Impostor was actually ${impostorName} with the word: <i>${escapeHTML(lobby.wordB)}</i>)`, { parse_mode: 'HTML' });
        gameManager.deleteLobby(chatId);
     } else {
        const gSettings = await sb.getGroupSettings(chatId);
        lobby.state = 'IMPOSTOR_GUESS';
-       await bot.api.sendMessage(chatId, `🎯 <b>CORRECT VOTE!</b>\n\nBrilliant deduction! You caught the Impostor: <a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>! (Their unique word was <tg-spoiler>${lobby.wordB}</tg-spoiler>).\n\n🚨 <b>BUT WAIT...</b>\n<a href="tg://user?id=${votedPlayer.id}">${votedPlayer.first_name}</a>, you have exactly ONE CHANCE. Type what you think the group's word was right down here in the chat to steal the win! (You have ${gSettings.impostor_guess_time} seconds!)`, { parse_mode: 'HTML' });
+       await bot.api.sendMessage(chatId, `🎯 <b>CORRECT VOTE!</b>\n\nBrilliant deduction! You caught the Impostor: <a href="tg://user?id=${votedPlayer.id}">${escapeHTML(votedPlayer.first_name)}</a>! (Their unique word was <tg-spoiler>${escapeHTML(lobby.wordB)}</tg-spoiler>).\n\n🚨 <b>BUT WAIT...</b>\n<a href="tg://user?id=${votedPlayer.id}">${escapeHTML(votedPlayer.first_name)}</a>, you have exactly ONE CHANCE. Type what you think the group's word was right down here in the chat to steal the win! (You have ${gSettings.impostor_guess_time} seconds!)`, { parse_mode: 'HTML' });
        
        setTimeout(async () => {
           const currentLobby = gameManager.getLobby(chatId);
           if (currentLobby && currentLobby.state === 'IMPOSTOR_GUESS') {
              lobby.state = 'END';
              processGameEnd(currentLobby, 'MAJORITY');
-             await bot.api.sendMessage(chatId, `⏳ <b>TIME IS UP!</b>\n\nThe Impostor failed to guess the word in time.\nThe real word was <b>${currentLobby.wordA}</b>.\n\n🎉 <b>THE MAJORITY WINS!</b>`, { parse_mode: 'HTML' });
+             await bot.api.sendMessage(chatId, `⏳ <b>TIME IS UP!</b>\n\nThe Impostor failed to guess the word in time.\nThe real word was <b>${escapeHTML(currentLobby.wordA)}</b>.\n\n🎉 <b>THE MAJORITY WINS!</b>`, { parse_mode: 'HTML' });
              gameManager.deleteLobby(chatId);
           }
        }, gSettings.impostor_guess_time * 1000);
@@ -1824,8 +1848,8 @@ async function updateLobbyMessage(chatId, lobby, messageId) {
     .text("❌ Leave", "leave_game")
     .row()
     .text("▶️ Start (Host only)", "start_game");
-  let text = `🕵️‍♂️ <b>Undercover Lobby</b> 🕵️‍♂️\n\nHost: <a href="tg://user?id=${lobby.host.id}">${lobby.host.first_name}</a>\nPlayers joined: ${lobby.players.length} (Minimum 3 required)\n\n`;
-  lobby.players.forEach((p, idx) => { text += `${idx + 1}. <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
+  let text = `🕵️‍♂️ <b>Undercover Lobby</b> 🕵️‍♂️\n\nHost: <a href="tg://user?id=${lobby.host.id}">${escapeHTML(lobby.host.first_name)}</a>\nPlayers joined: ${lobby.players.length} (Minimum 3 required)\n\n`;
+  lobby.players.forEach((p, idx) => { text += `${idx + 1}. <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; });
   try { await bot.api.editMessageText(chatId, messageId, text, { reply_markup: keyboard, parse_mode: 'HTML' }); }
   catch (error) { if (!error.message.includes("is not modified")) console.error(error); }
 }
@@ -1835,8 +1859,8 @@ async function updateMafiaLobbyMessage(chatId, lobby, messageId) {
   const keyboard = new InlineKeyboard()
     .text("✅ Join Game", "maf_join").text("❌ Leave", "maf_leave").row()
     .text("▶️ Start (Host only)", "maf_start");
-  let text = `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${lobby.host.id}">${lobby.host.first_name}</a>\nPlayers: ${lobby.players.length} (Minimum 3 required)\nRoles: ${dist.impostors} Impostor${dist.impostors > 1 ? 's' : ''} | ${dist.joker} Joker\n\n`;
-  lobby.players.forEach((p, idx) => { text += `${idx + 1}. <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
+  let text = `🔫 <b>Mafia Lobby</b> 🔫\n\nHost: <a href="tg://user?id=${lobby.host.id}">${escapeHTML(lobby.host.first_name)}</a>\nPlayers: ${lobby.players.length} (Minimum 3 required)\nRoles: ${dist.impostors} Impostor${dist.impostors > 1 ? 's' : ''} | ${dist.joker} Joker\n\n`;
+  lobby.players.forEach((p, idx) => { text += `${idx + 1}. <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; });
   try { await bot.api.editMessageText(chatId, messageId, text, { reply_markup: keyboard, parse_mode: 'HTML' }); }
   catch (error) { if (!error.message.includes("is not modified")) console.error(error); }
 }
@@ -1856,8 +1880,8 @@ async function handleClueTimeout(chatId) {
   for (const p of afkPlayers) {
     const role = lobby.roles[p.id];
     mafiaManager.eliminatePlayer(chatId, p.id);
-    elimText += `💤 <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${RE[role]} ${role.charAt(0) + role.slice(1).toLowerCase()}`;
-    if (role === 'IMPOSTOR') elimText += ` (Their word was: <tg-spoiler>${lobby.wordB}</tg-spoiler>)`;
+    elimText += `💤 <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a> — ${RE[role]} ${role.charAt(0) + role.slice(1).toLowerCase()}`;
+    if (role === 'IMPOSTOR') elimText += ` (Their word was: <tg-spoiler>${escapeHTML(lobby.wordB)}</tg-spoiler>)`;
     elimText += `\n`;
   }
 
@@ -1877,7 +1901,7 @@ async function handleClueTimeout(chatId) {
   lobby.state = 'DISCUSSION';
   let clueText = `🔫 <b>Round ${lobby.round} — Clues Revealed!</b>\n\n`;
   lobby.alivePlayers.forEach(p => {
-    clueText += `- <a href="tg://user?id=${p.id}">${p.first_name}</a>: <b>${lobby.cluesReceived[p.id] || '—'}</b>\n`;
+    clueText += `- <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>: <b>${escapeHTML(lobby.cluesReceived[p.id] || '—')}</b>\n`;
   });
   const dt = lobby.settings.discussion_time || 90;
   clueText += `\n💬 <b>DISCUSSION:</b> ${dt} seconds to discuss!`;
@@ -1924,13 +1948,13 @@ async function tallyMafiaVotes(chatId) {
 
   if (role === 'JOKER') {
     lobby.jokerWon = true;
-    elimText = `🃏 <b>THE JOKER WINS!</b> 🃏\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was the <b>Joker</b>! They WANTED to get voted out and pulled it off!\n\n🎭 The Joker takes the victory — game over!`;
+    elimText = `🃏 <b>THE JOKER WINS!</b> 🃏\n\n<a href="tg://user?id=${votedP.id}">${escapeHTML(votedP.first_name)}</a> was the <b>Joker</b>! They WANTED to get voted out and pulled it off!\n\n🎭 The Joker takes the victory — game over!`;
     await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
     return endMafiaGame(chatId, 'JOKER_WIN');
   } else if (role === 'IMPOSTOR') {
-    elimText = `✅ <b>IMPOSTOR CAUGHT!</b>\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was an <b>Impostor</b>! ${RE[role]}\n🔑 Their word was: <tg-spoiler>${lobby.wordB}</tg-spoiler>`;
+    elimText = `✅ <b>IMPOSTOR CAUGHT!</b>\n\n<a href="tg://user?id=${votedP.id}">${escapeHTML(votedP.first_name)}</a> was an <b>Impostor</b>! ${RE[role]}\n🔑 Their word was: <tg-spoiler>${escapeHTML(lobby.wordB)}</tg-spoiler>`;
   } else {
-    elimText = `❌ <b>WRONG TARGET!</b>\n\n<a href="tg://user?id=${votedP.id}">${votedP.first_name}</a> was a <b>Civilian</b>! ${RE[role]}\nThe impostors are still among you...`;
+    elimText = `❌ <b>WRONG TARGET!</b>\n\n<a href="tg://user?id=${votedP.id}">${escapeHTML(votedP.first_name)}</a> was a <b>Civilian</b>! ${RE[role]}\nThe impostors are still among you...`;
   }
   elimText += `\n\n👥 <b>Alive:</b> ${lobby.alivePlayers.length} players remaining`;
   await bot.api.sendMessage(chatId, elimText, { parse_mode: 'HTML' });
@@ -1949,7 +1973,7 @@ async function startNextMafiaRound(chatId) {
   const me = bot.botInfo || await bot.api.getMe();
   const dmKb = new InlineKeyboard().url("📩 Go to Bot DM", `https://t.me/${me.username}`);
   let text = `🔫 <b>Round ${lobby.round} — Clue Phase</b>\n\nCheck your DMs and reply with your clue! ⏰ <b>60 seconds!</b>\n\n<b>Status:</b>\n`;
-  lobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${p.first_name}</a>\n`; });
+  lobby.alivePlayers.forEach(p => { text += `⏳ <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a>\n`; });
   try { const msg = await bot.api.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: dmKb }); lobby.clueStatusMessageId = msg.message_id; } catch(e) {}
   lobby.clueTimer = setTimeout(() => handleClueTimeout(chatId), 60000);
 }
@@ -1982,7 +2006,7 @@ async function endMafiaGame(chatId, result) {
     else isWinner = r === 'IMPOSTOR';
 
     const status = alive ? 'Survived' : 'Eliminated';
-    const entry = `${RE[r]} <a href="tg://user?id=${p.id}">${p.first_name}</a> — ${r.charAt(0) + r.slice(1).toLowerCase()} (${status})`;
+    const entry = `${RE[r]} <a href="tg://user?id=${p.id}">${escapeHTML(p.first_name)}</a> — ${r.charAt(0) + r.slice(1).toLowerCase()} (${status})`;
     if (isWinner) winners.push(entry);
     else losers.push(entry);
   });
@@ -2026,6 +2050,11 @@ app.get('/', (req, res) => res.send('Bot is safely running!'));
 // Serve Mini App
 app.get('/miniapp', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Serve Adsgram Bonus App
+app.get('/bonus-app', (req, res) => {
+    res.sendFile(path.join(__dirname, 'bonus.html'));
 });
 
 // Reward Endpoint
@@ -2072,7 +2101,8 @@ if (require.main === module) {
     { command: "play", description: "Start an Undercover lobby" },
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
-    { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
+    { command: "drop", description: "🎁 Mystery Drop (OnClicka)" },
+    { command: "bonus", description: "💰 Video Bonus (Adsgram)" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "daily", description: "Claim your daily coin reward" },
