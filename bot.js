@@ -2340,7 +2340,18 @@ app.get('/api/user-stats', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Dummy web server running on port ${PORT}`);
+  
+  // --- Keep-Alive Ping (Prevents Sleep) ---
+  const hostname = process.env.RENDER_EXTERNAL_HOSTNAME;
+  if (hostname) {
+    setInterval(() => {
+      const url = `https://${hostname}/`;
+      fetch(url).catch(() => {}); // Self-ping
+    }, 5 * 60 * 1000); // Every 5 minutes
+  }
+});
 
 module.exports = { bot };
 if (require.main === module) { 
