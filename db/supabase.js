@@ -376,6 +376,32 @@ async function claimDaily(userId, amount) {
   }
 }
 
+async function claimGroupInviteReward(userId, chatId, amount) {
+  if (!supabase) return { success: false };
+  
+  // 1. Check if this group was already rewarded
+  const { data: existing } = await supabase.from('group_rewards').select('chat_id').eq('chat_id', chatId).single();
+  if (existing) return { success: false, error: 'ALREADY_REWARDED' };
+
+  const release = await acquireLock(userId);
+  try {
+    // 2. Record the reward to prevent double claiming
+    const { error: recordError } = await supabase.from('group_rewards').insert({ 
+      chat_id: chatId, 
+      user_id: userId, 
+      amount: amount 
+    });
+    
+    if (recordError) return { success: false, error: 'DB_ERROR' };
+
+    // 3. Add coins to the user
+    const newBalance = await addCoinsInternal(userId, amount);
+    return { success: true, amount, newBalance };
+  } finally {
+    releaseLock(release);
+  }
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -402,6 +428,7 @@ module.exports = {
   deleteHiloGame,
   cleanupStaleHiloGames,
   claimDaily,
+  claimGroupInviteReward,
   recordBonusClaim,
   DEFAULT_SETTINGS
 };

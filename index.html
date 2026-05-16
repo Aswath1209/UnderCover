@@ -3,96 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mystery Drop</title>
+    <title>Mystery Drop | Undercover Bot</title>
     <!-- Telegram SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Adsgram SDK -->
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: var(--tg-theme-button-color, #248bfe);
+            --bg: var(--tg-theme-bg-color, #1c1c1d);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            --text: var(--tg-theme-text-color, #ffffff);
+            --hint: var(--tg-theme-hint-color, #8e8e93);
+            --success: #34c759;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .card {
+            width: 85%;
+            max-width: 380px;
+            background: var(--secondary-bg);
+            border-radius: 24px;
+            padding: 32px 24px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
             text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .container {
-            width: 90%;
-            max-width: 400px;
-            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            border-radius: 15px;
-            padding: 30px 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+
+        .icon-container {
+            font-size: 64px;
+            margin-bottom: 16px;
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.1));
         }
+
+        h2 {
+            font-size: 24px;
+            margin: 0 0 12px 0;
+            font-weight: 700;
+        }
+
+        p {
+            font-size: 15px;
+            color: var(--hint);
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
         .btn {
-            background-color: var(--tg-theme-button-color, #248bfe);
-            color: var(--tg-theme-button-text-color, #ffffff);
+            background-color: var(--primary);
+            color: #ffffff;
             border: none;
-            padding: 15px 35px;
-            border-radius: 12px;
-            font-weight: bold;
-            font-size: 18px;
+            padding: 16px 24px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 16px;
             cursor: pointer;
             width: 100%;
+            transition: filter 0.2s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(36, 139, 254, 0.3);
         }
+
+        .btn:active {
+            transform: scale(0.98);
+            filter: brightness(0.9);
+        }
+
+        .btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--hint);
+            font-weight: 500;
+        }
+
         .hidden { display: none; }
-        .status { font-size: 14px; opacity: 0.7; margin-top: 15px; }
+
+        .reward-amount {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--success);
+            margin: 12px 0;
+        }
+
+        /* Animations */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .animate-bounce {
+            animation: bounce 2s infinite ease-in-out;
+        }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <div id="ad-prompt">
-            <h2>🎁 Mystery Drop</h2>
-            <p>Watch a short video to open your mystery crate!</p>
-            <button class="btn" id="watch-btn">📦 Open Crate</button>
-            <div class="status" id="status">Ready to open!</div>
+    <div class="card" id="main-card">
+        <div id="ad-view">
+            <div class="icon-container animate-bounce">🎁</div>
+            <h2>Mystery Drop</h2>
+            <p>You have a pending mystery crate! Watch a short video to unlock up to <b>5,000 coins</b> inside.</p>
+            <button class="btn" id="watch-btn">📦 Unlock Crate</button>
+            <div class="status-badge" id="status">Ready to unlock</div>
         </div>
 
-        <div id="reward-box" class="hidden">
-            <h2 style="color: #4caf50;">✅ Crate Unlocked!</h2>
-            <p>Your reward is ready.</p>
+        <div id="success-view" class="hidden">
+            <div class="icon-container">🎉</div>
+            <h2 style="color: var(--success);">Crate Unlocked!</h2>
+            <p>Your coins have been calculated. Click below to claim them to your account.</p>
             <button class="btn" id="claim-btn">💰 Claim Coins</button>
+            <div class="status-badge">One step remaining</div>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
+        tg.ready();
         tg.expand();
         
+        // Match Telegram theme colors for the header
+        tg.setHeaderColor(tg.themeParams.secondary_bg_color || '#2c2c2e');
+
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
         const msgId = urlParams.get('msg_id');
 
-        // Initialize Adsgram with your Block ID
-        const AdController = window.Adsgram.init({ blockId: "30301" });
+        // NEW BLOCK ID: 30340
+        const AdController = window.Adsgram.init({ blockId: "30340" });
         
         document.getElementById('watch-btn').onclick = () => {
             const status = document.getElementById('status');
             const btn = document.getElementById('watch-btn');
             
             btn.disabled = true;
-            status.innerText = "Opening crate...";
+            status.innerText = "⏳ Loading Video...";
 
             AdController.show().then((result) => {
-                // Success
-                document.getElementById('ad-prompt').classList.add('hidden');
-                document.getElementById('reward-box').classList.remove('hidden');
+                // Success: Ad watched completely
+                tg.HapticFeedback.notificationOccurred('success');
+                document.getElementById('ad-view').classList.add('hidden');
+                document.getElementById('success-view').classList.remove('hidden');
             }).catch((result) => {
-                // Error/Closed
+                // Error or Closed
+                tg.HapticFeedback.notificationOccurred('error');
                 btn.disabled = false;
-                status.innerText = "Please watch the full video to unlock!";
-                alert("Watch the full video to claim your coins!");
+                status.innerText = "⚠️ Full video required";
+                tg.showAlert("Please watch the full video to claim your reward! 🎁");
             });
         };
 
         document.getElementById('claim-btn').onclick = () => {
+            const btn = document.getElementById('claim-btn');
+            btn.disabled = true;
+            btn.innerText = "Claiming...";
+            
             fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}`)
-                .then(() => tg.close())
+                .then(() => {
+                    tg.HapticFeedback.impactOccurred('medium');
+                    tg.close();
+                })
                 .catch(() => tg.close());
         };
     </script>

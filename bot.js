@@ -113,6 +113,101 @@ async function ensureRegistered(ctx) {
   } catch (e) {}
 }
 
+async function handleGroupInvite(ctx) {
+    if (!sb.supabase) return;
+    
+    const update = ctx.myChatMember;
+    // Check if the bot was added (status changed to 'member' or 'administrator')
+    const isAdded = (update.new_chat_member.status === 'member' || update.new_chat_member.status === 'administrator') &&
+                    (update.old_chat_member.status === 'left' || update.old_chat_member.status === 'kicked');
+    
+    if (!isAdded) return;
+
+    const userId = update.from.id;
+    if (update.from.is_bot) return;
+
+    const chatId = ctx.chat.id;
+    const chatTitle = ctx.chat.title;
+
+    try {
+        const count = await ctx.api.getChatMemberCount(chatId);
+        
+        if (count < 50) return; // No reward for small groups
+
+        let amount = 0;
+        if (count >= 50 && count <= 100) amount = 2000;
+        else if (count <= 500) amount = 5000;
+        else if (count <= 2000) amount = 10000;
+        else amount = 20000;
+
+        const result = await sb.claimGroupInviteReward(userId, chatId, amount);
+        
+        if (result.success) {
+            await ctx.api.sendMessage(chatId, 
+                `🎉 <b>Bot Added to Group!</b>\n\n` +
+                `Thank you <a href="tg://user?id=${userId}">${escapeHTML(update.from.first_name)}</a> for inviting me to <b>${escapeHTML(chatTitle)}</b>!\n\n` +
+                `💰 You have been rewarded with <b>${amount}</b> coins for this active group (${count} members).\n` +
+                `New Balance: <b>${result.newBalance}</b>`,
+                { parse_mode: 'HTML' }
+            );
+            
+            // Also notify user in private to be safe
+            await ctx.api.sendMessage(userId, `✅ You earned <b>${amount}</b> coins for adding me to <b>${chatTitle}</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
+        }
+    } catch (e) {
+        console.error("Error in handleGroupInvite:", e);
+    }
+}
+
+bot.on('my_chat_member', async (ctx) => {
+    await handleGroupInvite(ctx);
+});
+
+bot.command('help', async (ctx) => {
+  const text = `📖 <b>The Undercover Bot — Help Menu</b>\n\n` +
+               `🎮 <b>Main Games:</b>\n` +
+               `• /play — Start an Undercover lobby (3+ players)\n` +
+               `• /mafia — Start a Mafia lobby (3+ players)\n` +
+               `• /lies — Challenge a friend to Game of Lies (1v1)\n` +
+               `• /guessword — Start a Guess the Word game\n\n` +
+               `💰 <b>Gambling & Economy:</b>\n` +
+               `• /blackjack — Play Blackjack against the Dealer\n` +
+               `• /hilo — Play High-Low Cricket Stats\n` +
+               `• /fly — Bet on the crashing plane (Aviator)\n` +
+               `• /daily — Claim your daily coin bonus\n` +
+               `• /drop — Claim a Mystery Coin Drop (Video Ad)\n\n` +
+               `👤 <b>User Info:</b>\n` +
+               `• /profile — Check your wins, losses, and coins\n` +
+               `• /leaderboard — View top players globally\n` +
+               `• /balance — Check your coin balance\n` +
+               `• /send — Send coins to a friend (reply to them)\n\n` +
+               `⚙️ <b>Others:</b>\n` +
+               `• /settings — Configure game timers and rules\n` +
+               `• /cancel — Stop the current game in a group\n` +
+               `• /feedback — Send a message to the developers\n\n` +
+               `📢 <b>Join our community:</b> ${OFFICIAL_GC_USER}`;
+  
+  await ctx.reply(text, { parse_mode: 'HTML' });
+});
+
+bot.command('rules', async (ctx) => {
+    const text = `⚖️ <b>Game Rules & How to Play</b>\n\n` +
+                 `🕵️‍♂️ <b>Undercover:</b>\n` +
+                 `Everyone gets a secret word. One person (The Impostor) has a slightly different word. Give 1-word clues to find out who is the Impostor without revealing your own word!\n\n` +
+                 `🔫 <b>Mafia:</b>\n` +
+                 `Similar to Undercover, but with multiple roles like the Joker. The Joker wins if they get voted out, so be careful who you target!\n\n` +
+                 `🤥 <b>Game of Lies:</b>\n` +
+                 `A 1v1 trivia battle. You can answer correctly for points, or send a wrong answer to bait your opponent into "stealing" and losing points.\n\n` +
+                 `🃏 <b>Blackjack:</b>\n` +
+                 `Get as close to 21 as possible without going over. Aces are 1 or 11. Dealer must hit until 17.\n\n` +
+                 `⚖️ <b>Economy Rules:</b>\n` +
+                 `• Coins have no real-world value.\n` +
+                 `• Multi-accounting to farm coins is prohibited.\n` +
+                 `• Be respectful in group chats!`;
+    
+    await ctx.reply(text, { parse_mode: 'HTML' });
+});
+
 bot.command('start', async (ctx) => {
   ensureRegistered(ctx);
   
@@ -2245,6 +2340,7 @@ if (require.main === module) {
     { command: "cancel", description: "Cancel current game" },
     { command: "quit", description: "Quit current game" },
     { command: "help", description: "Show bot help" },
+    { command: "rules", description: "How to play the games" },
     { command: "start", description: "Start the bot" },
     { command: "ping", description: "Check bot status" }
   ]);
