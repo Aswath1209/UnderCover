@@ -6,6 +6,7 @@ const liesManager = require('./game/liesManager');
 const hiloManager = require('./game/hiloManager');
 const guessManager = require('./game/guessManager');
 const crashManager = require('./game/crashManager');
+const bjManager = require('./game/blackjackManager');
 const { normalizeWord, escapeHTML } = require('./utils');
 const sb = require('./db/supabase');
 const path = require('path');
@@ -508,6 +509,118 @@ bot.command('fly', async (ctx) => {
         );
     }
 });
+
+// --- BLACKJACK SYSTEM ---
+const activeBJ = new Map();
+
+function sendBJMsg(ctx, state, isEdit = false, chatId = null, msgId = null, extraMsg = '') {
+  const playerScore = bjManager.calculateScore(state.playerHand);
+  const dealerScore = bjManager.calculateScore(state.dealerHand);
+  const isGameOver = state.status !== 'PLAYING';
+
+  let text = `${extraMsg}🃏 <b>BLACKJACK</b> 🃏\n\n` +
+             `💰 Bet: <b>${state.bet}</b>\n\n` +
+             `👤 <b>Your Hand:</b> ${bjManager.renderHand(state.playerHand)} (<b>${playerScore}</b>)\n` +
+             `🏦 <b>Dealer Hand:</b> ${bjManager.renderHand(state.dealerHand, !isGameOver)} (<b>${isGameOver ? dealerScore : '?'}</b>)\n\n`;
+
+  if (state.status === 'WIN') {
+    text += "🎊 <b>YOU WON!</b> 🎊";
+  } else if (state.status === 'LOSS') {
+    text += "💀 <b>YOU LOST!</b> 💀";
+  } else if (state.status === 'PUSH') {
+    text += "⚖️ <b>PUSH (DRAW)!</b> ⚖️";
+  } else if (state.status === 'BUST') {
+    text += "💥 <b>BUSTED! YOU LOST.</b> 💥";
+  } else {
+    text += "<i>What is your next move?</i>";
+  }
+
+  const kb = new InlineKeyboard();
+  if (!isGameOver) {
+    kb.text("➕ Hit", "bj_hit").text("✋ Stand", "bj_stand");
+    if (state.playerHand.length === 2) kb.row().text("💰 Double", "bj_double");
+  }
+
+  if (isEdit) {
+    return bot.api.editMessageText(chatId, msgId, text, { reply_markup: kb, parse_mode: 'HTML' }).catch(()=>{});
+  }
+  return ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
+}
+
+bot.command(['blackjack', 'deal'], async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database disabled.");
+  const userId = ctx.from.id;
+  const args = ctx.message.text.split(' ');
+  const betStr = args[1];
+
+  if (!betStr || isNaN(betStr) || parseInt(betStr) <= 0) {
+    return ctx.reply("🃏 <b>Blackjack</b>\n\nUsage: /blackjack <bet>\nExample: /blackjack 500", { parse_mode: 'HTML' });
+  }
+  const bet = parseInt(betStr);
+
+  const profile = await sb.getProfile(userId);
+  if (!profile || (profile.coins || 0) < bet) {
+    return ctx.reply(`❌ Not enough coins! Balance: ${profile?.coins || 0}`);
+  }
+
+  if (activeBJ.has(userId)) {
+    return ctx.reply("❌ You already have an active game! Finish it first.");
+  }
+
+  // Deduct bet
+  const deduct = await sb.addCoins(userId, -bet);
+  if (deduct === false) return ctx.reply("❌ Error processing bet.");
+
+  const deck = bjManager.createDeck();
+  const playerHand = [deck.pop(), deck.pop()];
+  const dealerHand = [deck.pop(), deck.pop()];
+  
+  const state = {
+    userId,
+    bet,
+    deck,
+    playerHand,
+    dealerHand,
+    status: 'PLAYING',
+    chatId: ctx.chat.id
+  };
+
+  const pScore = bjManager.calculateScore(playerHand);
+  if (pScore === 21) {
+    state.status = 'WIN';
+    const payout = Math.floor(bet * 2.5); // Blackjack payout 3:2
+    await sb.addCoinsInternal(userId, payout);
+    activeBJ.delete(userId);
+    return sendBJMsg(ctx, state, false, null, null, "🃏 <b>NATURAL BLACKJACK!</b> 🔥 ");
+  }
+
+  const msg = await sendBJMsg(ctx, state);
+  state.messageId = msg.message_id;
+  activeBJ.set(userId, state);
+});
+
+async function handleBJStand(ctx, state) {
+  // Dealer's Turn
+  let dScore = bjManager.calculateScore(state.dealerHand);
+  while (dScore < 17) {
+    state.dealerHand.push(state.deck.pop());
+    dScore = bjManager.calculateScore(state.dealerHand);
+  }
+
+  const pScore = bjManager.calculateScore(state.playerHand);
+  if (dScore > 21 || pScore > dScore) {
+    state.status = 'WIN';
+    await sb.addCoinsInternal(state.userId, state.bet * 2);
+  } else if (dScore > pScore) {
+    state.status = 'LOSS';
+  } else {
+    state.status = 'PUSH';
+    await sb.addCoinsInternal(state.userId, state.bet);
+  }
+
+  activeBJ.delete(state.userId);
+  await sendBJMsg(ctx, state, true, state.chatId, state.messageId);
+}
 
 bot.command('quit', async (ctx) => {
   const userId = ctx.from.id;
@@ -1140,6 +1253,49 @@ bot.on('callback_query:data', async (ctx) => {
   const data = ctx.callbackQuery.data;
   const chatId = ctx.chat.id;
   const user = ctx.from;
+
+  // --- BLACKJACK CALLBACKS ---
+  if (data.startsWith('bj_')) {
+    const state = activeBJ.get(user.id);
+    if (!state || (chatId && state.chatId !== chatId)) return ctx.answerCallbackQuery("Game not found.");
+
+    if (data === 'bj_hit') {
+      state.playerHand.push(state.deck.pop());
+      const score = bjManager.calculateScore(state.playerHand);
+      if (score > 21) {
+        state.status = 'BUST';
+        activeBJ.delete(user.id);
+        await sendBJMsg(ctx, state, true, state.chatId, state.messageId);
+      } else {
+        await sendBJMsg(ctx, state, true, state.chatId, state.messageId);
+      }
+      return ctx.answerCallbackQuery();
+    }
+
+    if (data === 'bj_double') {
+      const profile = await sb.getProfile(user.id);
+      if (!profile || (profile.coins || 0) < state.bet) {
+        return ctx.answerCallbackQuery({ text: "Not enough coins to double!", show_alert: true });
+      }
+      await sb.addCoins(user.id, -state.bet);
+      state.bet *= 2;
+      state.playerHand.push(state.deck.pop());
+      const score = bjManager.calculateScore(state.playerHand);
+      if (score > 21) {
+        state.status = 'BUST';
+        activeBJ.delete(user.id);
+        await sendBJMsg(ctx, state, true, state.chatId, state.messageId);
+      } else {
+        await handleBJStand(ctx, state);
+      }
+      return ctx.answerCallbackQuery();
+    }
+
+    if (data === 'bj_stand') {
+      await handleBJStand(ctx, state);
+      return ctx.answerCallbackQuery();
+    }
+  }
 
   if (data.startsWith('hilo_')) {
     const action = data.replace('hilo_', '');
@@ -2075,6 +2231,8 @@ if (require.main === module) {
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
+    { command: "blackjack", description: "Play Blackjack (Alias: /deal)" },
+    { command: "deal", description: "Alias for /blackjack" },
     { command: "daily", description: "Claim your daily coin reward" },
     { command: "guessword", description: "Start a Guess the Word game (Alias: /gw)" },
     { command: "gw", description: "Alias for /guessword" },
