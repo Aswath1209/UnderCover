@@ -2314,6 +2314,31 @@ app.get('/api/reward', async (req, res) => {
     }
 });
 
+// User Stats Endpoint for Mini App
+app.get('/api/user-stats', async (req, res) => {
+    const { user_id } = req.query;
+    if (!user_id) return res.status(400).send('Missing user_id');
+
+    try {
+        const userId = parseInt(user_id);
+        const profile = await sb.getProfile(userId);
+        if (!profile) return res.status(404).send('User not found');
+
+        const globalRank = await sb.getUserGlobalRank(userId);
+
+        res.json({
+            name: profile.first_name,
+            coins: profile.coins || 0,
+            wins: profile.wins || 0,
+            played: profile.matches_played || 0,
+            rank: globalRank || "N/A"
+        });
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).send('error');
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Dummy web server running on port ${PORT}`));
 
