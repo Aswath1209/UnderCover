@@ -10,21 +10,24 @@
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: var(--tg-theme-button-color, #248bfe);
-            --bg: var(--tg-theme-bg-color, #1c1c1d);
-            --secondary-bg: var(--tg-theme-secondary-bg-color, #2c2c2e);
-            --text: var(--tg-theme-text-color, #ffffff);
-            --hint: var(--tg-theme-hint-color, #8e8e93);
+            --primary: #4facfe;
+            --primary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --bg-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            --glass-bg: rgba(255, 255, 255, 0.07);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text: #ffffff;
+            --hint: #a8a8b3;
             --success: #34c759;
             --danger: #ff3b30;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
             color: var(--text);
             margin: 0;
             padding: 0;
@@ -32,20 +35,30 @@
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
         }
 
         /* Tabs */
         .tab-bar {
             display: flex;
-            background: var(--secondary-bg);
-            padding: 8px;
             position: fixed;
-            bottom: 0;
-            width: 100%;
-            box-sizing: border-box;
-            border-top: 1px solid rgba(255,255,255,0.05);
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            padding: 10px;
             justify-content: space-around;
-            padding-bottom: calc(8px + env(safe-area-inset-bottom));
+            z-index: 100;
+            border-radius: 30px;
         }
 
         .tab-item {
@@ -53,138 +66,258 @@
             flex-direction: column;
             align-items: center;
             color: var(--hint);
-            font-size: 11px;
-            font-weight: 500;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
-            padding: 4px 12px;
-            transition: color 0.2s;
+            padding: 8px 24px;
+            border-radius: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .tab-item.active {
-            color: var(--primary);
+            color: #fff;
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
         }
 
         .tab-icon {
-            font-size: 22px;
+            font-size: 24px;
             margin-bottom: 4px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
         }
 
         /* Content */
         .content {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 100px;
+            padding: 24px;
+            padding-bottom: 120px;
         }
 
-        .view { display: none; }
+        .view { 
+            display: none; 
+            animation: fadeIn 0.4s ease-out forwards;
+        }
         .view.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* Stats Cards */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 16px;
+            margin-bottom: 30px;
         }
 
         .stat-card {
-            background: var(--secondary-bg);
-            border-radius: 16px;
-            padding: 16px;
+            padding: 20px;
             text-align: center;
-            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:active {
+            transform: scale(0.96);
         }
 
         .stat-val {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 26px;
+            font-weight: 800;
             display: block;
-            margin-top: 4px;
+            margin-top: 6px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .stat-label {
-            font-size: 12px;
+            font-size: 13px;
             color: var(--hint);
             text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
         }
 
         /* Header */
         .header {
             display: flex;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 30px;
+            background: rgba(0,0,0,0.2);
+            padding: 16px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.05);
         }
 
         .avatar {
-            width: 50px;
-            height: 50px;
-            background: var(--primary);
+            width: 56px;
+            height: 56px;
+            background: var(--primary-gradient);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            margin-right: 15px;
+            font-size: 28px;
+            margin-right: 16px;
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.4);
         }
 
         .user-name {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
-            margin: 0;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.5px;
         }
 
         .user-rank {
             font-size: 14px;
-            color: var(--primary);
+            color: #00f2fe;
             margin: 0;
+            font-weight: 500;
         }
 
         /* Ad Section */
         .ad-card {
-            background: linear-gradient(135deg, var(--secondary-bg), #3a3a3c);
-            border-radius: 20px;
-            padding: 24px;
+            padding: 30px 24px;
             text-align: center;
-            border: 1px solid rgba(36, 139, 254, 0.2);
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .ad-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
         }
 
+        .ad-icon {
+            font-size: 56px;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
+        }
+
+        .ad-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+        }
+
+        .ad-desc {
+            color: var(--hint);
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        /* Buttons */
         .btn {
-            background-color: var(--primary);
+            background: var(--primary-gradient);
             color: white;
             border: none;
-            padding: 14px 20px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 16px;
+            padding: 16px 24px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 17px;
             width: 100%;
             cursor: pointer;
-            margin-top: 15px;
+            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3);
+            transition: all 0.2s;
+            font-family: inherit;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
 
-        .btn:disabled { opacity: 0.5; }
+        .btn:active {
+            transform: scale(0.96);
+            box-shadow: 0 4px 10px rgba(79, 172, 254, 0.2);
+        }
+
+        .btn:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed;
+            transform: none;
+            background: #555;
+            box-shadow: none;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .pulse { animation: pulse 2s infinite; }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .bounce { animation: bounce 2s infinite ease-in-out; }
 
         /* Game List */
-        .game-item {
-            background: var(--secondary-bg);
-            border-radius: 14px;
-            padding: 12px 16px;
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 16px 4px;
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
-            border: 1px solid rgba(255,255,255,0.03);
+            gap: 8px;
+        }
+
+        .game-item {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            transition: transform 0.2s, background 0.2s;
+        }
+        
+        .game-item:active {
+            transform: translateX(4px);
+            background: rgba(255,255,255,0.1);
         }
 
         .game-icon {
-            font-size: 24px;
-            margin-right: 15px;
+            font-size: 32px;
+            margin-right: 16px;
+            background: rgba(0,0,0,0.2);
+            width: 50px; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 14px;
         }
 
-        .game-info h4 { margin: 0; font-size: 15px; }
-        .game-info p { margin: 0; font-size: 12px; color: var(--hint); }
+        .game-info h4 { margin: 0 0 4px 0; font-size: 17px; font-weight: 700; }
+        .game-info p { margin: 0; font-size: 13px; color: var(--hint); }
 
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+
+        .success-box {
+            text-align: center;
+            padding: 40px 24px;
+        }
+
+        .success-icon {
+            font-size: 72px;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+        
+        .status-text {
+            font-size: 13px; 
+            margin-top: 12px; 
+            color: #00f2fe;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
 
     </style>
 </head>
@@ -201,32 +334,32 @@
             </div>
 
             <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-label">Coins</span>
+                <div class="stat-card glass-panel">
+                    <span class="stat-label">Total Coins</span>
                     <span class="stat-val" id="stat-coins">--</span>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-label">Wins</span>
+                <div class="stat-card glass-panel">
+                    <span class="stat-label">Matches Won</span>
                     <span class="stat-val" id="stat-wins">--</span>
                 </div>
             </div>
 
-            <h3 style="margin-bottom: 15px;">Available Games</h3>
-            <div class="game-item">
+            <h3 class="section-title">🕹️ Available Games</h3>
+            <div class="game-item glass-panel">
                 <div class="game-icon">🕵️‍♂️</div>
                 <div class="game-info">
                     <h4>Undercover</h4>
                     <p>Find the impostor among you!</p>
                 </div>
             </div>
-            <div class="game-item">
+            <div class="game-item glass-panel">
                 <div class="game-icon">🔫</div>
                 <div class="game-info">
                     <h4>Mafia</h4>
                     <p>Roles, strategy, and deception.</p>
                 </div>
             </div>
-            <div class="game-item">
+            <div class="game-item glass-panel">
                 <div class="game-icon">🃏</div>
                 <div class="game-info">
                     <h4>Blackjack</h4>
@@ -237,33 +370,38 @@
 
         <!-- Earn View -->
         <div id="view-earn" class="view">
-            <h1>Rewards</h1>
-            <p style="color: var(--hint);">Complete tasks to earn bonus coins for your games.</p>
-
-            <div class="ad-card">
-                <div style="font-size: 40px; margin-bottom: 10px;">🎁</div>
-                <h3>Mystery Crate</h3>
-                <p>Open a crate to win up to 5,000 coins. Requires watching a short video.</p>
-                <button class="btn" id="watch-btn">📦 Open Crate</button>
-                <div id="status" style="font-size: 12px; margin-top: 10px; color: var(--hint);">Ready</div>
+            <div style="text-align: center; margin-bottom: 30px; margin-top: 10px;">
+                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Rewards Center</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 15px;">Watch ads to earn bonus coins for games.</p>
             </div>
 
-            <div id="success-box" class="hidden" style="text-align: center; margin-top: 20px;">
-                <h2 style="color: var(--success);">🎉 Success!</h2>
-                <p>Crate opened successfully.</p>
+            <div class="ad-card glass-panel" id="ad-container">
+                <div class="ad-icon bounce">🎁</div>
+                <h3 class="ad-title">Mystery Crate</h3>
+                <p class="ad-desc">Open a crate to win up to <b>5,000 coins</b>. Requires watching a short video.</p>
+                <button class="btn pulse" id="watch-btn">
+                    <span>📦 Open Crate</span>
+                </button>
+                <div id="status" class="status-text">READY TO OPEN</div>
+            </div>
+
+            <div id="success-box" class="hidden success-box glass-panel">
+                <div class="success-icon bounce">🎉</div>
+                <h2 style="color: var(--success); margin: 0 0 10px 0; font-size: 28px;">Success!</h2>
+                <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">Crate unlocked successfully.</p>
                 <button class="btn" id="claim-btn">💰 Claim Reward</button>
             </div>
         </div>
     </div>
 
     <!-- Tab Bar -->
-    <div class="tab-bar">
-        <div class="tab-item active" onclick="switchTab('home')">
+    <div class="tab-bar glass-panel">
+        <div class="tab-item active" onclick="switchTab('home', this)">
             <span class="tab-icon">🏠</span>
             <span>Home</span>
         </div>
-        <div class="tab-item" onclick="switchTab('earn')">
-            <span class="tab-icon">💰</span>
+        <div class="tab-item" onclick="switchTab('earn', this)">
+            <span class="tab-icon">💎</span>
             <span>Earn</span>
         </div>
     </div>
@@ -272,7 +410,8 @@
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-        tg.setHeaderColor(tg.themeParams.secondary_bg_color || '#2c2c2e');
+        tg.setHeaderColor('#0f0c29'); 
+        tg.setBackgroundColor('#0f0c29');
 
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
@@ -283,20 +422,21 @@
             .then(res => res.json())
             .then(data => {
                 document.getElementById('user-name').innerText = data.name;
-                document.getElementById('user-initial').innerText = data.name.charAt(0);
+                document.getElementById('user-initial').innerText = data.name.charAt(0).toUpperCase();
                 document.getElementById('user-rank').innerText = `Global Rank: #${data.rank}`;
                 document.getElementById('stat-coins').innerText = data.coins.toLocaleString();
                 document.getElementById('stat-wins').innerText = data.wins;
             })
             .catch(err => console.error(err));
 
-        function switchTab(tab) {
+        function switchTab(tab, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             
             document.getElementById(`view-${tab}`).classList.add('active');
-            event.currentTarget.classList.add('active');
-            tg.HapticFeedback.impactOccurred('light');
+            el.classList.add('active');
+            
+            try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
         }
 
         // Adsgram Integration
@@ -306,20 +446,30 @@
             const btn = document.getElementById('watch-btn');
             const status = document.getElementById('status');
             btn.disabled = true;
-            status.innerText = "Loading Video...";
+            btn.classList.remove('pulse');
+            status.innerText = "LOADING VIDEO... ⏳";
 
             AdController.show().then(() => {
-                tg.HapticFeedback.notificationOccurred('success');
-                document.querySelector('.ad-card').classList.add('hidden');
+                try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                document.getElementById('ad-container').classList.add('hidden');
                 document.getElementById('success-box').classList.remove('hidden');
             }).catch(() => {
                 btn.disabled = false;
-                status.innerText = "Video closed too early.";
+                btn.classList.add('pulse');
+                status.innerText = "VIDEO CLOSED EARLY";
                 tg.showAlert("You must watch the full video to claim your reward!");
             });
         };
 
-        document.getElementById('claim-btn').onclick = () => {
+        // Prevents multiple claims via rapid clicks
+        document.getElementById('claim-btn').onclick = (e) => {
+            const btn = e.target;
+            if (btn.disabled) return;
+            
+            btn.disabled = true;
+            btn.innerHTML = 'Claiming... ⏳';
+            try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+            
             fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}`)
                 .then(() => tg.close())
                 .catch(() => tg.close());

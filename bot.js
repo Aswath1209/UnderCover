@@ -2288,6 +2288,12 @@ app.get('/api/reward', async (req, res) => {
         const userId = parseInt(user_id);
         const msgId = parseInt(msg_id);
 
+        // 0. Strict server-side cooldown check to prevent multi-click abuse
+        const lastDrop = dropCooldowns.get(userId) || 0;
+        if (Date.now() - lastDrop < 60 * 60 * 1000) {
+            return res.status(429).send('Cooldown active');
+        }
+
         // 1. Update Cooldown
         dropCooldowns.set(userId, Date.now());
 
