@@ -14,6 +14,7 @@ const path = require('path');
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
 const dropCooldowns = new Map();
+const claimCooldowns = new Map();
 
 function getRandomReward() {
   const rand = Math.random() * 100;
@@ -2289,12 +2290,13 @@ app.get('/api/reward', async (req, res) => {
         const msgId = parseInt(msg_id);
 
         // 0. Strict server-side cooldown check to prevent multi-click abuse
-        const lastDrop = dropCooldowns.get(userId) || 0;
-        if (Date.now() - lastDrop < 60 * 60 * 1000) {
+        const lastClaim = claimCooldowns.get(userId) || 0;
+        if (Date.now() - lastClaim < 60 * 60 * 1000) {
             return res.status(429).send('Cooldown active');
         }
 
-        // 1. Update Cooldown
+        // 1. Update Cooldowns
+        claimCooldowns.set(userId, Date.now());
         dropCooldowns.set(userId, Date.now());
 
         // 2. Record Claim in DB
@@ -2331,13 +2333,18 @@ app.get('/api/user-stats', async (req, res) => {
         if (!profile) return res.status(404).send('User not found');
 
         const globalRank = await sb.getUserGlobalRank(userId);
+        
+        const lastClaim = claimCooldowns.get(userId) || 0;
+        const remainingMs = (60 * 60 * 1000) - (Date.now() - lastClaim);
+        const cooldownRemaining = remainingMs > 0 ? remainingMs : 0;
 
         res.json({
             name: profile.first_name,
             coins: profile.coins || 0,
             wins: profile.wins || 0,
             played: profile.matches_played || 0,
-            rank: globalRank || "N/A"
+            rank: globalRank || "N/A",
+            dropCooldown: cooldownRemaining
         });
     } catch (error) {
         console.error('Stats error:', error);

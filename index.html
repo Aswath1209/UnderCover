@@ -131,6 +131,7 @@
             margin-top: 6px;
             background: var(--primary-gradient);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -607,6 +608,17 @@
                 document.getElementById('user-rank').innerText = `Global Rank: #${data.rank}`;
                 document.getElementById('stat-coins').innerText = data.coins.toLocaleString();
                 document.getElementById('stat-wins').innerText = data.wins;
+
+                if (data.dropCooldown && data.dropCooldown > 0) {
+                    const btn = document.getElementById('watch-btn');
+                    btn.disabled = true;
+                    btn.classList.remove('pulse');
+                    const remainingMin = Math.ceil(data.dropCooldown / (60 * 1000));
+                    btn.innerHTML = `<span>⏳ Available in ${remainingMin}m</span>`;
+                    const status = document.getElementById('status');
+                    status.innerText = "COOLDOWN ACTIVE";
+                    status.style.color = "var(--hint)";
+                }
             })
             .catch(err => console.error(err));
 
