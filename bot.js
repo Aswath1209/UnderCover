@@ -2345,6 +2345,26 @@ app.get('/api/user-stats', async (req, res) => {
     }
 });
 
+// Leaderboard Endpoint for Mini App
+app.get('/api/leaderboard', async (req, res) => {
+    const { sort } = req.query; // 'coins' or 'wins'
+    const sortBy = sort === 'wins' ? 'wins' : 'coins';
+    
+    try {
+        const topPlayers = await sb.getGlobalLeaderboard(sortBy);
+        const formatted = topPlayers.map(p => ({
+            id: p.user_id,
+            name: p.first_name,
+            coins: p.coins || 0,
+            wins: p.wins || 0
+        }));
+        res.json(formatted);
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).send('error');
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Dummy web server running on port ${PORT}`);

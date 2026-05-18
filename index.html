@@ -48,7 +48,7 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
         }
 
-        /* Tabs */
+        /* Tabs (Bottom Bar) */
         .tab-bar {
             display: flex;
             position: fixed;
@@ -69,7 +69,7 @@
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            padding: 8px 24px;
+            padding: 8px 20px;
             border-radius: 20px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -164,6 +164,9 @@
             font-size: 28px;
             margin-right: 16px;
             box-shadow: 0 0 20px rgba(79, 172, 254, 0.4);
+            flex-shrink: 0;
+            color: white;
+            font-weight: 700;
         }
 
         .user-name {
@@ -249,6 +252,154 @@
             box-shadow: none;
         }
 
+        /* Leaderboard Segmented Control (Top Tabs) */
+        .seg-control {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            border-radius: 14px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        .seg-btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--hint);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .seg-btn.active {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Leaderboard List */
+        .lb-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .lb-item {
+            display: flex;
+            align-items: center;
+            padding: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .lb-item:active {
+            transform: scale(0.98);
+            background: rgba(255,255,255,0.15);
+        }
+        .lb-rank {
+            font-size: 20px;
+            font-weight: 800;
+            width: 36px;
+            text-align: center;
+            color: var(--hint);
+            margin-right: 12px;
+        }
+        .lb-item[data-rank="1"] .lb-rank { color: #FFD700; font-size: 26px; }
+        .lb-item[data-rank="2"] .lb-rank { color: #C0C0C0; font-size: 24px; }
+        .lb-item[data-rank="3"] .lb-rank { color: #CD7F32; font-size: 22px; }
+        
+        .lb-info {
+            flex: 1;
+        }
+        .lb-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        .lb-val {
+            font-size: 14px;
+            color: #00f2fe;
+            font-weight: 600;
+        }
+
+        /* Profile Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: var(--bg-gradient);
+            width: 85%;
+            max-width: 340px;
+            border-radius: 24px;
+            padding: 30px 24px;
+            position: relative;
+            transform: translateY(30px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+        .modal-close {
+            position: absolute;
+            top: 15px; right: 15px;
+            background: rgba(255,255,255,0.1);
+            border: none; color: #fff;
+            width: 32px; height: 32px;
+            border-radius: 16px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        .modal-avatar {
+            width: 80px; height: 80px;
+            margin: 0 auto 15px auto;
+            font-size: 36px;
+        }
+        .modal-name {
+            text-align: center;
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0 0 5px 0;
+        }
+        .modal-rank {
+            text-align: center;
+            color: #00f2fe;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .modal-stat {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
         /* Animations */
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -263,16 +414,6 @@
         }
         .bounce { animation: bounce 2s infinite ease-in-out; }
 
-        /* Game List */
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 0 0 16px 4px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
         .game-item {
             padding: 16px;
             display: flex;
@@ -280,12 +421,10 @@
             margin-bottom: 12px;
             transition: transform 0.2s, background 0.2s;
         }
-        
         .game-item:active {
             transform: translateX(4px);
             background: rgba(255,255,255,0.1);
         }
-
         .game-icon {
             font-size: 32px;
             margin-right: 16px;
@@ -294,29 +433,17 @@
             display: flex; align-items: center; justify-content: center;
             border-radius: 14px;
         }
-
         .game-info h4 { margin: 0 0 4px 0; font-size: 17px; font-weight: 700; }
         .game-info p { margin: 0; font-size: 13px; color: var(--hint); }
 
         .hidden { display: none !important; }
 
-        .success-box {
+        .loading-spinner {
             text-align: center;
-            padding: 40px 24px;
-        }
-
-        .success-icon {
-            font-size: 72px;
-            margin-bottom: 16px;
-            display: inline-block;
-        }
-        
-        .status-text {
-            font-size: 13px; 
-            margin-top: 12px; 
-            color: #00f2fe;
+            padding: 40px;
+            color: var(--primary);
             font-weight: 600;
-            letter-spacing: 0.5px;
+            animation: pulse 1.5s infinite;
         }
 
     </style>
@@ -344,7 +471,7 @@
                 </div>
             </div>
 
-            <h3 class="section-title">🕹️ Available Games</h3>
+            <h3 style="font-size: 18px; margin: 0 0 16px 4px;">🕹️ Available Games</h3>
             <div class="game-item glass-panel">
                 <div class="game-icon">🕵️‍♂️</div>
                 <div class="game-info">
@@ -382,15 +509,31 @@
                 <button class="btn pulse" id="watch-btn">
                     <span>📦 Open Crate</span>
                 </button>
-                <div id="status" class="status-text">READY TO OPEN</div>
+                <div id="status" style="font-size: 13px; margin-top: 12px; color: #00f2fe; font-weight: 600;">READY TO OPEN</div>
             </div>
 
-            <div id="success-box" class="hidden success-box glass-panel">
-                <div class="success-icon bounce">🎉</div>
+            <div id="success-box" class="hidden glass-panel" style="text-align: center; padding: 40px 24px;">
+                <div style="font-size: 72px; margin-bottom: 16px;" class="bounce">🎉</div>
                 <h2 style="color: var(--success); margin: 0 0 10px 0; font-size: 28px;">Success!</h2>
                 <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">Crate unlocked successfully.</p>
                 <button class="btn" id="claim-btn">💰 Claim Reward</button>
             </div>
+        </div>
+
+        <!-- Leaderboard View -->
+        <div id="view-leaderboard" class="view">
+            <div style="text-align: center; margin-bottom: 24px; margin-top: 10px;">
+                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Global Rankings</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 15px;">Top players in the Undercover Bot.</p>
+            </div>
+
+            <div class="seg-control">
+                <div class="seg-btn active" id="seg-coins" onclick="loadLeaderboard('coins')">💰 Top Coins</div>
+                <div class="seg-btn" id="seg-wins" onclick="loadLeaderboard('wins')">🏆 Top Wins</div>
+            </div>
+
+            <div id="lb-loading" class="loading-spinner">Fetching Data...</div>
+            <div id="lb-container" class="lb-list hidden"></div>
         </div>
     </div>
 
@@ -400,9 +543,45 @@
             <span class="tab-icon">🏠</span>
             <span>Home</span>
         </div>
+        <div class="tab-item" onclick="switchTab('leaderboard', this)">
+            <span class="tab-icon">🏆</span>
+            <span>Top</span>
+        </div>
         <div class="tab-item" onclick="switchTab('earn', this)">
             <span class="tab-icon">💎</span>
             <span>Earn</span>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal-overlay" id="profile-modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <div id="modal-body" class="hidden">
+                <div class="avatar modal-avatar" id="m-initial">?</div>
+                <h2 class="modal-name" id="m-name">Player</h2>
+                <div class="modal-rank" id="m-rank">Rank: #--</div>
+                
+                <div class="modal-grid">
+                    <div class="modal-stat">
+                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">COINS</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-coins">0</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">WINS</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-wins">0</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">PLAYED</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-played">0</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">WIN RATE</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-rate">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div id="modal-loading" class="loading-spinner">Loading Profile...</div>
         </div>
     </div>
 
@@ -416,6 +595,8 @@
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
         const msgId = urlParams.get('msg_id');
+
+        let currentLbSort = 'coins';
 
         // Initial Data Fetch
         fetch(`/api/user-stats?user_id=${userId}`)
@@ -437,6 +618,91 @@
             el.classList.add('active');
             
             try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+
+            if (tab === 'leaderboard') {
+                loadLeaderboard(currentLbSort);
+            }
+        }
+
+        // Leaderboard Logic
+        function loadLeaderboard(sort) {
+            currentLbSort = sort;
+            document.getElementById('seg-coins').classList.toggle('active', sort === 'coins');
+            document.getElementById('seg-wins').classList.toggle('active', sort === 'wins');
+            
+            const container = document.getElementById('lb-container');
+            const loader = document.getElementById('lb-loading');
+            
+            container.classList.add('hidden');
+            loader.classList.remove('hidden');
+
+            fetch(`/api/leaderboard?sort=${sort}`)
+                .then(res => res.json())
+                .then(data => {
+                    container.innerHTML = '';
+                    data.forEach((p, idx) => {
+                        const val = sort === 'coins' ? `💰 ${p.coins.toLocaleString()}` : `🏆 ${p.wins.toLocaleString()} Wins`;
+                        let rankDisplay = idx + 1;
+                        if (idx === 0) rankDisplay = '🥇';
+                        else if (idx === 1) rankDisplay = '🥈';
+                        else if (idx === 2) rankDisplay = '🥉';
+
+                        const div = document.createElement('div');
+                        div.className = 'lb-item glass-panel';
+                        div.setAttribute('data-rank', idx + 1);
+                        div.onclick = () => openProfile(p.id);
+                        div.innerHTML = `
+                            <div class="lb-rank">${rankDisplay}</div>
+                            <div class="lb-info">
+                                <h4 class="lb-name">${p.name}</h4>
+                                <div class="lb-val">${val}</div>
+                            </div>
+                            <div style="color: var(--hint); font-size: 20px;">›</div>
+                        `;
+                        container.appendChild(div);
+                    });
+                    loader.classList.add('hidden');
+                    container.classList.remove('hidden');
+                })
+                .catch(err => {
+                    loader.innerText = "Error loading data.";
+                });
+        }
+
+        // Profile Modal Logic
+        function openProfile(uid) {
+            try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+            const modal = document.getElementById('profile-modal');
+            const mBody = document.getElementById('modal-body');
+            const mLoad = document.getElementById('modal-loading');
+            
+            modal.classList.add('active');
+            mBody.classList.add('hidden');
+            mLoad.classList.remove('hidden');
+
+            fetch(`/api/user-stats?user_id=${uid}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('m-name').innerText = data.name;
+                    document.getElementById('m-initial').innerText = data.name.charAt(0).toUpperCase();
+                    document.getElementById('m-rank').innerText = `Global Rank: #${data.rank}`;
+                    document.getElementById('m-coins').innerText = data.coins.toLocaleString();
+                    document.getElementById('m-wins').innerText = data.wins;
+                    document.getElementById('m-played').innerText = data.played;
+                    
+                    const rate = data.played > 0 ? Math.round((data.wins / data.played) * 100) : 0;
+                    document.getElementById('m-rate').innerText = `${rate}%`;
+
+                    mLoad.classList.add('hidden');
+                    mBody.classList.remove('hidden');
+                })
+                .catch(() => {
+                    mLoad.innerText = "Error loading profile.";
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('profile-modal').classList.remove('active');
         }
 
         // Adsgram Integration
