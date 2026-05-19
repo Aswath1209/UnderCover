@@ -536,6 +536,158 @@
         .slice-text[data-i="8"] { transform: rotate(306deg); }
         .slice-text[data-i="9"] { transform: rotate(342deg); font-size: 22px; color: #fffacd; text-shadow: 0 0 10px #ffd700, 2px 2px 4px rgba(0,0,0,0.8); }
 
+        /* Player Shop CSS */
+        .shop-controls {
+            padding: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            font-family: inherit;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr;
+            gap: 8px;
+        }
+        .filter-row select {
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            font-family: inherit;
+            font-size: 12px;
+        }
+        .filter-row select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .player-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 12px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 175px;
+        }
+        .player-card:active {
+            transform: scale(0.97);
+        }
+        .player-badge-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .player-rating {
+            background: var(--primary-gradient);
+            color: #fff;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .player-tier {
+            font-size: 9px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+        .tier-normal {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ccc;
+        }
+        .tier-gold {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        .tier-legendary {
+            background: rgba(255, 0, 127, 0.2);
+            color: #ff007f;
+            border: 1px solid rgba(255, 0, 127, 0.3);
+        }
+        
+        /* Card variations by tier */
+        .player-card.card-gold {
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
+        }
+        .player-card.card-legendary {
+            border: 1px solid rgba(255, 0, 127, 0.4);
+            box-shadow: 0 4px 20px rgba(255, 0, 127, 0.2);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 0, 127, 0.04) 100%);
+        }
+        
+        .player-card-name {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 4px 0 2px 0;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .player-sub {
+            font-size: 11px;
+            color: var(--hint);
+            margin-bottom: 12px;
+        }
+        .player-buy-btn {
+            background: var(--primary-gradient);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            padding: 8px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 4px 10px rgba(79, 172, 254, 0.2);
+        }
+        .player-buy-btn:active {
+            transform: scale(0.95);
+        }
+        .player-buy-btn.owned {
+            background: rgba(52, 199, 89, 0.15) !important;
+            border: 1px solid var(--success) !important;
+            color: var(--success) !important;
+            cursor: default;
+            pointer-events: none;
+            box-shadow: none !important;
+        }
+
     </style>
 </head>
 <body>
@@ -585,29 +737,49 @@
             </div>
         </div>
 
-        <!-- Earn View -->
-        <div id="view-earn" class="view">
-            <div style="text-align: center; margin-bottom: 30px; margin-top: 10px;">
-                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Rewards Center</h1>
-                <p style="color: var(--hint); margin: 0; font-size: 15px;">Watch ads to earn bonus coins for games.</p>
+        <!-- Shop View -->
+        <div id="view-shop" class="view">
+            <div style="text-align: center; margin-bottom: 16px; margin-top: 10px;">
+                <h1 style="margin: 0 0 4px 0; font-size: 28px;">Player Shop</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 14px;">Directly buy players using your coins</p>
             </div>
 
-            <div class="ad-card glass-panel" id="ad-container">
-                <div class="ad-icon bounce">🎁</div>
-                <h3 class="ad-title">Mystery Crate</h3>
-                <p class="ad-desc">Open a crate to win up to <b>5,000 coins</b>. Requires watching a short video.</p>
-                <button class="btn pulse" id="watch-btn">
-                    <span>📦 Open Crate</span>
-                </button>
-                <div id="status" style="font-size: 13px; margin-top: 12px; color: #00f2fe; font-weight: 600;">READY TO OPEN</div>
+            <!-- Cricket / Football Toggle -->
+            <div class="seg-control" style="margin-bottom: 12px;">
+                <div class="seg-btn active" id="shop-tab-cricket" onclick="switchShopSport('cricket')">🏏 Cricket</div>
+                <div class="seg-btn" id="shop-tab-football" onclick="switchShopSport('football')">⚽ Football</div>
             </div>
 
-            <div id="success-box" class="hidden glass-panel" style="text-align: center; padding: 40px 24px;">
-                <div style="font-size: 72px; margin-bottom: 16px;" class="bounce">🎉</div>
-                <h2 style="color: var(--success); margin: 0 0 10px 0; font-size: 28px;">Success!</h2>
-                <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">Crate unlocked successfully.</p>
-                <button class="btn" id="claim-btn">💰 Claim Reward</button>
+            <!-- Controls (Search & Filters) -->
+            <div class="shop-controls glass-panel">
+                <div class="search-box">
+                    <input type="text" id="shop-search" placeholder="🔍 Search player name..." oninput="renderShop()">
+                </div>
+                <div class="filter-row">
+                    <select id="shop-filter-role" onchange="renderShop()">
+                        <option value="">All Roles</option>
+                    </select>
+                    <select id="shop-filter-tier" onchange="renderShop()">
+                        <option value="">All Tiers</option>
+                        <option value="Normal">Normal</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Legendary">Legendary</option>
+                    </select>
+                    <select id="shop-sort" onchange="renderShop()">
+                        <option value="rating_desc">OVR: High to Low</option>
+                        <option value="rating_asc">OVR: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="name_asc">Name: A to Z</option>
+                    </select>
+                </div>
             </div>
+
+            <!-- Loading indicator -->
+            <div id="shop-loading" class="loading-spinner">Loading Shop...</div>
+
+            <!-- Grid container for player cards -->
+            <div id="shop-grid" class="player-grid hidden"></div>
         </div>
 
         <!-- Leaderboard View -->
@@ -677,9 +849,9 @@
             <span class="tab-icon">🏆</span>
             <span>Top</span>
         </div>
-        <div class="tab-item" onclick="switchTab('earn', this)" data-target="earn">
-            <span class="tab-icon">💎</span>
-            <span>Earn</span>
+        <div class="tab-item" onclick="switchTab('shop', this)" data-target="shop">
+            <span class="tab-icon">🛒</span>
+            <span>Shop</span>
         </div>
     </div>
 
@@ -753,13 +925,17 @@
 
                 if (data.dropCooldown && data.dropCooldown > 0) {
                     const btn = document.getElementById('watch-btn');
-                    btn.disabled = true;
-                    btn.classList.remove('pulse');
-                    const remainingMin = Math.ceil(data.dropCooldown / (60 * 1000));
-                    btn.innerHTML = `<span>⏳ Available in ${remainingMin}m</span>`;
-                    const status = document.getElementById('status');
-                    status.innerText = "COOLDOWN ACTIVE";
-                    status.style.color = "var(--hint)";
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.classList.remove('pulse');
+                        const remainingMin = Math.ceil(data.dropCooldown / (60 * 1000));
+                        btn.innerHTML = `<span>⏳ Available in ${remainingMin}m</span>`;
+                        const status = document.getElementById('status');
+                        if (status) {
+                            status.innerText = "COOLDOWN ACTIVE";
+                            status.style.color = "var(--hint)";
+                        }
+                    }
                 }
 
                 if (data.spinCooldown && data.spinCooldown > 0) {
@@ -792,6 +968,8 @@
 
             if (tab === 'leaderboard') {
                 loadLeaderboard(currentLbSort);
+            } else if (tab === 'shop') {
+                loadShop();
             }
         }
 
@@ -879,53 +1057,222 @@
         // Adsgram Integration
         const AdController = window.Adsgram.init({ blockId: "30511" });
 
-        document.getElementById('watch-btn').onclick = () => {
-            const btn = document.getElementById('watch-btn');
-            const status = document.getElementById('status');
-            btn.disabled = true;
-            btn.classList.remove('pulse');
-            status.innerText = "LOADING VIDEO... ⏳";
+        const watchBtn = document.getElementById('watch-btn');
+        if (watchBtn) {
+            watchBtn.onclick = () => {
+                const btn = document.getElementById('watch-btn');
+                const status = document.getElementById('status');
+                btn.disabled = true;
+                btn.classList.remove('pulse');
+                status.innerText = "LOADING VIDEO... ⏳";
 
-            AdController.show().then(() => {
-                try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
-                document.getElementById('ad-container').classList.add('hidden');
-                document.getElementById('success-box').classList.remove('hidden');
-            }).catch(() => {
-                btn.disabled = false;
-                btn.classList.add('pulse');
-                status.innerText = "VIDEO CLOSED EARLY";
-                tg.showAlert("You must watch the full video to claim your reward!");
-            });
-        };
+                AdController.show().then(() => {
+                    try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                    document.getElementById('ad-container').classList.add('hidden');
+                    document.getElementById('success-box').classList.remove('hidden');
+                }).catch(() => {
+                    btn.disabled = false;
+                    btn.classList.add('pulse');
+                    status.innerText = "VIDEO CLOSED EARLY";
+                    tg.showAlert("You must watch the full video to claim your reward!");
+                });
+            };
+        }
 
         // Prevents multiple claims via rapid clicks
-        document.getElementById('claim-btn').onclick = (e) => {
-            const btn = e.target;
-            if (btn.disabled) return;
-            
-            btn.disabled = true;
-            btn.innerHTML = 'Claiming... ⏳';
-            try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
-            
-            const chatId = chatIdUrl || userId;
+        const claimBtn = document.getElementById('claim-btn');
+        if (claimBtn) {
+            claimBtn.onclick = (e) => {
+                const btn = e.target;
+                if (btn.disabled) return;
+                
+                btn.disabled = true;
+                btn.innerHTML = 'Claiming... ⏳';
+                try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+                
+                const chatId = chatIdUrl || userId;
 
-            fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
+                fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('success-box').innerHTML = `
+                                <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
+                                <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
+                                <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 20px;">${data.amount}</b> coins!</p>
+                                <button class="btn" onclick="tg.close()">Close</button>
+                            `;
+                            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                        } else {
+                            tg.close();
+                        }
+                    })
+                    .catch(() => tg.close());
+            };
+        }
+
+        // Shop Logic
+        let shopData = { cricket: [], football: [], owned: [] };
+        let currentShopSport = 'cricket';
+
+        function loadShop() {
+            const grid = document.getElementById('shop-grid');
+            const loader = document.getElementById('shop-loading');
+            grid.classList.add('hidden');
+            loader.classList.remove('hidden');
+            loader.innerText = 'Loading Shop...';
+
+            fetch(`/api/shop/players?user_id=${userId}`)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
-                        document.getElementById('success-box').innerHTML = `
-                            <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
-                            <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
-                            <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 20px;">${data.amount}</b> coins!</p>
-                            <button class="btn" onclick="tg.close()">Close</button>
-                        `;
-                        try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
-                    } else {
-                        tg.close();
-                    }
+                    shopData = data;
+                    updateShopFilterRoles();
+                    renderShop();
+                    loader.classList.add('hidden');
+                    grid.classList.remove('hidden');
                 })
-                .catch(() => tg.close());
-        };
+                .catch(err => {
+                    console.error(err);
+                    loader.innerText = "Error loading shop data.";
+                });
+        }
+
+        function switchShopSport(sport) {
+            currentShopSport = sport;
+            document.getElementById('shop-tab-cricket').classList.toggle('active', sport === 'cricket');
+            document.getElementById('shop-tab-football').classList.toggle('active', sport === 'football');
+            
+            document.getElementById('shop-search').value = '';
+            document.getElementById('shop-filter-tier').value = '';
+            
+            updateShopFilterRoles();
+            renderShop();
+        }
+
+        function updateShopFilterRoles() {
+            const roleSelect = document.getElementById('shop-filter-role');
+            roleSelect.innerHTML = '<option value="">All Roles</option>';
+            
+            let roles = [];
+            if (currentShopSport === 'cricket') {
+                roles = ['batsman', 'bowler', 'all_rounder', 'wicket_keeper'];
+            } else {
+                roles = ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
+            }
+            
+            roles.forEach(role => {
+                const opt = document.createElement('option');
+                opt.value = role;
+                const display = role.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                opt.innerText = display;
+                roleSelect.appendChild(opt);
+            });
+        }
+
+        function renderShop() {
+            const grid = document.getElementById('shop-grid');
+            grid.innerHTML = '';
+
+            const players = currentShopSport === 'cricket' ? shopData.cricket : shopData.football;
+            const search = document.getElementById('shop-search').value.toLowerCase();
+            const roleFilter = document.getElementById('shop-filter-role').value;
+            const tierFilter = document.getElementById('shop-filter-tier').value;
+            const sort = document.getElementById('shop-sort').value;
+
+            // Filter
+            let filtered = players.filter(p => {
+                const matchesSearch = p.name.toLowerCase().includes(search);
+                const matchesRole = !roleFilter || p.role === roleFilter;
+                const matchesTier = !tierFilter || p.tier === tierFilter;
+                return matchesSearch && matchesRole && matchesTier;
+            });
+
+            // Sort
+            filtered.sort((a, b) => {
+                if (sort === 'rating_desc') return b.ovr - a.ovr;
+                if (sort === 'rating_asc') return a.ovr - b.ovr;
+                if (sort === 'price_desc') return b.buy_price - a.buy_price;
+                if (sort === 'price_asc') return a.buy_price - b.buy_price;
+                if (sort === 'name_asc') return a.name.localeCompare(b.name);
+                return 0;
+            });
+
+            // Render
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--hint); padding: 40px 0;">No players found.</div>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                const isOwned = shopData.owned.some(o => o.player_id === p.id && o.sport === currentShopSport);
+                const displayRole = p.role.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                const tierClass = `tier-${p.tier.toLowerCase()}`;
+                const cardClass = p.tier === 'Gold' ? 'card-gold' : (p.tier === 'Legendary' ? 'card-legendary' : '');
+
+                const card = document.createElement('div');
+                card.className = `player-card glass-panel ${cardClass}`;
+                
+                let btnHtml = '';
+                if (isOwned) {
+                    btnHtml = `<button class="player-buy-btn owned">✅ Owned</button>`;
+                } else {
+                    btnHtml = `<button class="player-buy-btn" onclick="buyPlayer('${p.id}', ${p.buy_price})">💰 ${p.buy_price.toLocaleString()}</button>`;
+                }
+
+                card.innerHTML = `
+                    <div>
+                        <div class="player-badge-container">
+                            <span class="player-rating">${p.ovr} OVR</span>
+                            <span class="player-tier ${tierClass}">${p.tier}</span>
+                        </div>
+                        <div class="player-card-name">${p.name}</div>
+                        <div class="player-sub">${p.country} • ${displayRole}</div>
+                    </div>
+                    <div>
+                        ${btnHtml}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function buyPlayer(playerId, price) {
+            try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+            
+            tg.showConfirm(`Are you sure you want to buy this player for ${price.toLocaleString()} coins?`, (confirmed) => {
+                if (!confirmed) return;
+
+                const grid = document.getElementById('shop-grid');
+                const loader = document.getElementById('shop-loading');
+                
+                grid.classList.add('hidden');
+                loader.innerText = 'Processing purchase... ⏳';
+                loader.classList.remove('hidden');
+
+                fetch(`/api/shop/buy?user_id=${userId}&player_id=${playerId}&sport=${currentShopSport}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                            tg.showAlert('Purchase successful! Player added to your team.');
+                            const coinEl = document.getElementById('stat-coins');
+                            if (coinEl) coinEl.innerText = data.newBalance.toLocaleString();
+                            loadShop();
+                        } else {
+                            try { tg.HapticFeedback.notificationOccurred('error'); } catch(e) {}
+                            tg.showAlert(`Error: ${data.error}`);
+                            loader.classList.add('hidden');
+                            grid.classList.remove('hidden');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        tg.showAlert('Failed to process purchase. Try again.');
+                        loader.classList.add('hidden');
+                        grid.classList.remove('hidden');
+                    });
+            });
+        }
 
         // Spin Logic
         let currentRotation = 0;

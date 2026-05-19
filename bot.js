@@ -10,6 +10,8 @@ const bjManager = require('./game/blackjackManager');
 const { normalizeWord, escapeHTML } = require('./utils');
 const sb = require('./db/supabase');
 const path = require('path');
+const footballPlayers = require('./data/footballPlayers.json');
+
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -192,6 +194,7 @@ bot.command('help', async (ctx) => {
                `• /spin — Spin the Lucky Wheel for up to 10k Coins\n\n` +
                `👤 <b>User Info:</b>\n` +
                `• /profile — Check your wins, losses, and coins\n` +
+               `• /myteam — Show your owned club squads (Cricket & Football)\n` +
                `• /leaderboard — View top players globally\n` +
                `• /balance — Check your coin balance\n` +
                `• /send — Send coins to a friend (reply to them)\n\n` +
@@ -362,6 +365,24 @@ bot.command('profile', async (ctx) => {
     `👤 <b>Profile: <a href="tg://user?id=${user.id}">${escapeHTML(profile.first_name)}</a></b>\n\n🏆 <b>Wins:</b> ${profile.wins}\n🎮 <b>Matches Played:</b> ${profile.matches_played}\n📈 <b>Win Rate:</b> ${winRate}%\n💰 <b>Coins:</b> ${profile.coins || 0}`,
     { parse_mode: 'HTML' }
   );
+});
+
+bot.command('myteam', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  const user = ctx.message.reply_to_message?.from || ctx.from;
+  await sb.ensureUser(user.id, user.first_name).catch(() => {});
+  
+  const text = `👥 <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a>'s Club Squads</b>\n\n` +
+               `<blockquote>Select which sport's squad you would like to view. You can purchase more players in the Shop!</blockquote>`;
+  
+  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
+  const kb = new InlineKeyboard()
+    .text("🏏 Cricket Squad", `myteam:cricket:${user.id}`)
+    .text("⚽ Football Squad", `myteam:football:${user.id}`)
+    .row()
+    .webApp("🛒 Visit Player Shop", miniAppUrl);
+  
+  await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
 });
 
 const OFFICIAL_GC_ID = -1003906592838;
@@ -1370,6 +1391,188 @@ bot.on('callback_query:data', async (ctx) => {
   const data = ctx.callbackQuery.data;
   const chatId = ctx.chat.id;
   const user = ctx.from;
+
+  // --- MY TEAM CALLBACKS ---
+  if (data.startsWith('myteam:')) {
+    const parts = data.split(':');
+    const tab = parts[1]; // 'cricket', 'football', or 'home'
+    const targetUserId = parseInt(parts[2], 10);
+    
+    await ctx.answerCallbackQuery().catch(() => {});
+    
+    const profile = await sb.getProfile(targetUserId);
+    const name = profile ? profile.first_name : "User";
+    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
+    
+    if (tab === 'home') {
+      const text = `👥 <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a>'s Club Squads</b>\n\n` +
+                   `<blockquote>Select which sport's squad you would like to view. You can purchase more players in the Shop!</blockquote>`;
+      const kb = new InlineKeyboard()
+        .text("🏏 Cricket Squad", `myteam:cricket:${targetUserId}`)
+        .text("⚽ Football Squad", `myteam:football:${targetUserId}`)
+        .row()
+        .webApp("🛒 Visit Player Shop", miniAppUrl);
+      
+      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+      return;
+    }
+    
+    if (tab === 'cricket') {
+      const team = await sb.getUserCricketTeam(targetUserId);
+      
+      if (!team || team.length === 0) {
+        const text = `🏏 <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b> does not have any cricket players in their squad yet!\n\n` +
+                     `<blockquote>Go to the Shop tab in the Mini App to sign cricket players for your team.</blockquote>`;
+        const kb = new InlineKeyboard()
+          .text("⬅️ Back", `myteam:home:${targetUserId}`)
+          .webApp("🛒 Visit Shop", miniAppUrl);
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+        return;
+      }
+      
+      // Categorize cricket players: batsman, wicket_keeper, all_rounder, bowler
+      // Sort each category descending by OVR
+      const batsmen = team.filter(p => p.role === 'batsman').sort((a, b) => b.ovr - a.ovr);
+      const wks = team.filter(p => p.role === 'wicket_keeper').sort((a, b) => b.ovr - a.ovr);
+      const alrs = team.filter(p => p.role === 'all_rounder').sort((a, b) => b.ovr - a.ovr);
+      const bowlers = team.filter(p => p.role === 'bowler').sort((a, b) => b.ovr - a.ovr);
+      
+      let msg = `🏏 <u><b>CRICKET SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n\n`;
+      msg += `<blockquote>⚡ "Champions keep playing until they get it right."</blockquote>\n`;
+      
+      const renderPlayer = (p) => {
+        const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+        return `• <b>${escapeHTML(p.name)}</b> (OVR: <b>${p.ovr}</b>)${tierIndicator}`;
+      };
+      
+      msg += `🏏 <b>BATSMEN</b>\n`;
+      if (batsmen.length > 0) {
+        batsmen.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No batsmen signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `🧤 <b>WICKET KEEPERS</b>\n`;
+      if (wks.length > 0) {
+        wks.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No wicket keepers signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `⚡ <b>ALL ROUNDERS</b>\n`;
+      if (alrs.length > 0) {
+        alrs.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No all rounders signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `🥎 <b>BOWLERS</b>\n`;
+      if (bowlers.length > 0) {
+        bowlers.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No bowlers signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      const totalPlayers = team.length;
+      const avgOvr = Math.round(team.reduce((sum, p) => sum + (p.ovr || 0), 0) / totalPlayers);
+      const bestPlayer = [...team].sort((a, b) => b.ovr - a.ovr)[0];
+      
+      msg += `📊 <b>Squad Stats:</b>\n`;
+      msg += `👥 <b>Players:</b> ${totalPlayers}\n`;
+      msg += `📈 <b>Avg Rating:</b> ${avgOvr} OVR\n`;
+      msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
+      
+      const kb = new InlineKeyboard()
+        .text("⬅️ Back", `myteam:home:${targetUserId}`)
+        .webApp("🛒 Visit Shop", miniAppUrl);
+      
+      await ctx.editMessageText(msg, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+      return;
+    }
+    
+    if (tab === 'football') {
+      const owned = await sb.getUserOwnedPlayers(targetUserId);
+      const footballOwnedIds = owned.filter(o => o.sport === 'football').map(o => o.player_id);
+      const team = footballPlayers.filter(p => footballOwnedIds.includes(p.id));
+      
+      if (!team || team.length === 0) {
+        const text = `⚽ <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b> does not have any football players in their squad yet!\n\n` +
+                     `<blockquote>Go to the Shop tab in the Mini App to sign football players for your team.</blockquote>`;
+        const kb = new InlineKeyboard()
+          .text("⬅️ Back", `myteam:home:${targetUserId}`)
+          .webApp("🛒 Visit Shop", miniAppUrl);
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+        return;
+      }
+      
+      // Categorize football players: Forward, Midfielder, Defender, Goalkeeper
+      // Sort each category descending by OVR
+      const forwards = team.filter(p => p.role === 'Forward').sort((a, b) => b.ovr - a.ovr);
+      const midfielders = team.filter(p => p.role === 'Midfielder').sort((a, b) => b.ovr - a.ovr);
+      const defenders = team.filter(p => p.role === 'Defender').sort((a, b) => b.ovr - a.ovr);
+      const gks = team.filter(p => p.role === 'Goalkeeper').sort((a, b) => b.ovr - a.ovr);
+      
+      let msg = `⚽ <u><b>FOOTBALL SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n\n`;
+      msg += `<blockquote>⚽ "You have to fight to reach your dream. You have to sacrifice and work hard for it."</blockquote>\n`;
+      
+      const renderPlayer = (p) => {
+        const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+        return `• <b>${escapeHTML(p.name)}</b> (OVR: <b>${p.ovr}</b>)${tierIndicator}`;
+      };
+      
+      msg += `⚽ <b>FORWARDS</b>\n`;
+      if (forwards.length > 0) {
+        forwards.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No forwards signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `⚡ <b>MIDFIELDERS</b>\n`;
+      if (midfielders.length > 0) {
+        midfielders.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No midfielders signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `🛡️ <b>DEFENDERS</b>\n`;
+      if (defenders.length > 0) {
+        defenders.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No defenders signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      msg += `🧤 <b>GOALKEEPERS</b>\n`;
+      if (gks.length > 0) {
+        gks.forEach(p => msg += `${renderPlayer(p)}\n`);
+      } else {
+        msg += `<i>No goalkeepers signed yet.</i>\n`;
+      }
+      msg += `\n`;
+      
+      const totalPlayers = team.length;
+      const avgOvr = Math.round(team.reduce((sum, p) => sum + (p.ovr || 0), 0) / totalPlayers);
+      const bestPlayer = [...team].sort((a, b) => b.ovr - a.ovr)[0];
+      
+      msg += `📊 <b>Squad Stats:</b>\n`;
+      msg += `👥 <b>Players:</b> ${totalPlayers}\n`;
+      msg += `📈 <b>Avg Rating:</b> ${avgOvr} OVR\n`;
+      msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
+      
+      const kb = new InlineKeyboard()
+        .text("⬅️ Back", `myteam:home:${targetUserId}`)
+        .webApp("🛒 Visit Shop", miniAppUrl);
+      
+      await ctx.editMessageText(msg, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+      return;
+    }
+  }
 
   // --- BLACKJACK CALLBACKS ---
   if (data.startsWith('bj_')) {
@@ -2439,6 +2642,68 @@ app.get('/api/leaderboard', async (req, res) => {
     } catch (error) {
         console.error('Leaderboard error:', error);
         res.status(500).send('error');
+    }
+});
+
+// Player Shop Endpoints
+app.get('/api/shop/players', async (req, res) => {
+    const { user_id } = req.query;
+    if (!user_id) return res.status(400).send('Missing user_id');
+
+    try {
+        const userId = parseInt(user_id);
+        const owned = await sb.getUserOwnedPlayers(userId);
+        const cricketFromDb = await sb.getCricketPlayers();
+
+        const formatCricket = cricketFromDb.map(p => ({
+            id: p.id,
+            name: p.name,
+            country: p.country,
+            role: p.role,
+            ovr: p.ovr,
+            buy_price: p.buy_price,
+            tier: p.tier || 'Normal'
+        }));
+
+        res.json({
+            cricket: formatCricket,
+            football: footballPlayers,
+            owned: owned.map(o => ({ player_id: o.player_id, sport: o.sport }))
+        });
+    } catch (error) {
+        console.error('Shop players error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+app.get('/api/shop/buy', async (req, res) => {
+    const { user_id, player_id, sport } = req.query;
+    if (!user_id || !player_id || !sport) {
+        return res.status(400).json({ success: false, error: 'Missing parameters' });
+    }
+
+    try {
+        const userId = parseInt(user_id);
+        let price = 0;
+
+        if (sport === 'football') {
+            const player = footballPlayers.find(p => p.id === player_id);
+            if (!player) return res.status(404).json({ success: false, error: 'Football player not found' });
+            price = player.buy_price;
+        } else if (sport === 'cricket') {
+            const cricketFromDb = await sb.getCricketPlayers();
+            const player = cricketFromDb.find(p => p.id === player_id);
+            if (!player) return res.status(404).json({ success: false, error: 'Cricket player not found' });
+            price = player.buy_price;
+        } else {
+            return res.status(400).json({ success: false, error: 'Invalid sport' });
+        }
+
+        const result = await sb.buyPlayer(userId, player_id, sport, price);
+        res.json(result);
+    } catch (error) {
+        console.error('Shop buy error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 

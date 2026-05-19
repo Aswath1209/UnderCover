@@ -431,8 +431,123 @@ async function checkAndClaimFreeSpin(userId) {
   }
 }
 
+async function getUserOwnedPlayers(userId) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.from('user_owned_players').select('player_id, sport').eq('user_id', userId);
+    if (error) {
+      console.error("Error fetching owned players:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("Failed to get user owned players:", e);
+    return [];
+  }
+}
+
+async function getCricketPlayers() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.from('cricketplayers').select('*');
+    if (error) {
+      console.error("Error fetching cricket players:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("Failed to get cricket players:", e);
+    return [];
+  }
+}
+
+async function buyPlayer(userId, playerId, sport, price) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    // Check if player is already owned
+    const { data: existing } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', playerId)
+      .eq('sport', sport)
+      .maybeSingle();
+
+    if (existing) {
+      return { success: false, error: 'You already own this player!' };
+    }
+
+    // Check coins balance
+    const { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
+    if (!profile) return { success: false, error: 'User profile not found.' };
+
+    const currentCoins = profile.coins || 0;
+    if (currentCoins < price) {
+      return { success: false, error: `Insufficient coins! You need ${price.toLocaleString()} coins.` };
+    }
+
+    // Insert into user_owned_players
+    const { error: insertError } = await supabase.from('user_owned_players').insert({
+      user_id: userId,
+      player_id: playerId,
+      sport: sport
+    });
+
+    if (insertError) {
+      console.error("Insert owned player error:", insertError);
+      return { success: false, error: 'Failed to record purchase.' };
+    }
+
+    // Deduct coins
+    const newCoins = currentCoins - price;
+    await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+
+    return { success: true, newBalance: newCoins };
+  } catch (e) {
+    console.error("Purchase player transaction failed:", e);
+    return { success: false, error: 'Purchase failed due to database error.' };
+  } finally {
+    releaseLock(release);
+  }
+}
+
+async function getUserCricketTeam(userId) {
+  if (!supabase) return [];
+  try {
+    const { data: owned, error: ownedError } = await supabase
+      .from('user_owned_players')
+      .select('player_id')
+      .eq('user_id', userId)
+      .eq('sport', 'cricket');
+
+    if (ownedError) {
+      console.error("Error fetching user owned cricket players:", ownedError);
+      return [];
+    }
+    if (!owned || owned.length === 0) return [];
+
+    const playerIds = owned.map(o => o.player_id);
+
+    const { data: players, error: playersError } = await supabase
+      .from('cricketplayers')
+      .select('*')
+      .in('id', playerIds);
+
+    if (playersError) {
+      console.error("Error fetching cricket players details:", playersError);
+      return [];
+    }
+
+    return players || [];
+  } catch (e) {
+    console.error("Failed to get user cricket team:", e);
+    return [];
+  }
+}
+
 module.exports = {
   supabase,
+  getUserCricketTeam,
   recordWin,
   recordLoss,
   getProfile,
@@ -460,5 +575,8 @@ module.exports = {
   claimGroupInviteReward,
   recordBonusClaim,
   checkAndClaimFreeSpin,
+  getUserOwnedPlayers,
+  getCricketPlayers,
+  buyPlayer,
   DEFAULT_SETTINGS
 };
