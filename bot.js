@@ -188,7 +188,8 @@ bot.command('help', async (ctx) => {
                `• /hilo — Play High-Low Cricket Stats\n` +
                `• /fly — Bet on the crashing plane (Aviator)\n` +
                `• /daily — Claim your daily coin bonus\n` +
-               `• /drop — Claim a Mystery Coin Drop (Video Ad)\n\n` +
+               `• /drop — Claim a Mystery Coin Drop (Video Ad)\n` +
+               `• /spin — Spin the Lucky Wheel for up to 10k Coins\n\n` +
                `👤 <b>User Info:</b>\n` +
                `• /profile — Check your wins, losses, and coins\n` +
                `• /leaderboard — View top players globally\n` +
@@ -380,6 +381,16 @@ async function handleDropCommand(ctx) {
 
 bot.command('drop', async (ctx) => {
   await handleDropCommand(ctx);
+});
+
+bot.command('spin', async (ctx) => {
+    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=spin`;
+    const kb = new InlineKeyboard().webApp("🎡 Spin the Lucky Wheel", miniAppUrl);
+    
+    await ctx.reply(
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        { parse_mode: 'HTML', reply_markup: kb }
+    );
 });
 
 bot.command('daily', async (ctx) => {

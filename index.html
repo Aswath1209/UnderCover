@@ -447,39 +447,44 @@
             animation: pulse 1.5s infinite;
         }
 
-        /* Spin Wheel */
+        /* Premium Spin Wheel */
         .wheel-container {
             position: relative;
-            width: 280px;
-            height: 280px;
+            width: 300px;
+            height: 300px;
             margin: 0 auto 30px auto;
         }
         .wheel {
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: conic-gradient(
-                #ff3b30 0 72deg,
-                #4facfe 72deg 144deg,
-                #ffd700 144deg 216deg,
-                #34c759 216deg 288deg,
-                #9c27b0 288deg 360deg
+            background: conic-gradient(from -90deg,
+                #1a1a2e 0deg 36deg,
+                #4facfe 36deg 72deg,
+                #1a1a2e 72deg 108deg,
+                #9c27b0 108deg 144deg,
+                #1a1a2e 144deg 180deg,
+                #ff3b30 180deg 216deg,
+                #1a1a2e 216deg 252deg,
+                #34c759 252deg 288deg,
+                #1a1a2e 288deg 324deg,
+                #ffd700 324deg 360deg
             );
-            border: 4px solid rgba(255,255,255,0.2);
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            transition: transform 4s cubic-bezier(0.1, 0.9, 0.2, 1);
+            border: 8px solid #111;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.8);
+            transition: transform 5s cubic-bezier(0.15, 0.85, 0.15, 1);
         }
         .wheel-pointer {
             position: absolute;
-            top: -15px;
+            top: -20px;
             left: 50%;
             transform: translateX(-50%);
             width: 0; 
             height: 0; 
             border-left: 20px solid transparent;
             border-right: 20px solid transparent;
-            border-top: 35px solid #fff;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            border-top: 40px solid #ffd700;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
             z-index: 10;
         }
         .wheel-center {
@@ -489,16 +494,47 @@
             transform: translate(-50%, -50%);
             width: 60px;
             height: 60px;
-            background: #111;
+            background: radial-gradient(circle, #4facfe, #0f0c29);
             border-radius: 50%;
-            border: 3px solid #fff;
+            border: 4px solid #fff;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 26px;
             z-index: 5;
         }
+        .slice-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50%;
+            height: 24px;
+            margin-top: -12px;
+            transform-origin: 0 50%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 25px;
+            box-sizing: border-box;
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            user-select: none;
+        }
+
+        /* 10 slices, 36 degrees each. Center is i * 36 + 18 */
+        .slice-text[data-i="0"] { transform: rotate(18deg); }
+        .slice-text[data-i="1"] { transform: rotate(54deg); }
+        .slice-text[data-i="2"] { transform: rotate(90deg); }
+        .slice-text[data-i="3"] { transform: rotate(126deg); }
+        .slice-text[data-i="4"] { transform: rotate(162deg); }
+        .slice-text[data-i="5"] { transform: rotate(198deg); }
+        .slice-text[data-i="6"] { transform: rotate(234deg); }
+        .slice-text[data-i="7"] { transform: rotate(270deg); }
+        .slice-text[data-i="8"] { transform: rotate(306deg); }
+        .slice-text[data-i="9"] { transform: rotate(342deg); font-size: 22px; color: #fffacd; text-shadow: 0 0 10px #ffd700, 2px 2px 4px rgba(0,0,0,0.8); }
 
     </style>
 </head>
@@ -599,8 +635,19 @@
 
             <div class="wheel-container">
                 <div class="wheel-pointer"></div>
-                <div class="wheel" id="spin-wheel"></div>
-                <div class="wheel-center">🎡</div>
+                <div class="wheel" id="spin-wheel">
+                    <div class="slice-text" data-i="0">100</div>
+                    <div class="slice-text" data-i="1">500</div>
+                    <div class="slice-text" data-i="2">100</div>
+                    <div class="slice-text" data-i="3">1k</div>
+                    <div class="slice-text" data-i="4">100</div>
+                    <div class="slice-text" data-i="5">2k</div>
+                    <div class="slice-text" data-i="6">100</div>
+                    <div class="slice-text" data-i="7">500</div>
+                    <div class="slice-text" data-i="8">100</div>
+                    <div class="slice-text" data-i="9">10k</div>
+                </div>
+                <div class="wheel-center">💎</div>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
@@ -618,19 +665,19 @@
 
     <!-- Tab Bar -->
     <div class="tab-bar glass-panel">
-        <div class="tab-item active" onclick="switchTab('home', this)">
+        <div class="tab-item active" onclick="switchTab('home', this)" data-target="home">
             <span class="tab-icon">🏠</span>
             <span>Home</span>
         </div>
-        <div class="tab-item" onclick="switchTab('spin', this)">
+        <div class="tab-item" onclick="switchTab('spin', this)" data-target="spin">
             <span class="tab-icon">🎡</span>
             <span>Spin</span>
         </div>
-        <div class="tab-item" onclick="switchTab('leaderboard', this)">
+        <div class="tab-item" onclick="switchTab('leaderboard', this)" data-target="leaderboard">
             <span class="tab-icon">🏆</span>
             <span>Top</span>
         </div>
-        <div class="tab-item" onclick="switchTab('earn', this)">
+        <div class="tab-item" onclick="switchTab('earn', this)" data-target="earn">
             <span class="tab-icon">💎</span>
             <span>Earn</span>
         </div>
@@ -678,6 +725,7 @@
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
         const msgId = urlParams.get('msg_id');
+        const defaultTab = urlParams.get('tab');
 
         let currentLbSort = 'coins';
 
@@ -711,6 +759,12 @@
                         const remainingHrs = Math.ceil(data.spinCooldown / (60 * 60 * 1000));
                         freeBtn.innerHTML = `<span>⏳ Available in ${remainingHrs}h</span>`;
                     }
+                }
+
+                // Handle default tab routing
+                if (defaultTab) {
+                    const tabEl = document.querySelector(`.tab-item[data-target="${defaultTab}"]`);
+                    if (tabEl) switchTab(defaultTab, tabEl);
                 }
             })
             .catch(err => console.error(err));
@@ -889,19 +943,24 @@
                         // Animate wheel
                         try { tg.HapticFeedback.impactOccurred('rigid'); } catch(e) {}
                         
-                        const extraSpins = 5;
-                        const degreesPerCoin = {
-                            100: [0, 72],
-                            500: [72, 144],
-                            1000: [144, 216],
-                            2000: [216, 288],
-                            10000: [288, 360]
+                        const sliceMap = {
+                            100: [0, 2, 4, 6, 8],
+                            500: [1, 7],
+                            1000: [3],
+                            2000: [5],
+                            10000: [9]
                         };
-                        const range = degreesPerCoin[data.amount] || [0, 72];
-                        const randomDegreeWithinRange = Math.floor(Math.random() * (range[1] - range[0] - 10)) + range[0] + 5;
-                        const targetDegree = 360 - randomDegreeWithinRange; 
+                        const possibleIndices = sliceMap[data.amount] || [0];
+                        const targetIndex = possibleIndices[Math.floor(Math.random() * possibleIndices.length)];
+
+                        const offset = Math.floor(Math.random() * 24) - 12; // -12 to +12 degrees randomness
+                        const sliceCenter = targetIndex * 36 + 18;
+                        const targetDegree = 270 - (sliceCenter + offset);
                         
-                        currentRotation += (360 * extraSpins) + targetDegree - (currentRotation % 360);
+                        const extraSpins = 6;
+                        let nextRotation = currentRotation + (360 * extraSpins);
+                        nextRotation -= nextRotation % 360; 
+                        currentRotation = nextRotation + targetDegree;
                         
                         const wheel = document.getElementById('spin-wheel');
                         wheel.style.transform = `rotate(${currentRotation}deg)`;
@@ -924,7 +983,7 @@
                                 freeBtn.style.opacity = '0.5';
                             }
                             adBtn.disabled = false;
-                        }, 4000); // Wait for 4s CSS animation
+                        }, 5000); // Wait for 5s CSS animation
                     })
                     .catch(() => {
                         status.innerText = "ERROR OCCURRED";
