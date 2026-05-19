@@ -2362,9 +2362,12 @@ app.get('/api/user-stats', async (req, res) => {
         const remainingMs = (60 * 60 * 1000) - (Date.now() - lastClaim);
         const dropCooldownRemaining = remainingMs > 0 ? remainingMs : 0;
 
-        const lastSpin = spinCooldowns.get(userId) || 0;
-        const spinRemainingMs = (24 * 60 * 60 * 1000) - (Date.now() - lastSpin);
-        const spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
+        let spinCooldownRemaining = 0;
+        if (profile.last_spin) {
+            const lastSpinTime = new Date(profile.last_spin).getTime();
+            const spinRemainingMs = (24 * 60 * 60 * 1000) - (Date.now() - lastSpinTime);
+            spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
+        }
 
         res.json({
             name: profile.first_name,
@@ -2399,12 +2402,11 @@ app.get('/api/spin', async (req, res) => {
             }
             adSpinCooldowns.set(userId, now);
         } else {
-            // 24-hour cooldown for free spin
-            const lastSpin = spinCooldowns.get(userId) || 0;
-            if (now - lastSpin < 24 * 60 * 60 * 1000) {
+            // DB persistent cooldown for free spin
+            const spinCheck = await sb.checkAndClaimFreeSpin(userId);
+            if (!spinCheck.success) {
                 return res.status(429).json({ success: false, error: 'Free spin not ready' });
             }
-            spinCooldowns.set(userId, now);
             // Schedule a reminder 24 hours from now
             pendingSpinReminders.set(userId, now + (24 * 60 * 60 * 1000));
         }

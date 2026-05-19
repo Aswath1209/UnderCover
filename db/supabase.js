@@ -402,6 +402,35 @@ async function claimGroupInviteReward(userId, chatId, amount) {
   }
 }
 
+async function checkAndClaimFreeSpin(userId) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    const { data: profile } = await supabase.from('profiles').select('last_spin').eq('user_id', userId).single();
+    if (!profile) return { success: false, error: 'User not found.' };
+
+    const now = Date.now();
+    const lastSpin = profile.last_spin ? new Date(profile.last_spin).getTime() : 0;
+    const cooldown = 24 * 60 * 60 * 1000;
+
+    if (now - lastSpin < cooldown) {
+      return { success: false, lastSpin: lastSpin };
+    }
+
+    const { error } = await supabase.from('profiles').update({ 
+      last_spin: new Date().toISOString() 
+    }).eq('user_id', userId);
+    
+    if (error) return { success: false, error: 'DB_ERROR' };
+
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: 'DB_ERROR' };
+  } finally {
+    releaseLock(release);
+  }
+}
+
 module.exports = {
   supabase,
   recordWin,
@@ -430,5 +459,6 @@ module.exports = {
   claimDaily,
   claimGroupInviteReward,
   recordBonusClaim,
+  checkAndClaimFreeSpin,
   DEFAULT_SETTINGS
 };
