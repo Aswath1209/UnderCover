@@ -447,6 +447,59 @@
             animation: pulse 1.5s infinite;
         }
 
+        /* Spin Wheel */
+        .wheel-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto 30px auto;
+        }
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff3b30 0 72deg,
+                #4facfe 72deg 144deg,
+                #ffd700 144deg 216deg,
+                #34c759 216deg 288deg,
+                #9c27b0 288deg 360deg
+            );
+            border: 4px solid rgba(255,255,255,0.2);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            transition: transform 4s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+        .wheel-pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 35px solid #fff;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            z-index: 10;
+        }
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: #111;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 5;
+        }
+
     </style>
 </head>
 <body>
@@ -536,6 +589,31 @@
             <div id="lb-loading" class="loading-spinner">Fetching Data...</div>
             <div id="lb-container" class="lb-list hidden"></div>
         </div>
+
+        <!-- Spin View -->
+        <div id="view-spin" class="view">
+            <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
+                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Lucky Spin</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 15px;">Spin the wheel to win up to 10,000 coins!</p>
+            </div>
+
+            <div class="wheel-container">
+                <div class="wheel-pointer"></div>
+                <div class="wheel" id="spin-wheel"></div>
+                <div class="wheel-center">🎡</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px;">
+                <button class="btn pulse" id="free-spin-btn" onclick="executeSpin(false)">
+                    <span>🎁 Spin for Free</span>
+                </button>
+                <button class="btn" id="ad-spin-btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);" onclick="executeSpin(true)">
+                    <span>📺 Watch Ad to Spin</span>
+                </button>
+            </div>
+            
+            <div id="spin-status" style="text-align: center; font-size: 13px; margin-top: 16px; color: var(--hint); font-weight: 600;"></div>
+        </div>
     </div>
 
     <!-- Tab Bar -->
@@ -543,6 +621,10 @@
         <div class="tab-item active" onclick="switchTab('home', this)">
             <span class="tab-icon">🏠</span>
             <span>Home</span>
+        </div>
+        <div class="tab-item" onclick="switchTab('spin', this)">
+            <span class="tab-icon">🎡</span>
+            <span>Spin</span>
         </div>
         <div class="tab-item" onclick="switchTab('leaderboard', this)">
             <span class="tab-icon">🏆</span>
@@ -618,6 +700,17 @@
                     const status = document.getElementById('status');
                     status.innerText = "COOLDOWN ACTIVE";
                     status.style.color = "var(--hint)";
+                }
+
+                if (data.spinCooldown && data.spinCooldown > 0) {
+                    const freeBtn = document.getElementById('free-spin-btn');
+                    if (freeBtn) {
+                        freeBtn.disabled = true;
+                        freeBtn.classList.remove('pulse');
+                        freeBtn.style.opacity = '0.5';
+                        const remainingHrs = Math.ceil(data.spinCooldown / (60 * 60 * 1000));
+                        freeBtn.innerHTML = `<span>⏳ Available in ${remainingHrs}h</span>`;
+                    }
                 }
             })
             .catch(err => console.error(err));
@@ -748,10 +841,109 @@
             btn.innerHTML = 'Claiming... ⏳';
             try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
             
-            fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}`)
-                .then(() => tg.close())
+            const chatId = urlParams.get('chat_id') || userId;
+
+            fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('success-box').innerHTML = `
+                            <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
+                            <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
+                            <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 20px;">${data.amount}</b> coins!</p>
+                            <button class="btn" onclick="tg.close()">Close</button>
+                        `;
+                        try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                    } else {
+                        tg.close();
+                    }
+                })
                 .catch(() => tg.close());
         };
+
+        // Spin Logic
+        let currentRotation = 0;
+
+        function executeSpin(isAd) {
+            const freeBtn = document.getElementById('free-spin-btn');
+            const adBtn = document.getElementById('ad-spin-btn');
+            const status = document.getElementById('spin-status');
+
+            if (freeBtn.disabled && adBtn.disabled) return; 
+
+            const runSpinBackend = () => {
+                freeBtn.disabled = true;
+                adBtn.disabled = true;
+                status.innerText = "SPINNING... 🎡";
+                
+                fetch(`/api/spin?user_id=${userId}&is_ad=${isAd}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.success) {
+                            status.innerText = data.error.toUpperCase();
+                            freeBtn.disabled = !isAd ? false : freeBtn.disabled;
+                            adBtn.disabled = false;
+                            return;
+                        }
+
+                        // Animate wheel
+                        try { tg.HapticFeedback.impactOccurred('rigid'); } catch(e) {}
+                        
+                        const extraSpins = 5;
+                        const degreesPerCoin = {
+                            100: [0, 72],
+                            500: [72, 144],
+                            1000: [144, 216],
+                            2000: [216, 288],
+                            10000: [288, 360]
+                        };
+                        const range = degreesPerCoin[data.amount] || [0, 72];
+                        const randomDegreeWithinRange = Math.floor(Math.random() * (range[1] - range[0] - 10)) + range[0] + 5;
+                        const targetDegree = 360 - randomDegreeWithinRange; 
+                        
+                        currentRotation += (360 * extraSpins) + targetDegree - (currentRotation % 360);
+                        
+                        const wheel = document.getElementById('spin-wheel');
+                        wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                        setTimeout(() => {
+                            if (data.isJackpot) {
+                                try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                                status.innerHTML = `<span style="color:#FFD700; font-size:20px; animation: pulse 1s infinite;">🎉 JACKPOT! ${data.amount} COINS! 🎉</span>`;
+                            } else {
+                                try { tg.HapticFeedback.impactOccurred('heavy'); } catch(e) {}
+                                status.innerHTML = `<span style="color:#00f2fe;">You won ${data.amount} coins!</span>`;
+                            }
+                            
+                            const coinEl = document.getElementById('stat-coins');
+                            if (coinEl) coinEl.innerText = data.newBal.toLocaleString();
+
+                            if (!isAd) {
+                                freeBtn.innerHTML = `<span>⏳ Available in 24h</span>`;
+                                freeBtn.classList.remove('pulse');
+                                freeBtn.style.opacity = '0.5';
+                            }
+                            adBtn.disabled = false;
+                        }, 4000); // Wait for 4s CSS animation
+                    })
+                    .catch(() => {
+                        status.innerText = "ERROR OCCURRED";
+                        freeBtn.disabled = !isAd ? false : freeBtn.disabled;
+                        adBtn.disabled = false;
+                    });
+            };
+
+            if (isAd) {
+                status.innerText = "LOADING AD... ⏳";
+                AdController.show().then(() => {
+                    runSpinBackend();
+                }).catch(() => {
+                    status.innerText = "AD SKIPPED";
+                });
+            } else {
+                runSpinBackend();
+            }
+        }
 
     </script>
 </body>

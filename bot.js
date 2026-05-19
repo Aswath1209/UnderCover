@@ -15,6 +15,18 @@ const path = require('path');
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
 const dropCooldowns = new Map();
 const claimCooldowns = new Map();
+const spinCooldowns = new Map();
+const adSpinCooldowns = new Map();
+const pendingSpinReminders = new Map();
+
+function getRandomSpinReward() {
+  const rand = Math.random() * 100;
+  if (rand < 50) return 100; // 50%
+  if (rand < 80) return 500; // 30%
+  if (rand < 95) return 1000; // 15%
+  if (rand < 99) return 2000; // 4%
+  return 10000; // 1% Jackpot
+}
 
 function getRandomReward() {
   const rand = Math.random() * 100;
@@ -347,35 +359,15 @@ const OFFICIAL_GC_ID = -1003906592838;
 const OFFICIAL_GC_USER = "@UnderCoverOfficialGroup";
 
 async function handleDropCommand(ctx) {
-  if (ctx.chat.type !== 'private') {
-    const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/Imposter0_bot/bonus?startapp=drop`);
-    return ctx.reply("🎁 <b>Claim your mystery drop in private!</b>", { 
-        reply_markup: kb,
-        parse_mode: 'HTML' 
-    });
-  }
-
   const userId = ctx.from.id;
   
   // If they manually claim, remove any pending reminder
   pendingReminders.delete(userId);
 
-  const now = Date.now();
-  const lastClaim = dropCooldowns.get(userId) || 0;
-  const cooldown = 60 * 60 * 1000; // 1 hour
-
-  if (now - lastClaim < cooldown) {
-    const remainingMin = Math.ceil((cooldown - (now - lastClaim)) / (60 * 1000));
-    return ctx.reply(`⏳ <b>Please wait!</b>\n\nYou can claim another drop in <b>${remainingMin} minutes</b>.`, { parse_mode: 'HTML' });
-  }
-
-  // SET COOLDOWN IMMEDIATELY to prevent spamming the command
-  dropCooldowns.set(userId, now);
-
   // We send a temporary message so we can get its ID to edit later
   const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
 
-  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}`;
+  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}&chat_id=${ctx.chat.id}`;
   
   const kb = new InlineKeyboard()
     .webApp("📺 Watch & Claim Mystery Drop", miniAppUrl);
@@ -2282,12 +2274,13 @@ app.get('/bonus-app', (req, res) => {
 
 // Reward Endpoint
 app.get('/api/reward', async (req, res) => {
-    const { user_id, msg_id } = req.query;
+    const { user_id, msg_id, chat_id } = req.query;
     if (!user_id || !msg_id) return res.status(400).send('Missing params');
 
     try {
         const userId = parseInt(user_id);
         const msgId = parseInt(msg_id);
+        const chatId = chat_id ? parseInt(chat_id) : userId;
 
         // 0. Strict server-side cooldown check to prevent multi-click abuse
         const lastClaim = claimCooldowns.get(userId) || 0;
@@ -2310,12 +2303,14 @@ app.get('/api/reward', async (req, res) => {
         pendingReminders.set(userId, Date.now() + (60 * 60 * 1000));
         
         // 5. Edit Bot Message automatically (Removes the button)
-        await bot.api.editMessageText(userId, msgId, 
-            `✅ <b>Mystery Drop Claimed!</b>\n\nYou earned <b>${amount}</b> coins!\nNew Balance: <b>${newBal}</b> 💰`,
+        const profile = await sb.getProfile(userId);
+        const userName = profile ? escapeHTML(profile.first_name) : "User";
+        await bot.api.editMessageText(chatId, msgId, 
+            `✅ <b>Mystery Drop Claimed!</b>\n\n<a href="tg://user?id=${userId}">${userName}</a> earned <b>${amount}</b> coins!`,
             { parse_mode: 'HTML' }
         ).catch(e => console.error("Edit failed:", e));
 
-        res.send('ok');
+        res.json({ success: true, amount, newBal });
     } catch (error) {
         console.error('Reward error:', error);
         res.status(500).send('error');
@@ -2336,7 +2331,11 @@ app.get('/api/user-stats', async (req, res) => {
         
         const lastClaim = claimCooldowns.get(userId) || 0;
         const remainingMs = (60 * 60 * 1000) - (Date.now() - lastClaim);
-        const cooldownRemaining = remainingMs > 0 ? remainingMs : 0;
+        const dropCooldownRemaining = remainingMs > 0 ? remainingMs : 0;
+
+        const lastSpin = spinCooldowns.get(userId) || 0;
+        const spinRemainingMs = (24 * 60 * 60 * 1000) - (Date.now() - lastSpin);
+        const spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
 
         res.json({
             name: profile.first_name,
@@ -2344,11 +2343,51 @@ app.get('/api/user-stats', async (req, res) => {
             wins: profile.wins || 0,
             played: profile.matches_played || 0,
             rank: globalRank || "N/A",
-            dropCooldown: cooldownRemaining
+            dropCooldown: dropCooldownRemaining,
+            spinCooldown: spinCooldownRemaining
         });
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).send('error');
+    }
+});
+
+// Spin Wheel Endpoint
+app.get('/api/spin', async (req, res) => {
+    const { user_id, is_ad } = req.query;
+    if (!user_id) return res.status(400).send('Missing params');
+
+    try {
+        const userId = parseInt(user_id);
+        const isAdSpin = is_ad === 'true';
+        const now = Date.now();
+
+        if (isAdSpin) {
+            // Strict 30s server cooldown for ad spins
+            const lastAdSpin = adSpinCooldowns.get(userId) || 0;
+            if (now - lastAdSpin < 30 * 1000) {
+                return res.status(429).json({ success: false, error: 'Cooldown active' });
+            }
+            adSpinCooldowns.set(userId, now);
+        } else {
+            // 24-hour cooldown for free spin
+            const lastSpin = spinCooldowns.get(userId) || 0;
+            if (now - lastSpin < 24 * 60 * 60 * 1000) {
+                return res.status(429).json({ success: false, error: 'Free spin not ready' });
+            }
+            spinCooldowns.set(userId, now);
+            // Schedule a reminder 24 hours from now
+            pendingSpinReminders.set(userId, now + (24 * 60 * 60 * 1000));
+        }
+
+        const amount = getRandomSpinReward();
+        const isJackpot = amount >= 10000;
+        const newBal = await sb.addCoins(userId, amount);
+
+        res.json({ success: true, amount, isJackpot, newBal });
+    } catch (error) {
+        console.error('Spin error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 
@@ -2466,6 +2505,26 @@ if (require.main === module) {
           );
         } catch (e) {
           console.error(`Failed to send reminder to ${userId}:`, e.message);
+        }
+      }
+    }
+  }, 60 * 1000);
+
+  // --- Spin Wheel Reminders (Every 1 Minute) ---
+  setInterval(async () => {
+    const now = Date.now();
+    for (const [userId, reminderTime] of pendingSpinReminders.entries()) {
+      if (now >= reminderTime) {
+        pendingSpinReminders.delete(userId);
+        try {
+          const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${userId}`;
+          const kb = new InlineKeyboard().webApp("🎡 Spin the Wheel", miniAppUrl);
+          await bot.api.sendMessage(userId, 
+            "🎡 <b>Your Daily Free Spin is ready!</b>\n\nHead to the Mini App to spin the wheel and win up to 10,000 coins!", 
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        } catch (e) {
+          console.error(`Failed to send spin reminder to ${userId}:`, e.message);
         }
       }
     }
