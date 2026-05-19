@@ -12,6 +12,20 @@ const sb = require('./db/supabase');
 const path = require('path');
 const footballPlayers = require('./data/footballPlayers.json');
 
+function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") {
+  const isPrivate = ctx.chat?.type === 'private';
+  const botUsername = ctx.me?.username || botInfo?.username || 'Imposter0_bot';
+  
+  if (isPrivate) {
+    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com'}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=${tab}`;
+    kb.webApp(label, miniAppUrl);
+  } else {
+    const directLink = `https://t.me/${botUsername}/bonus?startapp=${tab}`;
+    kb.url(label, directLink);
+  }
+  return kb;
+}
+
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -377,19 +391,18 @@ bot.command('myteam', async (ctx) => {
   const text = `👥 <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a>'s Club Squads</b>\n\n` +
                `<blockquote>Select which sport's squad you would like to view. You can purchase more players in the Shop!</blockquote>`;
   
-  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
   const kb = new InlineKeyboard()
     .text("🏏 Cricket Squad", `myteam:cricket:${user.id}`)
     .text("⚽ Football Squad", `myteam:football:${user.id}`)
-    .row()
-    .webApp("🛒 Visit Player Shop", miniAppUrl);
+    .row();
+  
+  addShopButton(kb, ctx, "🛒 Visit Player Shop", "shop");
   
   await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
 });
 
 bot.command('shop', async (ctx) => {
-  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
-  const kb = new InlineKeyboard().webApp("🛒 Open Player Shop", miniAppUrl);
+  const kb = addShopButton(new InlineKeyboard(), ctx, "🛒 Open Player Shop", "shop");
   
   await ctx.reply(
     "🛒 <b>Welcome to the Player Shop!</b>\n\nDirectly buy Cricket and Football players using your coins to build your ultimate dream team!\n\nClick the button below to browse available players, filter by role/rating, and sign them to your squad.",
@@ -1517,16 +1530,15 @@ bot.on('callback_query:data', async (ctx) => {
     
     const profile = await sb.getProfile(targetUserId);
     const name = profile ? profile.first_name : "User";
-    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
-    
     if (tab === 'home') {
       const text = `👥 <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a>'s Club Squads</b>\n\n` +
                    `<blockquote>Select which sport's squad you would like to view. You can purchase more players in the Shop!</blockquote>`;
       const kb = new InlineKeyboard()
         .text("🏏 Cricket Squad", `myteam:cricket:${targetUserId}`)
         .text("⚽ Football Squad", `myteam:football:${targetUserId}`)
-        .row()
-        .webApp("🛒 Visit Player Shop", miniAppUrl);
+        .row();
+      
+      addShopButton(kb, ctx, "🛒 Visit Player Shop", "shop");
       
       await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
       return;
@@ -1539,8 +1551,10 @@ bot.on('callback_query:data', async (ctx) => {
         const text = `🏏 <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b> does not have any cricket players in their squad yet!\n\n` +
                      `<blockquote>Go to the Shop tab in the Mini App to sign cricket players for your team.</blockquote>`;
         const kb = new InlineKeyboard()
-          .text("⬅️ Back", `myteam:home:${targetUserId}`)
-          .webApp("🛒 Visit Shop", miniAppUrl);
+          .text("⬅️ Back", `myteam:home:${targetUserId}`);
+        
+        addShopButton(kb, ctx, "🛒 Visit Shop", "shop");
+        
         await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
         return;
       }
@@ -1604,8 +1618,8 @@ bot.on('callback_query:data', async (ctx) => {
       msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
       
       const kb = new InlineKeyboard()
-        .text("⬅️ Back", `myteam:home:${targetUserId}`)
-        .webApp("🛒 Visit Shop", miniAppUrl);
+        .text("⬅️ Back", `myteam:home:${targetUserId}`);
+      addShopButton(kb, ctx, "🛒 Visit Shop", "shop");
       
       await ctx.editMessageText(msg, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
       return;
@@ -1620,8 +1634,8 @@ bot.on('callback_query:data', async (ctx) => {
         const text = `⚽ <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b> does not have any football players in their squad yet!\n\n` +
                      `<blockquote>Go to the Shop tab in the Mini App to sign football players for your team.</blockquote>`;
         const kb = new InlineKeyboard()
-          .text("⬅️ Back", `myteam:home:${targetUserId}`)
-          .webApp("🛒 Visit Shop", miniAppUrl);
+          .text("⬅️ Back", `myteam:home:${targetUserId}`);
+        addShopButton(kb, ctx, "🛒 Visit Shop", "shop");
         await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
         return;
       }
@@ -1685,8 +1699,8 @@ bot.on('callback_query:data', async (ctx) => {
       msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
       
       const kb = new InlineKeyboard()
-        .text("⬅️ Back", `myteam:home:${targetUserId}`)
-        .webApp("🛒 Visit Shop", miniAppUrl);
+        .text("⬅️ Back", `myteam:home:${targetUserId}`);
+      addShopButton(kb, ctx, "🛒 Visit Shop", "shop");
       
       await ctx.editMessageText(msg, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
       return;
