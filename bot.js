@@ -12,12 +12,21 @@ const sb = require('./db/supabase');
 const path = require('path');
 const footballPlayers = require('./data/footballPlayers.json');
 
+function getWebAppUrl(chatId, tab = '') {
+  let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  if (host === 'undefined' || !host) {
+    host = 'undercover-bot.onrender.com';
+  }
+  const cleanHost = host.replace(/^https?:\/\//, '');
+  return `https://${cleanHost}/bonus-app?msg_id=0&chat_id=${chatId}${tab ? `&tab=${tab}` : ''}`;
+}
+
 function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") {
   const isPrivate = ctx.chat?.type === 'private';
   const botUsername = ctx.me?.username || botInfo?.username || 'Imposter0_bot';
   
   if (isPrivate) {
-    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com'}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=${tab}`;
+    const miniAppUrl = getWebAppUrl(ctx.chat.id, tab);
     kb.webApp(label, miniAppUrl);
   } else {
     const directLink = `https://t.me/${botUsername}/bonus?startapp=${tab}`;
@@ -249,7 +258,7 @@ bot.command('start', async (ctx) => {
     return handleDropCommand(ctx);
   }
   if (ctx.match === 'spin') {
-    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=spin`;
+    const miniAppUrl = getWebAppUrl(ctx.chat.id, 'spin');
     const kb = new InlineKeyboard().webApp("🎡 Spin the Lucky Wheel", miniAppUrl);
     return ctx.reply(
         "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
@@ -3073,7 +3082,7 @@ if (require.main === module) {
       if (now >= reminderTime) {
         pendingSpinReminders.delete(userId);
         try {
-          const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${userId}`;
+          const miniAppUrl = getWebAppUrl(userId);
           const kb = new InlineKeyboard().webApp("🎡 Spin the Wheel", miniAppUrl);
           await bot.api.sendMessage(userId, 
             "🎡 <b>Your Daily Free Spin is ready!</b>\n\nHead to the Mini App to spin the wheel and win up to 10,000 coins!", 
