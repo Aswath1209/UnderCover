@@ -724,8 +724,20 @@
 
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
-        const msgId = urlParams.get('msg_id');
-        const defaultTab = urlParams.get('tab');
+        let msgId = urlParams.get('msg_id');
+        let defaultTab = urlParams.get('tab');
+        let chatIdUrl = urlParams.get('chat_id');
+
+        const startParam = tg.initDataUnsafe?.start_param;
+        if (startParam) {
+            if (startParam.startsWith('drop_')) {
+                const parts = startParam.split('_');
+                msgId = parts[1];
+                chatIdUrl = parts[2];
+            } else if (startParam === 'spin') {
+                defaultTab = 'spin';
+            }
+        }
 
         let currentLbSort = 'coins';
 
@@ -895,7 +907,7 @@
             btn.innerHTML = 'Claiming... ⏳';
             try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
             
-            const chatId = urlParams.get('chat_id') || userId;
+            const chatId = chatIdUrl || userId;
 
             fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
                 .then(res => res.json())
