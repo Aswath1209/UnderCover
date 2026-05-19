@@ -373,33 +373,17 @@ async function handleDropCommand(ctx) {
   // If they manually claim, remove any pending reminder
   pendingReminders.delete(userId);
 
-  if (ctx.chat.type === 'private') {
-      const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
-      const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}&chat_id=${ctx.chat.id}`;
-      const kb = new InlineKeyboard().webApp("📺 Watch & Claim Mystery Drop", miniAppUrl);
-      await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-        "🚀 <b>Mystery Drop is here!</b>\n\nWatch a short video ad to claim a random reward between <b>300 to 5,000 coins</b>! Luck is on your side today.",
-        { parse_mode: 'HTML', reply_markup: kb }
-      );
-  } else {
-      const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
-      const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=${msg.message_id}&chat_id=${ctx.chat.id}`;
-      const kb = new InlineKeyboard().webApp("📺 Watch & Claim Mystery Drop", miniAppUrl);
-      
-      try {
-          await ctx.api.sendMessage(userId, "🚀 <b>Mystery Drop is here!</b>\n\nWatch a short video ad to claim a random reward between <b>300 to 5,000 coins</b>! Luck is on your side today.", { parse_mode: 'HTML', reply_markup: kb });
-          await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-            `🎁 <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a>, I have sent your Mystery Drop to your DMs!\n\nOpen it to claim your coins.`,
-            { parse_mode: 'HTML' }
-          );
-      } catch (e) {
-          const dmKb = new InlineKeyboard().url("📩 Start Bot to Claim", `https://t.me/${botInfo.username}?start=drop`);
-          await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-            `❌ <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a>, I cannot DM you the drop! Please start me in private first.`,
-            { parse_mode: 'HTML', reply_markup: dmKb }
-          );
-      }
-  }
+  const msg = await ctx.reply("🔄 <i>Preparing your mystery drop...</i>", { parse_mode: 'HTML' });
+  
+  const startParam = `drop_${msg.message_id}_${ctx.chat.id}`;
+  const directLink = `https://t.me/${ctx.me.username}/bonus?startapp=${startParam}`;
+  
+  const kb = new InlineKeyboard().url("📺 Watch & Claim Mystery Drop", directLink);
+
+  await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
+    "🚀 <b>Mystery Drop is here!</b>\n\nWatch a short video ad to claim a random reward between <b>300 to 5,000 coins</b>! Luck is on your side today.",
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
 }
 
 bot.command('drop', async (ctx) => {
@@ -407,24 +391,13 @@ bot.command('drop', async (ctx) => {
 });
 
 bot.command('spin', async (ctx) => {
-    if (ctx.chat.type === 'private') {
-        const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=spin`;
-        const kb = new InlineKeyboard().webApp("🎡 Spin the Lucky Wheel", miniAppUrl);
-        await ctx.reply(
-            "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
-            { parse_mode: 'HTML', reply_markup: kb }
-        );
-    } else {
-        const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=spin`;
-        const kb = new InlineKeyboard().webApp("🎡 Spin the Lucky Wheel", miniAppUrl);
-        try {
-            await ctx.api.sendMessage(ctx.from.id, "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>", { parse_mode: 'HTML', reply_markup: kb });
-            await ctx.reply(`🎡 <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>, I have sent the Spin Wheel to your DMs!`, { parse_mode: 'HTML' });
-        } catch (e) {
-            const dmKb = new InlineKeyboard().url("📩 Start Bot to Spin", `https://t.me/${botInfo.username}?start=spin`);
-            await ctx.reply(`❌ <a href="tg://user?id=${ctx.from.id}">${escapeHTML(ctx.from.first_name)}</a>, I cannot DM you! Please start me in private first.`, { parse_mode: 'HTML', reply_markup: dmKb });
-        }
-    }
+    const directLink = `https://t.me/${ctx.me.username}/bonus?startapp=spin`;
+    const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
+    
+    await ctx.reply(
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        { parse_mode: 'HTML', reply_markup: kb }
+    );
 });
 
 bot.command('daily', async (ctx) => {
