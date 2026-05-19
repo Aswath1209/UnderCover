@@ -811,7 +811,7 @@ bot.command('quit', async (ctx) => {
 
 // --- Admin Broadcast Commands ---
 
-async function sendBroadcast(ctx, targetIds, message) {
+async function sendBroadcast(ctx, targetIds, messageText, replyMessageId) {
     let success = 0;
     let failed = 0;
     const total = targetIds.length;
@@ -827,9 +827,19 @@ async function sendBroadcast(ctx, targetIds, message) {
     for (let i = 0; i < total; i++) {
         const targetId = targetIds[i];
         try {
-            const sentMsg = await bot.api.sendMessage(targetId, `📢 <b>ANNOUNCEMENT</b>\n\n${message}`, { parse_mode: 'HTML' });
+            let sentMsgId;
+            if (replyMessageId) {
+                // Using copyMessage perfectly preserves formatting, bold, quotes, links, and even photos/videos!
+                const res = await bot.api.copyMessage(targetId, ctx.chat.id, replyMessageId);
+                sentMsgId = res.message_id;
+            } else {
+                // Standard text broadcast, no default "Announcement" prefix
+                const res = await bot.api.sendMessage(targetId, messageText, { parse_mode: 'HTML' });
+                sentMsgId = res.message_id;
+            }
+            
             // Pin the message in both groups and private chats
-            await bot.api.pinChatMessage(targetId, sentMsg.message_id).catch(() => {});
+            await bot.api.pinChatMessage(targetId, sentMsgId).catch(() => {});
             success++;
         } catch (e) {
             failed++;
@@ -862,9 +872,10 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   
   const cmd = ctx.message.text.split(' ')[0].replace('/', '').split('@')[0];
   const broadcastMsg = ctx.message.text.split(' ').slice(1).join(' ');
+  const replyMsg = ctx.message.reply_to_message;
   
-  if (!broadcastMsg) {
-      return ctx.reply(`❌ Please provide a message. Usage: /${cmd} <message>`);
+  if (!broadcastMsg && !replyMsg) {
+      return ctx.reply(`❌ Please provide a message.\n\n<b>Usage 1:</b> /${cmd} Hello world!\n<b>Usage 2:</b> Reply to ANY message (with bold, images, etc.) with /${cmd} to preserve exact formatting!`, { parse_mode: 'HTML' });
   }
   
   let targetIds = [];
@@ -883,7 +894,7 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   if (targetIds.length === 0) {
       return ctx.reply("❌ No target chats found in database.");
   }
-    sendBroadcast(ctx, targetIds, broadcastMsg).catch(err => console.error("Broadcast Error:", err));
+    sendBroadcast(ctx, targetIds, broadcastMsg, replyMsg ? replyMsg.message_id : null).catch(err => console.error("Broadcast Error:", err));
     await ctx.reply("✅ <b>Broadcast has been moved to background.</b>\n\nYou can continue using the bot while it sends messages.", { parse_mode: 'HTML' });
 });
 
