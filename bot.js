@@ -191,10 +191,12 @@ bot.command('help', async (ctx) => {
                `• /fly — Bet on the crashing plane (Aviator)\n` +
                `• /daily — Claim your daily coin bonus\n` +
                `• /drop — Claim a Mystery Coin Drop (Video Ad)\n` +
-               `• /spin — Spin the Lucky Wheel for up to 10k Coins\n\n` +
+               `• /spin — Spin the Lucky Wheel for up to 10k Coins\n` +
+               `• /shop — Browse & buy cricket/football players\n\n` +
                `👤 <b>User Info:</b>\n` +
                `• /profile — Check your wins, losses, and coins\n` +
                `• /myteam — Show your owned club squads (Cricket & Football)\n` +
+               `• /sell — Sell a player back for 75% value\n` +
                `• /leaderboard — View top players globally\n` +
                `• /balance — Check your coin balance\n` +
                `• /send — Send coins to a friend (reply to them)\n\n` +
@@ -383,6 +385,119 @@ bot.command('myteam', async (ctx) => {
     .webApp("🛒 Visit Player Shop", miniAppUrl);
   
   await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+});
+
+bot.command('shop', async (ctx) => {
+  const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=shop`;
+  const kb = new InlineKeyboard().webApp("🛒 Open Player Shop", miniAppUrl);
+  
+  await ctx.reply(
+    "🛒 <b>Welcome to the Player Shop!</b>\n\nDirectly buy Cricket and Football players using your coins to build your ultimate dream team!\n\nClick the button below to browse available players, filter by role/rating, and sign them to your squad.",
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
+bot.command('sell', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  
+  const query = ctx.match?.trim();
+  if (!query) {
+    return ctx.reply(
+      "⚠️ <b>Usage:</b> `/sell &lt;player_name&gt;`\n\n" +
+      "E.g., `/sell Virat Kohli` or `/sell Messi`.\n" +
+      "You will receive <b>75%</b> of the original buy price back.",
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  const userId = ctx.from.id;
+  await sb.ensureUser(userId, ctx.from.first_name).catch(() => {});
+
+  try {
+    const owned = await sb.getUserOwnedPlayers(userId);
+    if (!owned || owned.length === 0) {
+      return ctx.reply("❌ You do not own any players yet!");
+    }
+
+    const cricketFromDb = await sb.getCricketPlayers();
+    
+    // Find all matches
+    const matches = [];
+
+    // Check Cricket players
+    const ownedCricketIds = owned.filter(o => o.sport === 'cricket').map(o => o.player_id);
+    const matchedCricket = cricketFromDb.filter(p => 
+      ownedCricketIds.includes(p.id) && 
+      p.name.toLowerCase().includes(query.toLowerCase())
+    );
+    matchedCricket.forEach(p => {
+      matches.push({
+        id: p.id,
+        name: p.name,
+        ovr: p.ovr,
+        buy_price: p.buy_price,
+        sport: 'cricket'
+      });
+    });
+
+    // Check Football players
+    const ownedFootballIds = owned.filter(o => o.sport === 'football').map(o => o.player_id);
+    const matchedFootball = footballPlayers.filter(p => 
+      ownedFootballIds.includes(p.id) && 
+      p.name.toLowerCase().includes(query.toLowerCase())
+    );
+    matchedFootball.forEach(p => {
+      matches.push({
+        id: p.id,
+        name: p.name,
+        ovr: p.ovr,
+        buy_price: p.buy_price,
+        sport: 'football'
+      });
+    });
+
+    if (matches.length === 0) {
+      return ctx.reply(`❌ No owned player matches your search for "<b>${escapeHTML(query)}</b>".`, { parse_mode: 'HTML' });
+    }
+
+    if (matches.length > 1) {
+      // Check if there is an exact name match (case-insensitive) to resolve ambiguity immediately
+      const exactMatch = matches.find(p => p.name.toLowerCase() === query.toLowerCase());
+      if (exactMatch) {
+        // Use the exact match and clear the others
+        matches.length = 0;
+        matches.push(exactMatch);
+      } else {
+        const list = matches.map(p => `• <b>${escapeHTML(p.name)}</b> (OVR: ${p.ovr}, ${p.sport === 'cricket' ? '🏏' : '⚽'})`).join('\n');
+        return ctx.reply(
+          `🔍 <b>Multiple players found matching "${escapeHTML(query)}":</b>\n\n${list}\n\n` +
+          `<i>Please specify a more precise name (e.g., /sell ${escapeHTML(matches[0].name)}).</i>`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    }
+
+    // Exactly one player match
+    const player = matches[0];
+    const sellPrice = Math.round(player.buy_price * 0.75);
+
+    const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
+                 `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
+                 `• OVR: <b>${player.ovr}</b>\n` +
+                 `• Sport: <b>${player.sport === 'cricket' ? '🏏 Cricket' : '⚽ Football'}</b>\n` +
+                 `• Original Price: 💰 <b>${player.buy_price.toLocaleString()}</b>\n\n` +
+                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (75% value).\n\n` +
+                 `<i>Do you want to proceed?</i>`;
+
+    const kb = new InlineKeyboard()
+      .text("✅ Yes, Sell", `sell_y:${player.sport === 'cricket' ? 'c' : 'f'}:${player.id}:${userId}`)
+      .text("❌ No, Cancel", `sell_n:${userId}`);
+
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+  } catch (error) {
+    console.error("Error in /sell command:", error);
+    await ctx.reply("❌ An error occurred while processing the sale request.");
+  }
 });
 
 const OFFICIAL_GC_ID = -1003906592838;
@@ -1478,12 +1593,14 @@ bot.on('callback_query:data', async (ctx) => {
       msg += `\n`;
       
       const totalPlayers = team.length;
-      const avgOvr = Math.round(team.reduce((sum, p) => sum + (p.ovr || 0), 0) / totalPlayers);
-      const bestPlayer = [...team].sort((a, b) => b.ovr - a.ovr)[0];
+      const sortedByOvr = [...team].sort((a, b) => b.ovr - a.ovr);
+      const top11 = sortedByOvr.slice(0, 11);
+      const teamRating = Math.round(top11.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
+      const bestPlayer = sortedByOvr[0];
       
       msg += `📊 <b>Squad Stats:</b>\n`;
       msg += `👥 <b>Players:</b> ${totalPlayers}\n`;
-      msg += `📈 <b>Avg Rating:</b> ${avgOvr} OVR\n`;
+      msg += `📈 <b>Team Rating:</b> ${teamRating} OVR\n`;
       msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
       
       const kb = new InlineKeyboard()
@@ -1557,12 +1674,14 @@ bot.on('callback_query:data', async (ctx) => {
       msg += `\n`;
       
       const totalPlayers = team.length;
-      const avgOvr = Math.round(team.reduce((sum, p) => sum + (p.ovr || 0), 0) / totalPlayers);
-      const bestPlayer = [...team].sort((a, b) => b.ovr - a.ovr)[0];
+      const sortedByOvr = [...team].sort((a, b) => b.ovr - a.ovr);
+      const top11 = sortedByOvr.slice(0, 11);
+      const teamRating = Math.round(top11.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
+      const bestPlayer = sortedByOvr[0];
       
       msg += `📊 <b>Squad Stats:</b>\n`;
       msg += `👥 <b>Players:</b> ${totalPlayers}\n`;
-      msg += `📈 <b>Avg Rating:</b> ${avgOvr} OVR\n`;
+      msg += `📈 <b>Team Rating:</b> ${teamRating} OVR\n`;
       msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
       
       const kb = new InlineKeyboard()
@@ -1572,6 +1691,66 @@ bot.on('callback_query:data', async (ctx) => {
       await ctx.editMessageText(msg, { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
       return;
     }
+  }
+
+  // --- PLAYER SELL CALLBACKS ---
+  if (data.startsWith('sell_y:') || data.startsWith('sell_n:')) {
+    const parts = data.split(':');
+    const initiatorId = parseInt(parts[parts.length - 1], 10);
+    
+    if (user.id !== initiatorId) {
+      return ctx.answerCallbackQuery({
+        text: "⚠️ Only the player who initiated this sale command can confirm or cancel it.",
+        show_alert: true
+      });
+    }
+
+    await ctx.answerCallbackQuery().catch(() => {});
+    
+    if (data.startsWith('sell_n:')) {
+      await ctx.editMessageText("❌ Player sale cancelled.", { reply_markup: null }).catch(() => {});
+      return;
+    }
+    
+    const sportAbbr = parts[1]; // 'c' or 'f'
+    const playerId = parts[2];
+    const sport = sportAbbr === 'c' ? 'cricket' : 'football';
+
+    try {
+      const userId = ctx.from.id;
+      
+      // Let's resolve the player's price
+      let player = null;
+      if (sport === 'football') {
+        player = footballPlayers.find(p => p.id === playerId);
+      } else {
+        const cricketFromDb = await sb.getCricketPlayers();
+        player = cricketFromDb.find(p => p.id === playerId);
+      }
+
+      if (!player) {
+        await ctx.editMessageText("❌ Player details not found.", { reply_markup: null }).catch(() => {});
+        return;
+      }
+
+      const sellPrice = Math.round(player.buy_price * 0.75);
+      const result = await sb.sellPlayer(userId, player.id, sport, sellPrice);
+      
+      if (result.success) {
+        await ctx.editMessageText(
+          `✅ <b>Player Sold Successfully!</b>\n\n` +
+          `You sold <b>${escapeHTML(player.name)}</b> for 💰 <b>${sellPrice.toLocaleString()} coins</b>.\n` +
+          `Your new balance is: 💰 <b>${result.newBalance.toLocaleString()} coins</b>.`,
+          { parse_mode: 'HTML', reply_markup: null }
+        ).catch(() => {});
+      } else {
+        await ctx.editMessageText(`❌ Sale failed: ${result.error}`, { reply_markup: null }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("Error in player sell callback:", err);
+      await ctx.editMessageText("❌ An error occurred while processing the sale callback.", { reply_markup: null }).catch(() => {});
+    }
+    return;
   }
 
   // --- BLACKJACK CALLBACKS ---
@@ -2495,8 +2674,71 @@ bot.catch((err) => {
   console.error(`Error in update ${err.ctx?.update?.update_id}:`, err.error);
 });
 
+const fs = require('fs');
 const express = require('express');
 const app = express();
+
+const cricketImageCache = new Map();
+const crickidexPlayersDir = '/home/home/Crickidex/assets/players';
+
+try {
+    if (fs.existsSync(crickidexPlayersDir)) {
+        const files = fs.readdirSync(crickidexPlayersDir);
+        files.forEach(file => {
+            if (file.endsWith('.jpg') || file.endsWith('.png') || file.endsWith('.jpeg')) {
+                cricketImageCache.set(file.toLowerCase(), file);
+            }
+        });
+        console.log(`[Shop] Cached ${cricketImageCache.size} player images from Crickidex.`);
+    } else {
+        console.warn(`[Shop] Crickidex players directory not found at: ${crickidexPlayersDir}`);
+    }
+} catch (error) {
+    console.error('[Shop] Error building image cache:', error);
+}
+
+// Helper to resolve player name to static image URL
+function getCricketPlayerImageUrl(name) {
+    if (!name) return null;
+    
+    // 1. Try formatted First_Last.jpg
+    const formattedName = name.trim().replace(/\s+/g, '_').toLowerCase();
+    const filenameJpg = `${formattedName}.jpg`;
+    if (cricketImageCache.has(filenameJpg)) {
+        return `/assets/players/${filenameJpg}`;
+    }
+    
+    // 2. Try removing special characters
+    const cleanName = name.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_').toLowerCase();
+    const cleanFilenameJpg = `${cleanName}.jpg`;
+    if (cricketImageCache.has(cleanFilenameJpg)) {
+        return `/assets/players/${cleanFilenameJpg}`;
+    }
+
+    // 3. Try matches in filename list where the filename contains all parts of the name
+    const nameParts = formattedName.split('_');
+    if (nameParts.length > 0) {
+        for (const [key] of cricketImageCache.entries()) {
+            if (nameParts.every(part => key.includes(part))) {
+                return `/assets/players/${key}`;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Serve player images case-insensitively
+app.get('/assets/players/:filename', (req, res) => {
+    const requested = req.params.filename.toLowerCase();
+    const actualFile = cricketImageCache.get(requested);
+    if (actualFile) {
+        res.sendFile(path.join(crickidexPlayersDir, actualFile));
+    } else {
+        res.status(404).send('Not found');
+    }
+});
+
 app.get('/', (req, res) => res.send('Bot is safely running!'));
 
 // Serve Mini App (Adsgram)
@@ -2662,7 +2904,8 @@ app.get('/api/shop/players', async (req, res) => {
             role: p.role,
             ovr: p.ovr,
             buy_price: p.buy_price,
-            tier: p.tier || 'Normal'
+            tier: p.tier || 'Normal',
+            image_url: getCricketPlayerImageUrl(p.name)
         }));
 
         res.json({
@@ -2736,6 +2979,9 @@ if (require.main === module) {
     { command: "guessword", description: "Start a Guess the Word game (Alias: /gw)" },
     { command: "gw", description: "Alias for /guessword" },
     { command: "profile", description: "Check your stats" },
+    { command: "shop", description: "🛒 Browse and buy team players" },
+    { command: "myteam", description: "👥 Show your club squads" },
+    { command: "sell", description: "💰 Sell a squad member (75% value)" },
     { command: "leaderboard", description: "Global leaderboard" },
     { command: "balance", description: "Check your coin balance" },
     { command: "send", description: "Send coins to another user" },

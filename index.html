@@ -559,23 +559,153 @@
             outline: none;
             border-color: var(--primary);
         }
-        .filter-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1.2fr;
-            gap: 8px;
+        .filter-section-title {
+            font-size: 11px;
+            color: var(--hint);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+            text-align: left;
         }
-        .filter-row select {
-            padding: 8px 10px;
-            border-radius: 10px;
-            background: rgba(0, 0, 0, 0.25);
+        .chips-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 4px 0;
+            scrollbar-width: none; /* Firefox */
+        }
+        .chips-container::-webkit-scrollbar {
+            display: none; /* Safari and Chrome */
+        }
+        .role-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--hint);
+            padding: 6px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .role-chip:active {
+            transform: scale(0.95);
+        }
+        .role-chip.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(79, 172, 254, 0.3);
+        }
+        .filter-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            gap: 12px;
+        }
+        .ovr-filter-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .meta-label {
+            font-size: 12px;
+            color: var(--hint);
+            font-weight: 600;
+        }
+        .ovr-filter-wrap select {
+            background: rgba(0, 0, 0, 0.3);
             border: 1px solid var(--glass-border);
             color: #fff;
-            font-family: inherit;
+            padding: 4px 8px;
+            border-radius: 8px;
             font-size: 12px;
-        }
-        .filter-row select:focus {
+            font-weight: 700;
             outline: none;
+            cursor: pointer;
+        }
+        .ovr-filter-wrap select:focus {
             border-color: var(--primary);
+        }
+        .sort-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sort-chips {
+            display: flex;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px;
+            border-radius: 8px;
+            border: 1px solid var(--glass-border);
+        }
+        .sort-chip {
+            background: transparent;
+            border: none;
+            color: var(--hint);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .sort-chip.active {
+            background: rgba(79, 172, 254, 0.15);
+            color: var(--primary);
+        }
+        .player-img-container {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            margin: 8px auto 6px auto;
+        }
+        .player-img {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+        }
+        .player-img-container.gold .player-img {
+            border-color: #ffd700;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+        }
+        .player-img-container.legendary .player-img {
+            border-color: #ff007f;
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.4);
+        }
+        .player-placeholder-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            box-sizing: border-box;
+        }
+        .player-placeholder-avatar span {
+            font-size: 28px;
+            font-weight: 800;
+        }
+        .player-role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-top: 6px;
         }
         .player-grid {
             display: grid;
@@ -753,25 +883,29 @@
             <!-- Controls (Search & Filters) -->
             <div class="shop-controls glass-panel">
                 <div class="search-box">
-                    <input type="text" id="shop-search" placeholder="🔍 Search player name..." oninput="renderShop()">
+                    <input type="text" id="shop-search" placeholder="🔍 Search player or country..." oninput="renderShop()">
                 </div>
-                <div class="filter-row">
-                    <select id="shop-filter-role" onchange="renderShop()">
-                        <option value="">All Roles</option>
-                    </select>
-                    <select id="shop-filter-tier" onchange="renderShop()">
-                        <option value="">All Tiers</option>
-                        <option value="Normal">Normal</option>
-                        <option value="Gold">Gold</option>
-                        <option value="Legendary">Legendary</option>
-                    </select>
-                    <select id="shop-sort" onchange="renderShop()">
-                        <option value="rating_desc">OVR: High to Low</option>
-                        <option value="rating_asc">OVR: Low to High</option>
-                        <option value="price_desc">Price: High to Low</option>
-                        <option value="price_asc">Price: Low to High</option>
-                        <option value="name_asc">Name: A to Z</option>
-                    </select>
+                
+                <div class="filter-section-title">Filter by Role</div>
+                <div class="chips-container" id="shop-role-chips">
+                    <!-- Dynamic role chips populated via script -->
+                </div>
+
+                <div class="filter-meta-row">
+                    <div class="ovr-filter-wrap">
+                        <span class="meta-label">OVR:</span>
+                        <select id="shop-filter-ovr" onchange="renderShop()">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="sort-wrap">
+                        <span class="meta-label">Sort:</span>
+                        <div class="sort-chips" id="shop-sort-chips">
+                            <button class="sort-chip active" data-sort="ovr" onclick="setShopSort('ovr', this)">OVR</button>
+                            <button class="sort-chip" data-sort="price" onclick="setShopSort('price', this)">Price</button>
+                            <button class="sort-chip" data-sort="name" onclick="setShopSort('name', this)">Name</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1114,6 +1248,57 @@
         // Shop Logic
         let shopData = { cricket: [], football: [], owned: [] };
         let currentShopSport = 'cricket';
+        let currentShopRole = ''; // empty means 'All'
+        let currentShopSort = 'ovr'; // default sort
+
+        const countryFlags = {
+            'India': '🇮🇳', 'Australia': '🇦🇺', 'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'New Zealand': '🇳🇿',
+            'South Africa': '🇿🇦', 'Pakistan': '🇵🇰', 'West Indies': '🏝️', 'Sri Lanka': '🇱🇰',
+            'Bangladesh': '🇧🇩', 'Afghanistan': '🇦🇫', 'Zimbabwe': '🇿🇼', 'Ireland': '🇮🇪',
+            'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Netherlands': '🇳🇱', 'Namibia': '🇳🇦', 'Nepal': '🇳🇵',
+            'UAE': '🇦🇪', 'Oman': '🇴🇲', 'USA': '🇺🇸', 'Argentina': '🇦🇷', 'Portugal': '🇵🇹',
+            'France': '🇫🇷', 'Norway': '🇳🇴', 'Belgium': '🇧🇪', 'Brazil': '🇧🇷', 'Egypt': '🇪🇬',
+            'Croatia': '🇭🇷', 'Germany': '🇩🇪', 'Spain': '🇪🇸', 'Italy': '🇮🇹', 'Poland': '🇵🇱',
+            'Senegal': '🇸🇳', 'South Korea': '🇰🇷', 'Korea Republic': '🇰🇷', 'Uruguay': '🇺🇾',
+            'Canada': '🇨🇦', 'Morocco': '🇲🇦', 'Japan': '🇯🇵', 'Colombia': '🇨🇴'
+        };
+
+        function getOvrColor(ovr) {
+            if (ovr >= 95) return '#FF6B35';
+            if (ovr >= 90) return '#A855F7';
+            if (ovr >= 85) return '#F5A623';
+            if (ovr >= 75) return '#94A3B8';
+            if (ovr >= 65) return '#B87333';
+            return '#6B7280';
+        }
+
+        function getRoleLabel(role) {
+            const labels = {
+                'batsman': 'BAT',
+                'bowler': 'BWL',
+                'all_rounder': 'AR',
+                'wicket_keeper': 'WK',
+                'Forward': 'FWD',
+                'Midfielder': 'MID',
+                'Defender': 'DEF',
+                'Goalkeeper': 'GK'
+            };
+            return labels[role] || role.toUpperCase();
+        }
+
+        function getRoleColor(role) {
+            const colors = {
+                'batsman': '#3B82F6',
+                'bowler': '#EF4444',
+                'all_rounder': '#8B5CF6',
+                'wicket_keeper': '#F59E0B',
+                'Forward': '#EF4444',
+                'Midfielder': '#8B5CF6',
+                'Defender': '#3B82F6',
+                'Goalkeeper': '#F59E0B'
+            };
+            return colors[role] || '#8b95a8';
+        }
 
         function loadShop() {
             const grid = document.getElementById('shop-grid');
@@ -1127,6 +1312,7 @@
                 .then(data => {
                     shopData = data;
                     updateShopFilterRoles();
+                    updateShopOvrFilter();
                     renderShop();
                     loader.classList.add('hidden');
                     grid.classList.remove('hidden');
@@ -1143,30 +1329,74 @@
             document.getElementById('shop-tab-football').classList.toggle('active', sport === 'football');
             
             document.getElementById('shop-search').value = '';
-            document.getElementById('shop-filter-tier').value = '';
+            currentShopRole = '';
             
+            // Reset sort button state visually
+            const sortChips = document.getElementById('shop-sort-chips');
+            sortChips.querySelectorAll('.sort-chip').forEach(c => c.classList.remove('active'));
+            sortChips.querySelector('[data-sort="ovr"]').classList.add('active');
+            currentShopSort = 'ovr';
+
             updateShopFilterRoles();
+            updateShopOvrFilter();
             renderShop();
         }
 
         function updateShopFilterRoles() {
-            const roleSelect = document.getElementById('shop-filter-role');
-            roleSelect.innerHTML = '<option value="">All Roles</option>';
+            const container = document.getElementById('shop-role-chips');
+            container.innerHTML = '';
             
-            let roles = [];
-            if (currentShopSport === 'cricket') {
-                roles = ['batsman', 'bowler', 'all_rounder', 'wicket_keeper'];
-            } else {
-                roles = ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
-            }
+            const roles = currentShopSport === 'cricket' 
+                ? [
+                    { id: '', label: 'All' },
+                    { id: 'batsman', label: '🏏 BAT' },
+                    { id: 'bowler', label: '🎳 BWL' },
+                    { id: 'all_rounder', label: '⚡ AR' },
+                    { id: 'wicket_keeper', label: '🧤 WK' }
+                  ]
+                : [
+                    { id: '', label: 'All' },
+                    { id: 'Forward', label: '⚽ FWD' },
+                    { id: 'Midfielder', label: '⚡ MID' },
+                    { id: 'Defender', label: '🛡️ DEF' },
+                    { id: 'Goalkeeper', label: '🧤 GK' }
+                  ];
             
-            roles.forEach(role => {
-                const opt = document.createElement('option');
-                opt.value = role;
-                const display = role.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                opt.innerText = display;
-                roleSelect.appendChild(opt);
+            roles.forEach(r => {
+                const btn = document.createElement('button');
+                btn.className = `role-chip ${currentShopRole === r.id ? 'active' : ''}`;
+                btn.innerText = r.label;
+                btn.onclick = () => {
+                    container.querySelectorAll('.role-chip').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentShopRole = r.id;
+                    renderShop();
+                };
+                container.appendChild(btn);
             });
+        }
+
+        function updateShopOvrFilter() {
+            const ovrSelect = document.getElementById('shop-filter-ovr');
+            ovrSelect.innerHTML = '<option value="">All</option>';
+            
+            const players = currentShopSport === 'cricket' ? shopData.cricket : shopData.football;
+            const ovrs = [...new Set(players.map(p => p.ovr))].sort((a, b) => b - a);
+            
+            ovrs.forEach(ovr => {
+                const opt = document.createElement('option');
+                opt.value = ovr;
+                opt.innerText = ovr;
+                ovrSelect.appendChild(opt);
+            });
+        }
+
+        function setShopSort(sortType, btn) {
+            currentShopSort = sortType;
+            const container = document.getElementById('shop-sort-chips');
+            container.querySelectorAll('.sort-chip').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            renderShop();
         }
 
         function renderShop() {
@@ -1175,25 +1405,21 @@
 
             const players = currentShopSport === 'cricket' ? shopData.cricket : shopData.football;
             const search = document.getElementById('shop-search').value.toLowerCase();
-            const roleFilter = document.getElementById('shop-filter-role').value;
-            const tierFilter = document.getElementById('shop-filter-tier').value;
-            const sort = document.getElementById('shop-sort').value;
+            const ovrFilter = document.getElementById('shop-filter-ovr').value;
 
             // Filter
             let filtered = players.filter(p => {
-                const matchesSearch = p.name.toLowerCase().includes(search);
-                const matchesRole = !roleFilter || p.role === roleFilter;
-                const matchesTier = !tierFilter || p.tier === tierFilter;
-                return matchesSearch && matchesRole && matchesTier;
+                const matchesSearch = p.name.toLowerCase().includes(search) || (p.country && p.country.toLowerCase().includes(search));
+                const matchesRole = !currentShopRole || p.role === currentShopRole;
+                const matchesOvr = !ovrFilter || p.ovr == ovrFilter;
+                return matchesSearch && matchesRole && matchesOvr;
             });
 
             // Sort
             filtered.sort((a, b) => {
-                if (sort === 'rating_desc') return b.ovr - a.ovr;
-                if (sort === 'rating_asc') return a.ovr - b.ovr;
-                if (sort === 'price_desc') return b.buy_price - a.buy_price;
-                if (sort === 'price_asc') return a.buy_price - b.buy_price;
-                if (sort === 'name_asc') return a.name.localeCompare(b.name);
+                if (currentShopSort === 'ovr') return b.ovr - a.ovr;
+                if (currentShopSort === 'price') return b.buy_price - a.buy_price;
+                if (currentShopSort === 'name') return a.name.localeCompare(b.name);
                 return 0;
             });
 
@@ -1205,30 +1431,46 @@
 
             filtered.forEach(p => {
                 const isOwned = shopData.owned.some(o => o.player_id === p.id && o.sport === currentShopSport);
-                const displayRole = p.role.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                const displayRole = getRoleLabel(p.role);
+                const roleColor = getRoleColor(p.role);
                 const tierClass = `tier-${p.tier.toLowerCase()}`;
                 const cardClass = p.tier === 'Gold' ? 'card-gold' : (p.tier === 'Legendary' ? 'card-legendary' : '');
+                const ovrColor = getOvrColor(p.ovr);
+                const flag = countryFlags[p.country] || '🏳️';
+
+                let btnHtml = '';
+                if (isOwned) {
+                    btnHtml = `<button class="player-buy-btn owned"><span>✓ Owned</span></button>`;
+                } else {
+                    btnHtml = `<button class="player-buy-btn" onclick="buyPlayer('${p.id}', '${currentShopSport}', ${p.buy_price})">
+                        <span>💰 ${p.buy_price.toLocaleString()}</span>
+                    </button>`;
+                }
+
+                const avatarHtml = p.image_url ? 
+                    `<div class="player-img-container ${p.tier.toLowerCase()}">
+                        <img class="player-img" src="${p.image_url}" alt="${p.name}">
+                     </div>` : 
+                    `<div class="player-placeholder-avatar" style="background: ${ovrColor}20; border-color: ${ovrColor}; margin-top: 8px; margin-bottom: 6px;">
+                        <span style="color: ${ovrColor};">${p.name.charAt(0)}</span>
+                     </div>`;
 
                 const card = document.createElement('div');
                 card.className = `player-card glass-panel ${cardClass}`;
-                
-                let btnHtml = '';
-                if (isOwned) {
-                    btnHtml = `<button class="player-buy-btn owned">✅ Owned</button>`;
-                } else {
-                    btnHtml = `<button class="player-buy-btn" onclick="buyPlayer('${p.id}', ${p.buy_price})">💰 ${p.buy_price.toLocaleString()}</button>`;
-                }
-
                 card.innerHTML = `
                     <div>
                         <div class="player-badge-container">
-                            <span class="player-rating">${p.ovr} OVR</span>
+                            <span class="player-rating" style="background: ${ovrColor};">${p.ovr} OVR</span>
                             <span class="player-tier ${tierClass}">${p.tier}</span>
                         </div>
-                        <div class="player-card-name">${p.name}</div>
-                        <div class="player-sub">${p.country} • ${displayRole}</div>
+                        ${avatarHtml}
+                        <div class="player-card-name" title="${p.name}">${p.name}</div>
+                        <div class="player-sub">${flag} ${p.country}</div>
+                        <div class="player-role-badge" style="background: ${roleColor}20; color: ${roleColor}; border: 1px solid ${roleColor}30;">
+                            ${displayRole}
+                        </div>
                     </div>
-                    <div>
+                    <div style="margin-top: 10px; width: 100%;">
                         ${btnHtml}
                     </div>
                 `;
@@ -1236,7 +1478,7 @@
             });
         }
 
-        function buyPlayer(playerId, price) {
+        function buyPlayer(playerId, sport, price) {
             try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
             
             tg.showConfirm(`Are you sure you want to buy this player for ${price.toLocaleString()} coins?`, (confirmed) => {
@@ -1249,7 +1491,7 @@
                 loader.innerText = 'Processing purchase... ⏳';
                 loader.classList.remove('hidden');
 
-                fetch(`/api/shop/buy?user_id=${userId}&player_id=${playerId}&sport=${currentShopSport}`)
+                fetch(`/api/shop/buy?user_id=${userId}&player_id=${playerId}&sport=${sport}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {

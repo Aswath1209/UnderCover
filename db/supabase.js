@@ -511,6 +511,50 @@ async function buyPlayer(userId, playerId, sport, price) {
   }
 }
 
+async function sellPlayer(userId, playerId, sport, sellPrice) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    // Check if player is owned
+    const { data: existing, error: findError } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', playerId)
+      .eq('sport', sport)
+      .maybeSingle();
+
+    if (findError || !existing) {
+      return { success: false, error: "You do not own this player!" };
+    }
+
+    // Delete from user_owned_players
+    const { error: deleteError } = await supabase.from('user_owned_players')
+      .delete()
+      .eq('user_id', userId)
+      .eq('player_id', playerId)
+      .eq('sport', sport);
+
+    if (deleteError) {
+      console.error("Delete owned player error:", deleteError);
+      return { success: false, error: 'Failed to sell player.' };
+    }
+
+    // Get current coins balance
+    const { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
+    if (!profile) return { success: false, error: 'User profile not found.' };
+
+    const newCoins = (profile.coins || 0) + sellPrice;
+    await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+
+    return { success: true, newBalance: newCoins };
+  } catch (e) {
+    console.error("Sell player transaction failed:", e);
+    return { success: false, error: 'Sell failed due to database error.' };
+  } finally {
+    releaseLock(release);
+  }
+}
+
 async function getUserCricketTeam(userId) {
   if (!supabase) return [];
   try {
@@ -578,5 +622,6 @@ module.exports = {
   getUserOwnedPlayers,
   getCricketPlayers,
   buyPlayer,
+  sellPlayer,
   DEFAULT_SETTINGS
 };
