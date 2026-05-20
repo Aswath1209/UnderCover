@@ -2702,7 +2702,7 @@ const express = require('express');
 const app = express();
 
 const cricketImageCache = new Map();
-const crickidexPlayersDir = '/home/home/Crickidex/assets/players';
+const crickidexPlayersDir = path.join(__dirname, 'assets', 'players');
 
 try {
     if (fs.existsSync(crickidexPlayersDir)) {

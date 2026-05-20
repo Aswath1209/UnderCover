@@ -818,6 +818,33 @@
             box-shadow: none !important;
         }
 
+        /* Floating Animation */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .float-animation {
+            animation: float 2.5s ease-in-out infinite;
+        }
+
+        /* Responsive Tab Bar for 5 items */
+        @media (max-width: 400px) {
+            .tab-bar {
+                left: 10px;
+                right: 10px;
+                padding: 6px;
+                bottom: 12px;
+            }
+            .tab-item {
+                padding: 6px 8px;
+                font-size: 10px;
+            }
+            .tab-icon {
+                font-size: 20px;
+                margin-bottom: 2px;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -967,6 +994,51 @@
             
             <div id="spin-status" style="text-align: center; font-size: 13px; margin-top: 16px; color: var(--hint); font-weight: 600;"></div>
         </div>
+
+        <!-- Drop View -->
+        <div id="view-drop" class="view">
+            <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
+                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Mystery Drop</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 15px;">Claim a mystery crate filled with random coins!</p>
+            </div>
+
+            <div class="drop-container glass-panel" style="text-align: center; padding: 32px 24px; margin-top: 20px; border-radius: 20px;">
+                <!-- Crate Area -->
+                <div id="ad-container">
+                    <div class="float-animation" style="font-size: 80px; margin-bottom: 16px; display: inline-block;">🎁</div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 20px; color: #fff;">Mystery Coin Crate</h3>
+                    <p style="color: var(--hint); font-size: 14px; line-height: 1.5; margin-bottom: 24px; max-width: 320px; margin-left: auto; margin-right: auto;">
+                        Watch a short video ad to claim a random reward between <b style="color: #00f2fe;">300 to 5,000 coins</b>! Luck is on your side today.
+                    </p>
+                    
+                    <button class="btn pulse" id="watch-btn" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
+                        <span>📺 Watch & Claim Drop</span>
+                    </button>
+                    
+                    <div id="status" style="margin-top: 16px; font-size: 13px; color: var(--hint); font-weight: 600;">Ready to unlock!</div>
+                </div>
+
+                <!-- Success Box -->
+                <div id="success-box" class="hidden">
+                    <div id="success-prompt">
+                        <div class="float-animation" style="font-size: 80px; margin-bottom: 16px; display: inline-block;">🎁</div>
+                        <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Crate Unlocked!</h2>
+                        <p style="color: var(--hint); margin-bottom: 24px; font-size: 15px;">Your random coin reward is ready to be claimed.</p>
+                        <button class="btn" id="claim-btn" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
+                            <span>💰 Claim Coins</span>
+                        </button>
+                    </div>
+                    <div id="claim-result" class="hidden">
+                        <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
+                        <h2 style="color: #34c759; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
+                        <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 22px;" id="reward-amount-display">0</b> coins!</p>
+                        <button class="btn" onclick="resetDropUI()" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
+                            <span>Back to Dashboard</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Tab Bar -->
@@ -978,6 +1050,10 @@
         <div class="tab-item" onclick="switchTab('spin', this)" data-target="spin">
             <span class="tab-icon">🎡</span>
             <span>Spin</span>
+        </div>
+        <div class="tab-item" onclick="switchTab('drop', this)" data-target="drop">
+            <span class="tab-icon">🎁</span>
+            <span>Drop</span>
         </div>
         <div class="tab-item" onclick="switchTab('leaderboard', this)" data-target="leaderboard">
             <span class="tab-icon">🏆</span>
@@ -1030,7 +1106,7 @@
 
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
-        let msgId = urlParams.get('msg_id');
+        let msgId = urlParams.get('msg_id') || '0';
         let defaultTab = urlParams.get('tab');
         let chatIdUrl = urlParams.get('chat_id');
 
@@ -1040,14 +1116,73 @@
                 const parts = startParam.split('_');
                 msgId = parts[1];
                 chatIdUrl = parts[2];
+                defaultTab = 'drop';
             } else if (startParam === 'spin') {
                 defaultTab = 'spin';
             } else if (startParam === 'shop') {
                 defaultTab = 'shop';
+            } else if (startParam === 'drop') {
+                defaultTab = 'drop';
             }
         }
 
         let currentLbSort = 'coins';
+
+        function updateDropCooldownUI(data) {
+            const btn = document.getElementById('watch-btn');
+            const status = document.getElementById('status');
+            if (!btn) return;
+
+            if (data.dropCooldown && data.dropCooldown > 0) {
+                btn.disabled = true;
+                btn.classList.remove('pulse');
+                const remainingMin = Math.ceil(data.dropCooldown / (60 * 1000));
+                btn.innerHTML = `<span>⏳ Available in ${remainingMin}m</span>`;
+                if (status) {
+                    status.innerText = "COOLDOWN ACTIVE";
+                    status.style.color = "var(--hint)";
+                }
+            } else {
+                btn.disabled = false;
+                btn.classList.add('pulse');
+                btn.innerHTML = `<span>📺 Watch & Claim Drop</span>`;
+                if (status) {
+                    status.innerText = "Ready to unlock!";
+                    status.style.color = "var(--hint)";
+                }
+            }
+        }
+
+        function checkDropCooldown() {
+            fetch(`/api/user-stats?user_id=${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const coinEl = document.getElementById('stat-coins');
+                    if (coinEl) coinEl.innerText = data.coins.toLocaleString();
+                    updateDropCooldownUI(data);
+                })
+                .catch(err => console.error(err));
+        }
+
+        function resetDropUI() {
+            document.getElementById('success-box').classList.add('hidden');
+            document.getElementById('ad-container').classList.remove('hidden');
+            document.getElementById('claim-result').classList.add('hidden');
+            document.getElementById('success-prompt').classList.remove('hidden');
+            
+            const claimBtn = document.getElementById('claim-btn');
+            if (claimBtn) {
+                claimBtn.disabled = false;
+                const btnSpan = claimBtn.querySelector('span');
+                if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
+                else claimBtn.innerText = '💰 Claim Coins';
+            }
+            
+            checkDropCooldown();
+            
+            const homeTab = document.querySelector('.tab-item[data-target="home"]');
+            if (homeTab) switchTab('home', homeTab);
+        }
 
         // Initial Data Fetch
         fetch(`/api/user-stats?user_id=${userId}`)
@@ -1059,21 +1194,6 @@
                 document.getElementById('stat-coins').innerText = data.coins.toLocaleString();
                 document.getElementById('stat-wins').innerText = data.wins;
 
-                if (data.dropCooldown && data.dropCooldown > 0) {
-                    const btn = document.getElementById('watch-btn');
-                    if (btn) {
-                        btn.disabled = true;
-                        btn.classList.remove('pulse');
-                        const remainingMin = Math.ceil(data.dropCooldown / (60 * 1000));
-                        btn.innerHTML = `<span>⏳ Available in ${remainingMin}m</span>`;
-                        const status = document.getElementById('status');
-                        if (status) {
-                            status.innerText = "COOLDOWN ACTIVE";
-                            status.style.color = "var(--hint)";
-                        }
-                    }
-                }
-
                 if (data.spinCooldown && data.spinCooldown > 0) {
                     const freeBtn = document.getElementById('free-spin-btn');
                     if (freeBtn) {
@@ -1084,6 +1204,8 @@
                         freeBtn.innerHTML = `<span>⏳ Available in ${remainingHrs}h</span>`;
                     }
                 }
+
+                updateDropCooldownUI(data);
 
                 // Handle default tab routing
                 if (defaultTab) {
@@ -1106,6 +1228,8 @@
                 loadLeaderboard(currentLbSort);
             } else if (tab === 'shop') {
                 loadShop();
+            } else if (tab === 'drop') {
+                checkDropCooldown();
             }
         }
 
@@ -1219,11 +1343,14 @@
         const claimBtn = document.getElementById('claim-btn');
         if (claimBtn) {
             claimBtn.onclick = (e) => {
-                const btn = e.target;
+                const btn = claimBtn;
                 if (btn.disabled) return;
                 
                 btn.disabled = true;
-                btn.innerHTML = 'Claiming... ⏳';
+                const btnSpan = btn.querySelector('span');
+                if (btnSpan) btnSpan.innerText = 'Claiming... ⏳';
+                else btn.innerText = 'Claiming... ⏳';
+                
                 try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
                 
                 const chatId = chatIdUrl || userId;
@@ -1232,18 +1359,24 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            document.getElementById('success-box').innerHTML = `
-                                <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
-                                <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
-                                <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 20px;">${data.amount}</b> coins!</p>
-                                <button class="btn" onclick="tg.close()">Close</button>
-                            `;
+                            document.getElementById('reward-amount-display').innerText = data.amount.toLocaleString();
+                            document.getElementById('success-prompt').classList.add('hidden');
+                            document.getElementById('claim-result').classList.remove('hidden');
                             try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
                         } else {
-                            tg.close();
+                            btn.disabled = false;
+                            if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
+                            else btn.innerText = '💰 Claim Coins';
+                            tg.showAlert(`Failed to claim: ${data.error || 'unknown error'}`);
                         }
                     })
-                    .catch(() => tg.close());
+                    .catch((err) => {
+                        console.error("Claim error:", err);
+                        btn.disabled = false;
+                        if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
+                        else btn.innerText = '💰 Claim Coins';
+                        tg.showAlert('Failed to connect to the server. Please try again.');
+                    });
             };
         }
 
