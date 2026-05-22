@@ -774,6 +774,40 @@ bot.command('fly', async (ctx) => {
     }
 });
 
+bot.command('dice', async (ctx) => {
+    if (!sb.supabase) return ctx.reply("Database disabled.");
+    const userId = ctx.from.id;
+    const args = ctx.message.text.split(' ');
+    const betStr = args[1];
+
+    if (!betStr || isNaN(betStr)) {
+        return ctx.reply("🎲 <b>7 Up 7 Down Dice Game</b>\n\nUsage: /dice &lt;bet_amount&gt;\nExample: /dice 100", { parse_mode: 'HTML' });
+    }
+
+    const bet = parseInt(betStr);
+    if (bet <= 0) {
+        return ctx.reply("❌ Minimum bet is 1 coin.");
+    }
+
+    const profile = await sb.getProfile(userId);
+    if (!profile || (profile.coins || 0) < bet) {
+        return ctx.reply(`❌ Not enough coins! Balance: ${profile?.coins || 0}`);
+    }
+
+    const kb = new InlineKeyboard()
+        .text("Below 7 (2x)", `dice_bet:below:${bet}:${userId}`)
+        .text("Above 7 (2x)", `dice_bet:above:${bet}:${userId}`).row()
+        .text("Exactly 7 (5x)", `dice_bet:exact:${bet}:${userId}`);
+
+    await ctx.reply(
+        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+        `Bet Amount: <b>${bet.toLocaleString()} coins</b>\n` +
+        `Current Balance: <b>${(profile.coins || 0).toLocaleString()} coins</b>\n\n` +
+        `Guess the total sum of 2 rolled dice:`,
+        { parse_mode: 'HTML', reply_markup: kb }
+    );
+});
+
 // --- BLACKJACK SYSTEM ---
 const activeBJ = new Map();
 
@@ -1630,6 +1664,123 @@ bot.on('callback_query:data', async (ctx) => {
   const data = ctx.callbackQuery.data;
   const chatId = ctx.chat.id;
   const user = ctx.from;
+
+  // --- DICE BET CALLBACKS ---
+  if (data.startsWith('dice_bet:')) {
+    const parts = data.split(':');
+    const choice = parts[1]; // 'below', 'exact', 'above'
+    const bet = parseInt(parts[2], 10);
+    const queryUserId = parseInt(parts[3], 10);
+
+    if (user.id !== queryUserId) {
+        return ctx.answerCallbackQuery({ text: "❌ This is not your game!", show_alert: true }).catch(() => {});
+    }
+
+    await ctx.answerCallbackQuery().catch(() => {});
+
+    // Check balance again
+    const profile = await sb.getProfile(user.id);
+    if (!profile || (profile.coins || 0) < bet) {
+        return ctx.editMessageText(`❌ Not enough coins! Balance: ${profile?.coins || 0}`).catch(() => {});
+    }
+
+    // Deduct bet
+    const deduct = await sb.addCoins(user.id, -bet);
+    if (deduct === false) {
+        return ctx.editMessageText("❌ Error processing bet.").catch(() => {});
+    }
+
+    const choiceText = choice === 'below' ? 'Below 7 (2x)' : (choice === 'above' ? 'Above 7 (2x)' : 'Exactly 7 (5x)');
+    
+    // Edit message immediately to clear buttons and show rolling status
+    await ctx.editMessageText(
+        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+        `Choice: <b>${choiceText}</b>\n` +
+        `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
+        `Rolling first dice... 🎲`,
+        { parse_mode: 'HTML' }
+    ).catch(() => {});
+
+    // Send first dice
+    let dice1Val = 1;
+    try {
+        const dice1 = await ctx.replyWithDice({ emoji: '🎲' });
+        dice1Val = dice1.dice.value;
+    } catch (e) {
+        console.error("Dice 1 roll error:", e);
+        dice1Val = Math.floor(Math.random() * 6) + 1;
+    }
+
+    // Wait 1.5 seconds
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Update message for second roll
+    await ctx.editMessageText(
+        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+        `Choice: <b>${choiceText}</b>\n` +
+        `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
+        `Dice 1: <b>${dice1Val}</b>\n` +
+        `Rolling second dice... 🎲`,
+        { parse_mode: 'HTML' }
+    ).catch(() => {});
+
+    // Send second dice
+    let dice2Val = 1;
+    try {
+        const dice2 = await ctx.replyWithDice({ emoji: '🎲' });
+        dice2Val = dice2.dice.value;
+    } catch (e) {
+        console.error("Dice 2 roll error:", e);
+        dice2Val = Math.floor(Math.random() * 6) + 1;
+    }
+
+    // Wait 1.5 seconds
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const total = dice1Val + dice2Val;
+    let won = false;
+    let multiplier = 0;
+    
+    if (choice === 'below' && total < 7) {
+        won = true;
+        multiplier = 2;
+    } else if (choice === 'above' && total > 7) {
+        won = true;
+        multiplier = 2;
+    } else if (choice === 'exact' && total === 7) {
+        won = true;
+        multiplier = 5;
+    }
+
+    let resultText = '';
+    if (won) {
+        const payout = bet * multiplier;
+        await sb.addCoinsInternal(user.id, payout);
+        const profit = payout - bet;
+        
+        resultText = `🎉 <b>You Won!</b>\n\n` +
+                     `📈 Payout: <b>+${payout.toLocaleString()} coins</b> (Net: +${profit.toLocaleString()} coins)`;
+    } else {
+        resultText = `❌ <b>You Lost!</b>\n\n` +
+                     `📉 Loss: <b>-${bet.toLocaleString()} coins</b>`;
+    }
+
+    const currentProfile = await sb.getProfile(user.id);
+    const balance = currentProfile ? currentProfile.coins : 0;
+
+    await ctx.editMessageText(
+        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+        `Choice: <b>${choiceText}</b>\n` +
+        `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
+        `🎲 Dice 1: <b>${dice1Val}</b>\n` +
+        `🎲 Dice 2: <b>${dice2Val}</b>\n` +
+        `📊 Total Sum: <b>${total}</b>\n\n` +
+        `${resultText}\n` +
+        `💰 Current Balance: <b>${balance.toLocaleString()} coins</b>`,
+        { parse_mode: 'HTML' }
+    ).catch(() => {});
+    return;
+  }
 
   // --- MY TEAM CALLBACKS ---
   if (data.startsWith('myteam:')) {
@@ -3123,6 +3274,7 @@ if (require.main === module) {
     { command: "spin", description: "🎡 Spin the wheel to win Bhuvneshwar Kumar" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
+    { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },
     { command: "blackjack", description: "Play Blackjack (Alias: /deal)" },
     { command: "deal", description: "Alias for /blackjack" },
     { command: "daily", description: "Claim your daily coin reward" },
