@@ -1708,7 +1708,7 @@ bot.on('callback_query:data', async (ctx) => {
             // Send first dice
             let dice1Val = 1;
             try {
-                const dice1 = await ctx.replyWithDice({ emoji: '🎲' });
+                const dice1 = await ctx.replyWithDice('🎲');
                 dice1Val = dice1.dice.value;
             } catch (e) {
                 console.error("Dice 1 roll error:", e);
@@ -1731,7 +1731,7 @@ bot.on('callback_query:data', async (ctx) => {
             // Send second dice
             let dice2Val = 1;
             try {
-                const dice2 = await ctx.replyWithDice({ emoji: '🎲' });
+                const dice2 = await ctx.replyWithDice('🎲');
                 dice2Val = dice2.dice.value;
             } catch (e) {
                 console.error("Dice 2 roll error:", e);
