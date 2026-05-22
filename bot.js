@@ -553,7 +553,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win up to <b>10,000 Coins</b>!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win Bhuvneshwar Kumar!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -1146,7 +1146,7 @@ bot.command('leaderboard', async (ctx) => {
 
   const kb = new InlineKeyboard();
   kb.text("● Global", "lb_global_wins").text("Group", "lb_group_wins").row();
-  kb.text("● Wins", "lb_global_wins").text("Coins", "lb_global_coins");
+  kb.text("● Wins", "lb_global_wins").text("Coins", "lb_global_coins").text("Rating", "lb_global_rating");
 
   await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
@@ -1890,14 +1890,14 @@ bot.on('callback_query:data', async (ctx) => {
   if (data.startsWith('lb_')) {
      const parts = data.split('_'); // lb_scope_sort
      const scope = parts[1]; // global or group
-     const sortBy = parts[2]; // wins or coins
+     const sortBy = parts[2]; // wins or coins or rating
      
      const isGlobal = scope === 'global';
      const records = isGlobal ? await sb.getGlobalLeaderboard(sortBy) : await sb.getGroupLeaderboard(chatId, sortBy);
      
-     const title = sortBy === 'wins' ? 'Wins' : 'Coins';
+     const title = sortBy === 'wins' ? 'Wins' : (sortBy === 'coins' ? 'Coins' : 'Rating');
      const scopeTitle = isGlobal ? 'Global' : 'Group';
-     const icon = sortBy === 'wins' ? '🏆' : '💰';
+     const icon = sortBy === 'wins' ? '🏆' : (sortBy === 'coins' ? '💰' : '📈');
      const scopeIcon = isGlobal ? '🌍' : '🏠';
      
      let text = `${scopeIcon} <b>${scopeTitle} Top 10 — ${title}</b> ${scopeIcon}\n\n`;
@@ -1909,8 +1909,10 @@ bot.on('callback_query:data', async (ctx) => {
            if (sortBy === 'wins') {
                const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
                text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
-           } else {
+           } else if (sortBy === 'coins') {
                text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.coins} Coins 💰\n`;
+           } else if (sortBy === 'rating') {
+               text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.rating || 0} Rating 📈\n`;
            }
         });
      }
@@ -1928,7 +1930,8 @@ bot.on('callback_query:data', async (ctx) => {
      
      // Sort Selector Row
      kb.text(sortBy === 'wins' ? "● Wins" : "Wins", `lb_${scope}_wins`)
-       .text(sortBy === 'coins' ? "● Coins" : "Coins", `lb_${scope}_coins`);
+       .text(sortBy === 'coins' ? "● Coins" : "Coins", `lb_${scope}_coins`)
+       .text(sortBy === 'rating' ? "● Rating" : "Rating", `lb_${scope}_rating`);
        
      try {
        await ctx.editMessageText(text, { reply_markup: kb, parse_mode: 'HTML' });
@@ -2881,9 +2884,30 @@ app.get('/api/spin', async (req, res) => {
 
         const amount = getRandomSpinReward();
         const isJackpot = amount >= 10000;
-        const newBal = await sb.addCoins(userId, amount);
+        let wonPlayer = false;
+        let alreadyOwned = false;
+        let newBal = 0;
 
-        res.json({ success: true, amount, isJackpot, newBal });
+        if (isJackpot) {
+            const bhuviId = '430ed266-0662-4012-835a-4591f071e143';
+            const awardRes = await sb.awardPlayer(userId, bhuviId, 'cricket');
+            if (awardRes.success) {
+                wonPlayer = true;
+                if (awardRes.alreadyOwned) {
+                    alreadyOwned = true;
+                    newBal = await sb.addCoins(userId, amount);
+                } else {
+                    const profile = await sb.getProfile(userId);
+                    newBal = profile ? (profile.coins || 0) : 0;
+                }
+            } else {
+                newBal = await sb.addCoins(userId, amount);
+            }
+        } else {
+            newBal = await sb.addCoins(userId, amount);
+        }
+
+        res.json({ success: true, amount, isJackpot, wonPlayer, alreadyOwned, newBal });
     } catch (error) {
         console.error('Spin error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
@@ -2994,6 +3018,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
+    { command: "spin", description: "🎡 Spin the wheel to win Bhuvneshwar Kumar" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "blackjack", description: "Play Blackjack (Alias: /deal)" },

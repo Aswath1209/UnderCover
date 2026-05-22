@@ -963,7 +963,7 @@
         <div id="view-spin" class="view">
             <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
                 <h1 style="margin: 0 0 8px 0; font-size: 28px;">Lucky Spin</h1>
-                <p style="color: var(--hint); margin: 0; font-size: 15px;">Spin the wheel to win up to 10,000 coins!</p>
+                <p style="color: var(--hint); margin: 0; font-size: 15px;">Spin the wheel to win Bhuvneshwar Kumar!</p>
             </div>
 
             <div class="wheel-container">
@@ -978,7 +978,7 @@
                     <div class="slice-text" data-i="6">100</div>
                     <div class="slice-text" data-i="7">500</div>
                     <div class="slice-text" data-i="8">100</div>
-                    <div class="slice-text" data-i="9">10k</div>
+                    <div class="slice-text" data-i="9">Bhuvi</div>
                 </div>
                 <div class="wheel-center">💎</div>
             </div>
@@ -1702,7 +1702,14 @@
                         wheel.style.transform = `rotate(${currentRotation}deg)`;
 
                         setTimeout(() => {
-                            if (data.isJackpot) {
+                            if (data.wonPlayer) {
+                                try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                                if (data.alreadyOwned) {
+                                    status.innerHTML = `<span style="color:#FFD700; font-size:16px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 10px rgba(255,215,0,0.5);">🎉 JACKPOT! Won Bhuvneshwar Kumar! <br><span style="font-size:13px; color:#aaa;">(Already owned, got 10,000 Coins)</span> 🎉</span>`;
+                                } else {
+                                    status.innerHTML = `<span style="color:#FFD700; font-size:18px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 15px #ffd700;">🎉 JACKPOT! Won Bhuvneshwar Kumar! 🎉</span>`;
+                                }
+                            } else if (data.isJackpot) {
                                 try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
                                 status.innerHTML = `<span style="color:#FFD700; font-size:20px; animation: pulse 1s infinite;">🎉 JACKPOT! ${data.amount} COINS! 🎉</span>`;
                             } else {
