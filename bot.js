@@ -3056,12 +3056,14 @@ app.get('/api/reward', async (req, res) => {
         pendingReminders.set(userId, Date.now() + (60 * 60 * 1000));
         
         // 5. Edit Bot Message automatically (Removes the button)
-        const profile = await sb.getProfile(userId);
-        const userName = profile ? escapeHTML(profile.first_name) : "User";
-        await bot.api.editMessageText(chatId, msgId, 
-            `✅ <b>Mystery Drop Claimed!</b>\n\n<a href="tg://user?id=${userId}">${userName}</a> earned <b>${amount}</b> coins!`,
-            { parse_mode: 'HTML' }
-        ).catch(e => console.error("Edit failed:", e));
+        if (msgId && msgId !== 0) {
+            const profile = await sb.getProfile(userId);
+            const userName = profile ? escapeHTML(profile.first_name) : "User";
+            await bot.api.editMessageText(chatId, msgId, 
+                `✅ <b>Mystery Drop Claimed!</b>\n\n<a href="tg://user?id=${userId}">${userName}</a> earned <b>${amount}</b> coins!`,
+                { parse_mode: 'HTML' }
+            ).catch(e => console.error("Edit failed:", e));
+        }
 
         res.json({ success: true, amount, newBal });
     } catch (error) {
