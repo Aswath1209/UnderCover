@@ -144,8 +144,20 @@ async function getProfile(userId) {
   return data;
 }
 
+const leaderboardCache = new Map();
+
 async function getGlobalLeaderboard(sortBy = 'wins') {
   if (!supabase) return [];
+  
+  const now = Date.now();
+  if (leaderboardCache.has(sortBy)) {
+    const cached = leaderboardCache.get(sortBy);
+    if (now - cached.timestamp < 30000) {
+      return cached.data;
+    }
+  }
+
+  let result = [];
   if (sortBy === 'rating') {
     const { data: profiles } = await supabase.from('profiles').select('*');
     if (!profiles) return [];
@@ -168,10 +180,14 @@ async function getGlobalLeaderboard(sortBy = 'wins') {
     });
     
     profiles.sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.coins - a.coins);
-    return profiles.slice(0, 10);
+    result = profiles.slice(0, 10);
+  } else {
+    const { data } = await supabase.from('profiles').select('*').order(sortBy, { ascending: false }).limit(10);
+    result = data || [];
   }
-  const { data } = await supabase.from('profiles').select('*').order(sortBy, { ascending: false }).limit(10);
-  return data;
+
+  leaderboardCache.set(sortBy, { timestamp: now, data: result });
+  return result;
 }
 
 async function getGroupLeaderboard(chatId, sortBy = 'wins') {
@@ -394,6 +410,8 @@ async function getAllUserIds() {
 const userCache = new Set();
 async function ensureUser(userId, firstName) {
   if (!supabase || !userId) return;
+  if (userCache.has(userId)) return;
+
   const release = await acquireLock(userId);
   try {
     const { data: profile } = await supabase.from('profiles').select('first_name').eq('user_id', userId).single();
@@ -403,7 +421,10 @@ async function ensureUser(userId, firstName) {
         // Update name if it's one of the placeholders or if it has changed
         await supabase.from('profiles').update({ first_name: firstName }).eq('user_id', userId);
     }
-  } catch (e) {} finally {
+    userCache.add(userId);
+  } catch (e) {
+    console.error("ensureUser error:", e);
+  } finally {
     releaseLock(release);
   }
 }
