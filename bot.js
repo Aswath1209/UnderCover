@@ -969,6 +969,87 @@ bot.command('quit', async (ctx) => {
 
 // --- Admin Broadcast Commands ---
 
+function convertTelegramToHtml(text, entities) {
+    if (!entities || entities.length === 0) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
+    const startTags = Array.from({ length: text.length + 1 }, () => []);
+    const endTags = Array.from({ length: text.length + 1 }, () => []);
+    
+    entities.forEach(ent => {
+        let startTag = '';
+        let endTag = '';
+        switch (ent.type) {
+            case 'bold':
+                startTag = '<b>';
+                endTag = '</b>';
+                break;
+            case 'italic':
+                startTag = '<i>';
+                endTag = '</i>';
+                break;
+            case 'underline':
+                startTag = '<u>';
+                endTag = '</u>';
+                break;
+            case 'strikethrough':
+                startTag = '<s>';
+                endTag = '</s>';
+                break;
+            case 'code':
+                startTag = '<code>';
+                endTag = '</code>';
+                break;
+            case 'pre':
+                startTag = '<pre>';
+                endTag = '</pre>';
+                break;
+            case 'text_link':
+                startTag = `<a href="${ent.url}">`;
+                endTag = '</a>';
+                break;
+            case 'spoiler':
+                startTag = '<tg-spoiler>';
+                endTag = '</tg-spoiler>';
+                break;
+            case 'blockquote':
+                startTag = '<blockquote>';
+                endTag = '</blockquote>';
+                break;
+        }
+        if (startTag) {
+            startTags[ent.offset].push({ tag: startTag, len: ent.length });
+            endTags[ent.offset + ent.length].push({ tag: endTag, len: ent.length });
+        }
+    });
+    
+    let result = '';
+    for (let i = 0; i <= text.length; i++) {
+        const closing = endTags[i];
+        if (closing && closing.length > 0) {
+            closing.sort((a, b) => a.len - b.len);
+            closing.forEach(c => result += c.tag);
+        }
+        
+        const opening = startTags[i];
+        if (opening && opening.length > 0) {
+            opening.sort((a, b) => b.len - a.len);
+            opening.forEach(o => result += o.tag);
+        }
+        
+        if (i < text.length) {
+            const char = text[i];
+            if (char === '<') result += '&lt;';
+            else if (char === '>') result += '&gt;';
+            else if (char === '&') result += '&amp;';
+            else result += char;
+        }
+    }
+    
+    return result;
+}
+
 async function sendBroadcast(ctx, targetIds, messageText, replyMessageId) {
     let success = 0;
     let failed = 0;
@@ -1029,10 +1110,31 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   if (!ADMIN_IDS.includes(ctx.from.id)) return;
   
   const cmd = ctx.message.text.split(' ')[0].replace('/', '').split('@')[0];
-  const broadcastMsg = ctx.message.text.split(' ').slice(1).join(' ');
+  const match = ctx.message.text.match(/^\/\S+\s*/);
+  const offsetShift = match ? match[0].length : 0;
+  const broadcastMsgText = ctx.message.text.slice(offsetShift);
+  
+  const adjustedEntities = [];
+  if (ctx.message.entities) {
+      ctx.message.entities.forEach(ent => {
+          if (ent.offset + ent.length <= offsetShift) return;
+          
+          const newOffset = Math.max(0, ent.offset - offsetShift);
+          const newLength = ent.offset >= offsetShift ? ent.length : ent.length - (offsetShift - ent.offset);
+          if (newLength > 0) {
+              adjustedEntities.push({
+                  ...ent,
+                  offset: newOffset,
+                  length: newLength
+              });
+          }
+      });
+  }
+  
+  const broadcastMsg = convertTelegramToHtml(broadcastMsgText, adjustedEntities);
   const replyMsg = ctx.message.reply_to_message;
   
-  if (!broadcastMsg && !replyMsg) {
+  if (!broadcastMsgText && !replyMsg) {
       return ctx.reply(`❌ Please provide a message.\n\n<b>Usage 1:</b> /${cmd} Hello world!\n<b>Usage 2:</b> Reply to ANY message (with bold, images, etc.) with /${cmd} to preserve exact formatting!`, { parse_mode: 'HTML' });
   }
   
