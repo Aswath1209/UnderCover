@@ -1701,84 +1701,93 @@ bot.on('callback_query:data', async (ctx) => {
         { parse_mode: 'HTML' }
     ).catch(() => {});
 
-    // Send first dice
-    let dice1Val = 1;
-    try {
-        const dice1 = await ctx.replyWithDice({ emoji: '🎲' });
-        dice1Val = dice1.dice.value;
-    } catch (e) {
-        console.error("Dice 1 roll error:", e);
-        dice1Val = Math.floor(Math.random() * 6) + 1;
-    }
+    // Run the rolling animation and result declaration in the background
+    // to allow the webhook response to be sent back to Telegram immediately (HTTP 200).
+    (async () => {
+        try {
+            // Send first dice
+            let dice1Val = 1;
+            try {
+                const dice1 = await ctx.replyWithDice({ emoji: '🎲' });
+                dice1Val = dice1.dice.value;
+            } catch (e) {
+                console.error("Dice 1 roll error:", e);
+                dice1Val = Math.floor(Math.random() * 6) + 1;
+            }
 
-    // Wait 1.5 seconds
-    await new Promise(resolve => setTimeout(resolve, 1500));
+            // Wait 1.5 seconds
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Update message for second roll
-    await ctx.editMessageText(
-        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
-        `Choice: <b>${choiceText}</b>\n` +
-        `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
-        `Dice 1: <b>${dice1Val}</b>\n` +
-        `Rolling second dice... 🎲`,
-        { parse_mode: 'HTML' }
-    ).catch(() => {});
+            // Update message for second roll
+            await ctx.editMessageText(
+                `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+                `Choice: <b>${choiceText}</b>\n` +
+                `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
+                `Dice 1: <b>${dice1Val}</b>\n` +
+                `Rolling second dice... 🎲`,
+                { parse_mode: 'HTML' }
+            ).catch(() => {});
 
-    // Send second dice
-    let dice2Val = 1;
-    try {
-        const dice2 = await ctx.replyWithDice({ emoji: '🎲' });
-        dice2Val = dice2.dice.value;
-    } catch (e) {
-        console.error("Dice 2 roll error:", e);
-        dice2Val = Math.floor(Math.random() * 6) + 1;
-    }
+            // Send second dice
+            let dice2Val = 1;
+            try {
+                const dice2 = await ctx.replyWithDice({ emoji: '🎲' });
+                dice2Val = dice2.dice.value;
+            } catch (e) {
+                console.error("Dice 2 roll error:", e);
+                dice2Val = Math.floor(Math.random() * 6) + 1;
+            }
 
-    // Wait 1.5 seconds
-    await new Promise(resolve => setTimeout(resolve, 1500));
+            // Wait 1.5 seconds
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const total = dice1Val + dice2Val;
-    let won = false;
-    let multiplier = 0;
-    
-    if (choice === 'below' && total < 7) {
-        won = true;
-        multiplier = 2;
-    } else if (choice === 'above' && total > 7) {
-        won = true;
-        multiplier = 2;
-    } else if (choice === 'exact' && total === 7) {
-        won = true;
-        multiplier = 5;
-    }
+            const total = dice1Val + dice2Val;
+            let won = false;
+            let multiplier = 0;
+            
+            if (choice === 'below' && total < 7) {
+                won = true;
+                multiplier = 2;
+            } else if (choice === 'above' && total > 7) {
+                won = true;
+                multiplier = 2;
+            } else if (choice === 'exact' && total === 7) {
+                won = true;
+                multiplier = 5;
+            }
 
-    let resultText = '';
-    if (won) {
-        const payout = bet * multiplier;
-        await sb.addCoinsInternal(user.id, payout);
-        const profit = payout - bet;
-        
-        resultText = `🎉 <b>You Won!</b>\n\n` +
-                     `📈 Payout: <b>+${payout.toLocaleString()} coins</b> (Net: +${profit.toLocaleString()} coins)`;
-    } else {
-        resultText = `❌ <b>You Lost!</b>\n\n` +
-                     `📉 Loss: <b>-${bet.toLocaleString()} coins</b>`;
-    }
+            let resultText = '';
+            if (won) {
+                const payout = bet * multiplier;
+                await sb.addCoinsInternal(user.id, payout);
+                const profit = payout - bet;
+                
+                resultText = `🎉 <b>You Won!</b>\n\n` +
+                             `📈 Payout: <b>+${payout.toLocaleString()} coins</b> (Net: +${profit.toLocaleString()} coins)`;
+            } else {
+                resultText = `❌ <b>You Lost!</b>\n\n` +
+                             `📉 Loss: <b>-${bet.toLocaleString()} coins</b>`;
+            }
 
-    const currentProfile = await sb.getProfile(user.id);
-    const balance = currentProfile ? currentProfile.coins : 0;
+            const currentProfile = await sb.getProfile(user.id);
+            const balance = currentProfile ? currentProfile.coins : 0;
 
-    await ctx.editMessageText(
-        `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
-        `Choice: <b>${choiceText}</b>\n` +
-        `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
-        `🎲 Dice 1: <b>${dice1Val}</b>\n` +
-        `🎲 Dice 2: <b>${dice2Val}</b>\n` +
-        `📊 Total Sum: <b>${total}</b>\n\n` +
-        `${resultText}\n` +
-        `💰 Current Balance: <b>${balance.toLocaleString()} coins</b>`,
-        { parse_mode: 'HTML' }
-    ).catch(() => {});
+            await ctx.editMessageText(
+                `🎲 <b>7 Up 7 Down Dice Game</b>\n\n` +
+                `Choice: <b>${choiceText}</b>\n` +
+                `Bet: <b>${bet.toLocaleString()} coins</b>\n\n` +
+                `🎲 Dice 1: <b>${dice1Val}</b>\n` +
+                `🎲 Dice 2: <b>${dice2Val}</b>\n` +
+                `📊 Total Sum: <b>${total}</b>\n\n` +
+                `${resultText}\n` +
+                `💰 Current Balance: <b>${balance.toLocaleString()} coins</b>`,
+                { parse_mode: 'HTML' }
+            ).catch(() => {});
+        } catch (err) {
+            console.error("Error in dice rolling thread:", err);
+        }
+    })();
+
     return;
   }
 
