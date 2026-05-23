@@ -501,6 +501,9 @@ bot.command('sell', async (ctx) => {
 
     // Exactly one player match
     const player = matches[0];
+    if (player.id === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
+      return ctx.reply("❌ <b>KL Rahul</b> is a special Grand Prize player and cannot be sold!", { parse_mode: 'HTML' });
+    }
     const sellPrice = Math.round(player.buy_price * 0.75);
 
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
@@ -2019,6 +2022,10 @@ bot.on('callback_query:data', async (ctx) => {
     
     const sportAbbr = parts[1]; // 'c' or 'f'
     const playerId = parts[2];
+    if (playerId === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
+      await ctx.editMessageText("❌ This special Grand Prize player cannot be sold.", { reply_markup: null }).catch(() => {});
+      return;
+    }
     const sport = sportAbbr === 'c' ? 'cricket' : 'football';
 
     try {
