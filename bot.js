@@ -49,8 +49,8 @@ function getRandomSpinReward() {
   if (rand < 40) return 100; // 40%
   if (rand < 68) return 500; // 28%
   if (rand < 88) return 1000; // 20%
-  if (rand < 98) return 2000; // 10%
-  return 10000; // 2% Jackpot
+  if (rand < 98.7) return 2000; // 10.7%
+  return 10000; // 1.3% Jackpot
 }
 
 function getRandomReward() {
