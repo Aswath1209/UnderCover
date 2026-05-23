@@ -501,17 +501,19 @@ bot.command('sell', async (ctx) => {
 
     // Exactly one player match
     const player = matches[0];
+    let sellPrice = Math.round(player.buy_price * 0.75);
+    let sellPriceLabel = "75% value";
     if (player.id === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
-      return ctx.reply("❌ <b>KL Rahul</b> is a special Grand Prize player and cannot be sold!", { parse_mode: 'HTML' });
+      sellPrice = 10000;
+      sellPriceLabel = "special jackpot rate";
     }
-    const sellPrice = Math.round(player.buy_price * 0.75);
 
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
                  `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
                  `• OVR: <b>${player.ovr}</b>\n` +
                  `• Sport: <b>${player.sport === 'cricket' ? '🏏 Cricket' : '⚽ Football'}</b>\n` +
                  `• Original Price: 💰 <b>${player.buy_price.toLocaleString()}</b>\n\n` +
-                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (75% value).\n\n` +
+                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (${sellPriceLabel}).\n\n` +
                  `<i>Do you want to proceed?</i>`;
 
     const kb = new InlineKeyboard()
@@ -2022,10 +2024,6 @@ bot.on('callback_query:data', async (ctx) => {
     
     const sportAbbr = parts[1]; // 'c' or 'f'
     const playerId = parts[2];
-    if (playerId === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
-      await ctx.editMessageText("❌ This special Grand Prize player cannot be sold.", { reply_markup: null }).catch(() => {});
-      return;
-    }
     const sport = sportAbbr === 'c' ? 'cricket' : 'football';
 
     try {
@@ -2045,7 +2043,10 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
 
-      const sellPrice = Math.round(player.buy_price * 0.75);
+      let sellPrice = Math.round(player.buy_price * 0.75);
+      if (player.id === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
+        sellPrice = 10000;
+      }
       const result = await sb.sellPlayer(userId, player.id, sport, sellPrice);
       
       if (result.success) {
