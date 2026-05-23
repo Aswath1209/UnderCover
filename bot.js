@@ -1084,7 +1084,7 @@ function convertTelegramToHtml(text, entities) {
     return result;
 }
 
-async function sendBroadcast(ctx, targetIds, messageText, replyMessageId) {
+async function sendBroadcast(ctx, targetIds, messageText, replyMessageId, copyCurrentMessageWithCaption = null) {
     let success = 0;
     let failed = 0;
     const total = targetIds.length;
@@ -1104,6 +1104,13 @@ async function sendBroadcast(ctx, targetIds, messageText, replyMessageId) {
             if (replyMessageId) {
                 // Using copyMessage perfectly preserves formatting, bold, quotes, links, and even photos/videos!
                 const res = await bot.api.copyMessage(targetId, ctx.chat.id, replyMessageId);
+                sentMsgId = res.message_id;
+            } else if (copyCurrentMessageWithCaption) {
+                // Copy the uploaded media message but override caption to strip command prefix
+                const res = await bot.api.copyMessage(targetId, ctx.chat.id, copyCurrentMessageWithCaption, {
+                    caption: messageText,
+                    parse_mode: 'HTML'
+                });
                 sentMsgId = res.message_id;
             } else {
                 // Standard text broadcast, no default "Announcement" prefix
@@ -1140,17 +1147,26 @@ async function sendBroadcast(ctx, targetIds, messageText, replyMessageId) {
     } catch (e) {}
 }
 
-bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) => {
+bot.on(['message:text', 'message:caption'], async (ctx, next) => {
+  const rawText = ctx.message.text || ctx.message.caption || '';
+  if (!rawText.startsWith('/')) return next();
+  
+  const cmd = rawText.split(/\s+/)[0].replace('/', '').split('@')[0];
+  if (!['broadcast', 'broadcast_groups', 'broadcast_users'].includes(cmd)) {
+      return next();
+  }
+  
   if (!ADMIN_IDS.includes(ctx.from.id)) return;
   
-  const cmd = ctx.message.text.split(' ')[0].replace('/', '').split('@')[0];
-  const match = ctx.message.text.match(/^\/\S+\s*/);
+  const match = rawText.match(/^\/\S+\s*/);
   const offsetShift = match ? match[0].length : 0;
-  const broadcastMsgText = ctx.message.text.slice(offsetShift);
+  const broadcastMsgText = rawText.slice(offsetShift);
   
+  const isCaption = !ctx.message.text && ctx.message.caption;
+  const rawEntities = isCaption ? ctx.message.caption_entities : ctx.message.entities;
   const adjustedEntities = [];
-  if (ctx.message.entities) {
-      ctx.message.entities.forEach(ent => {
+  if (rawEntities) {
+      rawEntities.forEach(ent => {
           if (ent.offset + ent.length <= offsetShift) return;
           
           const newOffset = Math.max(0, ent.offset - offsetShift);
@@ -1168,8 +1184,8 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   const broadcastMsg = convertTelegramToHtml(broadcastMsgText, adjustedEntities);
   const replyMsg = ctx.message.reply_to_message;
   
-  if (!broadcastMsgText && !replyMsg) {
-      return ctx.reply(`❌ Please provide a message.\n\n<b>Usage 1:</b> /${cmd} Hello world!\n<b>Usage 2:</b> Reply to ANY message (with bold, images, etc.) with /${cmd} to preserve exact formatting!`, { parse_mode: 'HTML' });
+  if (!broadcastMsgText && !replyMsg && !isCaption) {
+      return ctx.reply(`❌ Please provide a message.\n\n<b>Usage 1:</b> /${cmd} Hello world!\n<b>Usage 2:</b> Reply to ANY message (with bold, images, etc.) with /${cmd} to preserve exact formatting!\n<b>Usage 3:</b> Upload an image/media and write /${cmd} Your caption here!`, { parse_mode: 'HTML' });
   }
   
   let targetIds = [];
@@ -1188,8 +1204,12 @@ bot.command(['broadcast', 'broadcast_groups', 'broadcast_users'], async (ctx) =>
   if (targetIds.length === 0) {
       return ctx.reply("❌ No target chats found in database.");
   }
-    sendBroadcast(ctx, targetIds, broadcastMsg, replyMsg ? replyMsg.message_id : null).catch(err => console.error("Broadcast Error:", err));
-    await ctx.reply("✅ <b>Broadcast has been moved to background.</b>\n\nYou can continue using the bot while it sends messages.", { parse_mode: 'HTML' });
+  
+  const copyCurrent = (isCaption && !replyMsg) ? ctx.message.message_id : null;
+  sendBroadcast(ctx, targetIds, broadcastMsg, replyMsg ? replyMsg.message_id : null, copyCurrent)
+      .catch(err => console.error("Broadcast Error:", err));
+      
+  await ctx.reply("✅ <b>Broadcast has been moved to background.</b>\n\nYou can continue using the bot while it sends messages.", { parse_mode: 'HTML' });
 });
 
 bot.command(['feedback', 'report'], async (ctx) => {
