@@ -459,19 +459,19 @@
             height: 100%;
             border-radius: 50%;
             background: conic-gradient(from -90deg,
-                #1a1a2e 0deg 36deg,
-                #4facfe 36deg 72deg,
-                #1a1a2e 72deg 108deg,
-                #9c27b0 108deg 144deg,
-                #1a1a2e 144deg 180deg,
-                #ff3b30 180deg 216deg,
-                #1a1a2e 216deg 252deg,
-                #34c759 252deg 288deg,
-                #1a1a2e 288deg 324deg,
-                #ffd700 324deg 360deg
+                #1a1a2e 0deg 35.5deg, #111 35.5deg 36deg,
+                #4facfe 36deg 71.5deg, #111 71.5deg 72deg,
+                #1a1a2e 72deg 107.5deg, #111 107.5deg 108deg,
+                #9c27b0 108deg 143.5deg, #111 143.5deg 144deg,
+                #1a1a2e 144deg 179.5deg, #111 179.5deg 180deg,
+                #ff3b30 180deg 215.5deg, #111 215.5deg 216deg,
+                #1a1a2e 216deg 251.5deg, #111 251.5deg 252deg,
+                #34c759 252deg 287.5deg, #111 287.5deg 288deg,
+                #1a1a2e 288deg 323.5deg, #111 323.5deg 324deg,
+                #ffd700 324deg 359.5deg, #111 359.5deg 360deg
             );
-            border: 8px solid #111;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.8);
+            border: 8px solid #222;
+            box-shadow: 0 0 35px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.8);
             transition: transform 5s cubic-bezier(0.15, 0.85, 0.15, 1);
         }
         .wheel-pointer {
@@ -486,23 +486,62 @@
             border-top: 40px solid #ffd700;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
             z-index: 10;
+            transform-origin: 50% 0%;
+        }
+        .wheel-pointer.tick {
+            animation: pointer-click 0.15s ease-out;
         }
         .wheel-center {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            background: radial-gradient(circle, #4facfe, #0f0c29);
+            width: 54px;
+            height: 54px;
+            background: radial-gradient(circle, #ffd700, #b78708, #111);
             border-radius: 50%;
-            border: 4px solid #fff;
+            border: 4px solid #ffd700;
             box-shadow: 0 0 15px rgba(0,0,0,0.8);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 26px;
+            font-size: 20px;
             z-index: 5;
+        }
+        .wheel-lights {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 3;
+        }
+        .light {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            margin-top: -4px;
+            margin-left: -4px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 6px #fff, 0 0 12px #ffd700;
+            animation: light-flash 0.6s infinite alternate;
+        }
+        .light:nth-child(even) {
+            animation-delay: 0.3s;
+            background: #ffd700;
+        }
+        @keyframes light-flash {
+            0% { opacity: 0.4; filter: brightness(0.8); }
+            100% { opacity: 1; filter: brightness(1.3); box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; }
+        }
+        @keyframes pointer-click {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            50% { transform: translateX(-50%) rotate(-15deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
         }
         .slice-text {
             position: absolute;
@@ -534,76 +573,48 @@
         .slice-text[data-i="6"] { transform: rotate(234deg); }
         .slice-text[data-i="7"] { transform: rotate(270deg); }
         .slice-text[data-i="8"] { transform: rotate(306deg); }
-        .slice-text[data-i="9"] { transform: rotate(342deg); font-size: 13px; color: #fffacd; text-shadow: 0 0 10px #ffd700, 2px 2px 4px rgba(0,0,0,0.8); }
+        .slice-text[data-i="9"] { 
+            transform: rotate(342deg); 
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 16px;
+        }
+        .slice-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 10px #ffd700;
+            transform: rotate(-342deg); /* Counter-rotate to stay upright */
+            object-fit: cover;
+        }
 
-        /* Premium Grand Prize Showcase */
-        .grand-prize-banner {
-            margin: 20px auto 15px auto;
-            padding: 16px;
-            max-width: 320px;
-            text-align: center;
-            border-radius: 16px;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, rgba(26, 26, 46, 0.8) 100%);
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        /* Sleek Minimal Grand Prize Tag */
+        .grand-prize-tag {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px auto 25px auto;
+            padding: 12px 20px;
+            max-width: 280px;
+            border-radius: 30px;
+            background: rgba(255, 215, 0, 0.08);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1), inset 0 0 10px rgba(255, 215, 0, 0.05);
+            font-size: 14px;
+            color: #fff;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
-        .prize-sparkles {
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            color: #ffd700;
-            text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
-            margin-bottom: 12px;
+        .prize-crown {
+            font-size: 20px;
+            animation: crown-float 2s ease-in-out infinite alternate;
         }
-        .grand-prize-card-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .active-prize-card {
-            width: 140px !important;
-            padding: 10px !important;
-            border-radius: 12px !important;
-            transform: scale(1);
-            animation: prizeCardFloat 3s ease-in-out infinite;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3) !important;
-            border: 1px solid rgba(255, 215, 0, 0.4) !important;
-        }
-        .active-prize-card .player-img-container {
-            width: 65px !important;
-            height: 65px !important;
-            margin: 6px auto !important;
-        }
-        .active-prize-card .player-card-name {
-            font-size: 13px !important;
-            margin-top: 4px !important;
-        }
-        .active-prize-card .player-rating {
-            font-size: 9px !important;
-            padding: 1px 4px !important;
-        }
-        .active-prize-card .player-tier {
-            font-size: 9px !important;
-            padding: 1px 4px !important;
-        }
-        .active-prize-card .player-role-badge {
-            font-size: 9px !important;
-            padding: 1px 4px !important;
-            margin-top: 4px !important;
-        }
-        .prize-desc {
-            font-size: 12px;
-            color: var(--hint);
-            line-height: 1.4;
-            margin-top: 6px;
-        }
-        @keyframes prizeCardFloat {
-            0% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-6px) rotate(1deg); }
-            100% { transform: translateY(0px) rotate(0deg); }
+        @keyframes crown-float {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(-3px) scale(1.1); }
         }
 
         /* Player Shop CSS */
@@ -1038,6 +1049,18 @@
 
             <div class="wheel-container">
                 <div class="wheel-pointer"></div>
+                <div class="wheel-lights">
+                    <div class="light" style="transform: rotate(0deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(36deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(72deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(108deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(144deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(180deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(216deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(252deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(288deg) translate(146px);"></div>
+                    <div class="light" style="transform: rotate(324deg) translate(146px);"></div>
+                </div>
                 <div class="wheel" id="spin-wheel">
                     <div class="slice-text" data-i="0">100</div>
                     <div class="slice-text" data-i="1">500</div>
@@ -1048,33 +1071,17 @@
                     <div class="slice-text" data-i="6">100</div>
                     <div class="slice-text" data-i="7">500</div>
                     <div class="slice-text" data-i="8">100</div>
-                    <div class="slice-text" data-i="9">👑 KL Rahul</div>
-                </div>
-                <div class="wheel-center">💎</div>
-            </div>
-
-            <!-- Premium Grand Prize Showcase -->
-            <div class="grand-prize-banner glass-panel">
-                <div class="prize-sparkles">✨ GRAND PRIZE ✨</div>
-                <div class="grand-prize-card-wrapper">
-                    <div class="player-card glass-panel card-gold active-prize-card" style="margin: 0;">
-                        <div>
-                            <div class="player-badge-container" style="display: flex; gap: 4px;">
-                                <span class="player-rating" style="background: #A855F7;">91 OVR</span>
-                                <span class="player-tier tier-gold">Gold</span>
-                            </div>
-                            <div class="player-img-container gold">
-                                <img class="player-img" src="/assets/players/kl_rahul.jpg" alt="KL Rahul">
-                            </div>
-                            <div class="player-card-name">KL Rahul</div>
-                            <div class="player-sub">🇮🇳 India</div>
-                            <div class="player-role-badge" style="background: #F59E0B20; color: #F59E0B; border: 1px solid #F59E0B30; display: inline-block;">
-                                WK
-                            </div>
-                        </div>
+                    <div class="slice-text" data-i="9">
+                        <img class="slice-img" src="/assets/players/kl_rahul.jpg" alt="KL">
                     </div>
                 </div>
-                <div class="prize-desc">Spin the lucky wheel for a chance to win KL Rahul!</div>
+                <div class="wheel-center">⭐</div>
+            </div>
+
+            <!-- Premium Grand Prize Showcase Tag -->
+            <div class="grand-prize-tag">
+                <span class="prize-crown">👑</span>
+                <span class="prize-tag-text">Grand Prize: <b>KL Rahul</b> (91 OVR WK)</span>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
@@ -1793,7 +1800,41 @@
                         currentRotation = nextRotation + targetDegree;
                         
                         const wheel = document.getElementById('spin-wheel');
+                        const pointer = document.querySelector('.wheel-pointer');
                         wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                        // Real-time pointer clicking animation and haptic tick loop
+                        let lastSlice = -1;
+                        const startTime = Date.now();
+                        const duration = 5000;
+                        function checkTick() {
+                            const elapsed = Date.now() - startTime;
+                            if (elapsed >= duration) {
+                                if (pointer) pointer.classList.remove('tick');
+                                return;
+                            }
+                            const style = window.getComputedStyle(wheel);
+                            const matrix = style.transform || style.webkitTransform;
+                            if (matrix && matrix !== 'none') {
+                                const values = matrix.split('(')[1].split(')')[0].split(',');
+                                const a = parseFloat(values[0]);
+                                const b = parseFloat(values[1]);
+                                let angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+                                if (angle < 0) angle += 360;
+                                const currentSlice = Math.floor(angle / 36);
+                                if (currentSlice !== lastSlice) {
+                                    lastSlice = currentSlice;
+                                    if (pointer) {
+                                        pointer.classList.remove('tick');
+                                        void pointer.offsetWidth; // force reflow
+                                        pointer.classList.add('tick');
+                                    }
+                                    try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+                                }
+                            }
+                            requestAnimationFrame(checkTick);
+                        }
+                        requestAnimationFrame(checkTick);
 
                         setTimeout(() => {
                             if (data.wonPlayer) {
