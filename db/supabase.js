@@ -565,13 +565,13 @@ async function checkAndClaimFreeSpin(userId) {
   }
 }
 
-async function checkJackpotClaimed(userId) {
+async function checkJackpotClaimed(userId, jackpotPlayerId) {
   if (!supabase) return false;
   try {
     const { data } = await supabase.from('user_owned_players')
       .select('id')
       .eq('user_id', userId)
-      .eq('player_id', 'kl_rahul_jackpot_claimed')
+      .eq('player_id', `jackpot_claimed_${jackpotPlayerId}`)
       .eq('sport', 'jackpot')
       .maybeSingle();
     return !!data;
@@ -581,12 +581,12 @@ async function checkJackpotClaimed(userId) {
   }
 }
 
-async function recordJackpotClaim(userId) {
+async function recordJackpotClaim(userId, jackpotPlayerId) {
   if (!supabase) return;
   try {
     await supabase.from('user_owned_players').insert({
       user_id: userId,
-      player_id: 'kl_rahul_jackpot_claimed',
+      player_id: `jackpot_claimed_${jackpotPlayerId}`,
       sport: 'jackpot'
     });
   } catch (e) {

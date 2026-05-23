@@ -3173,16 +3173,16 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const hasClaimed = await sb.checkJackpotClaimed(userId);
+            const jackpotPlayerId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
+            const hasClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
             if (hasClaimed) {
                 alreadyOwned = true;
                 newBal = await sb.addCoins(userId, amount);
             } else {
-                const klRahulId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
-                const awardRes = await sb.awardPlayer(userId, klRahulId, 'cricket');
+                const awardRes = await sb.awardPlayer(userId, jackpotPlayerId, 'cricket');
                 if (awardRes.success) {
                     wonPlayer = true;
-                    await sb.recordJackpotClaim(userId);
+                    await sb.recordJackpotClaim(userId, jackpotPlayerId);
                     let userName = "Player";
                     const profile = await sb.getProfile(userId);
                     if (profile) {
