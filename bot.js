@@ -3157,13 +3157,42 @@ app.get('/api/spin', async (req, res) => {
             const awardRes = await sb.awardPlayer(userId, klRahulId, 'cricket');
             if (awardRes.success) {
                 wonPlayer = true;
-                if (awardRes.alreadyOwned) {
-                    alreadyOwned = true;
-                    newBal = await sb.addCoins(userId, amount);
+                let userName = "Player";
+                const profile = await sb.getProfile(userId);
+                if (profile) {
+                    if (profile.first_name) userName = profile.first_name;
+                    if (awardRes.alreadyOwned) {
+                        alreadyOwned = true;
+                        newBal = await sb.addCoins(userId, amount);
+                    } else {
+                        newBal = profile.coins || 0;
+                    }
                 } else {
-                    const profile = await sb.getProfile(userId);
-                    newBal = profile ? (profile.coins || 0) : 0;
+                    try {
+                        const chat = await bot.api.getChat(userId);
+                        if (chat && chat.first_name) userName = chat.first_name;
+                    } catch (e) {}
+                    newBal = 0;
                 }
+
+                // Broadcast jackpot win to all active groups in the background
+                (async () => {
+                    try {
+                        const groupIds = await sb.getAllGroupIds();
+                        const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
+                                        `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
+                                        `Congratulations! 🥳`;
+                        for (const groupId of groupIds) {
+                            try {
+                                await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
+                            } catch (e) {
+                                console.error(`Failed to send jackpot broadcast to group ${groupId}:`, e);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error in jackpot broadcast loop:", err);
+                    }
+                })();
             } else {
                 newBal = await sb.addCoins(userId, amount);
             }
