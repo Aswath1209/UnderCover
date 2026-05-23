@@ -3188,6 +3188,8 @@ app.get('/api/spin', async (req, res) => {
                             } catch (e) {
                                 console.error(`Failed to send jackpot broadcast to group ${groupId}:`, e);
                             }
+                            // 100ms non-blocking delay between sends to yield event loop and avoid Telegram rate limits
+                            await new Promise(resolve => setTimeout(resolve, 100));
                         }
                     } catch (err) {
                         console.error("Error in jackpot broadcast loop:", err);
