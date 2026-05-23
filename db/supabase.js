@@ -11,6 +11,11 @@ if (supabaseUrl && supabaseKey) {
   console.log("WARNING: Supabase URL or Key missing. Database features will be bypassed.");
 }
 
+// --- Player Caching System ---
+let cachedCricketPlayers = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // --- Mutex Lock System ---
 const coinLocks = new Map();
 
@@ -162,7 +167,7 @@ async function getGlobalLeaderboard(sortBy = 'wins') {
     const { data: profiles } = await supabase.from('profiles').select('*');
     if (!profiles) return [];
     const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket');
-    const { data: cricket } = await supabase.from('cricketplayers').select('id, ovr');
+    const cricket = await getCricketPlayers();
     const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
     
     const userPlayers = new Map();
@@ -219,7 +224,7 @@ async function getGroupLeaderboard(chatId, sortBy = 'wins') {
     if (!profiles || profiles.length === 0) return [];
     
     const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket').in('user_id', userIds);
-    const { data: cricket } = await supabase.from('cricketplayers').select('id, ovr');
+    const cricket = await getCricketPlayers();
     const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
     
     const userPlayers = new Map();
@@ -247,7 +252,7 @@ async function getUserGlobalRank(userId, sortBy = 'wins') {
     const { data: allProfiles } = await supabase.from('profiles').select('user_id, wins, coins');
     if (!allProfiles) return null;
     const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket');
-    const { data: cricket } = await supabase.from('cricketplayers').select('id, ovr');
+    const cricket = await getCricketPlayers();
     const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
     
     const userPlayers = new Map();
@@ -299,7 +304,7 @@ async function getUserGroupRank(chatId, userId, sortBy = 'wins') {
     if (!profiles || profiles.length === 0) return null;
     
     const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket').in('user_id', userIds);
-    const { data: cricket } = await supabase.from('cricketplayers').select('id, ovr');
+    const cricket = await getCricketPlayers();
     const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
     
     const userPlayers = new Map();
@@ -577,13 +582,31 @@ async function getUserOwnedPlayers(userId) {
 
 async function getCricketPlayers() {
   if (!supabase) return [];
+  const now = Date.now();
+  if (cachedCricketPlayers && (now - lastCacheTime < CACHE_DURATION)) {
+    return cachedCricketPlayers;
+  }
   try {
-    const { data, error } = await supabase.from('cricketplayers').select('*');
-    if (error) {
-      console.error("Error fetching cricket players:", error);
-      return [];
+    let allPlayers = [];
+    let from = 0;
+    const limit = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from('cricketplayers')
+        .select('*')
+        .range(from, from + limit - 1);
+      if (error) {
+        console.error("Error fetching cricket players range:", error);
+        break;
+      }
+      if (!data || data.length === 0) break;
+      allPlayers.push(...data);
+      if (data.length < limit) break;
+      from += limit;
     }
-    return data || [];
+    cachedCricketPlayers = allPlayers;
+    lastCacheTime = now;
+    return allPlayers;
   } catch (e) {
     console.error("Failed to get cricket players:", e);
     return [];
