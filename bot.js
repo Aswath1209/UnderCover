@@ -3195,21 +3195,16 @@ app.get('/api/spin', async (req, res) => {
                     newBal = 0;
                 }
 
-                // Broadcast jackpot win to all active groups in the background
+                // Broadcast jackpot win to the official group chat in the background
                 (async () => {
                     try {
-                        const groupIds = await sb.getAllGroupIds();
                         const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
                                         `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
                                         `Congratulations! 🥳`;
-                        for (const groupId of groupIds) {
-                            try {
-                                await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
-                            } catch (e) {
-                                console.error(`Failed to send jackpot broadcast to group ${groupId}:`, e);
-                            }
-                            // 100ms non-blocking delay between sends to yield event loop and avoid Telegram rate limits
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                        try {
+                            await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
+                        } catch (e) {
+                            console.error(`Failed to send jackpot broadcast to official group:`, e);
                         }
                     } catch (err) {
                         console.error("Error in jackpot broadcast loop:", err);
