@@ -501,19 +501,14 @@ bot.command('sell', async (ctx) => {
 
     // Exactly one player match
     const player = matches[0];
-    let sellPrice = Math.round(player.buy_price * 0.75);
-    let sellPriceLabel = "75% value";
-    if (player.id === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
-      sellPrice = 10000;
-      sellPriceLabel = "special jackpot rate";
-    }
+    const sellPrice = Math.round(player.buy_price * 0.75);
 
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
                  `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
                  `• OVR: <b>${player.ovr}</b>\n` +
                  `• Sport: <b>${player.sport === 'cricket' ? '🏏 Cricket' : '⚽ Football'}</b>\n` +
                  `• Original Price: 💰 <b>${player.buy_price.toLocaleString()}</b>\n\n` +
-                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (${sellPriceLabel}).\n\n` +
+                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (75% value).\n\n` +
                  `<i>Do you want to proceed?</i>`;
 
     const kb = new InlineKeyboard()
@@ -2043,10 +2038,7 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
 
-      let sellPrice = Math.round(player.buy_price * 0.75);
-      if (player.id === 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9') {
-        sellPrice = 10000;
-      }
+      const sellPrice = Math.round(player.buy_price * 0.75);
       const result = await sb.sellPlayer(userId, player.id, sport, sellPrice);
       
       if (result.success) {
@@ -3181,45 +3173,52 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const klRahulId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
-            const awardRes = await sb.awardPlayer(userId, klRahulId, 'cricket');
-            if (awardRes.success) {
-                wonPlayer = true;
-                let userName = "Player";
-                const profile = await sb.getProfile(userId);
-                if (profile) {
-                    if (profile.first_name) userName = profile.first_name;
-                    if (awardRes.alreadyOwned) {
-                        alreadyOwned = true;
-                        newBal = await sb.addCoins(userId, amount);
-                    } else {
-                        newBal = profile.coins || 0;
-                    }
-                } else {
-                    try {
-                        const chat = await bot.api.getChat(userId);
-                        if (chat && chat.first_name) userName = chat.first_name;
-                    } catch (e) {}
-                    newBal = 0;
-                }
-
-                // Broadcast jackpot win to the official group chat in the background
-                (async () => {
-                    try {
-                        const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
-                                        `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
-                                        `Congratulations! 🥳`;
-                        try {
-                            await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
-                        } catch (e) {
-                            console.error(`Failed to send jackpot broadcast to official group:`, e);
-                        }
-                    } catch (err) {
-                        console.error("Error in jackpot broadcast loop:", err);
-                    }
-                })();
-            } else {
+            const hasClaimed = await sb.checkJackpotClaimed(userId);
+            if (hasClaimed) {
+                alreadyOwned = true;
                 newBal = await sb.addCoins(userId, amount);
+            } else {
+                const klRahulId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
+                const awardRes = await sb.awardPlayer(userId, klRahulId, 'cricket');
+                if (awardRes.success) {
+                    wonPlayer = true;
+                    await sb.recordJackpotClaim(userId);
+                    let userName = "Player";
+                    const profile = await sb.getProfile(userId);
+                    if (profile) {
+                        if (profile.first_name) userName = profile.first_name;
+                        if (awardRes.alreadyOwned) {
+                            alreadyOwned = true;
+                            newBal = await sb.addCoins(userId, amount);
+                        } else {
+                            newBal = profile.coins || 0;
+                        }
+                    } else {
+                        try {
+                            const chat = await bot.api.getChat(userId);
+                            if (chat && chat.first_name) userName = chat.first_name;
+                        } catch (e) {}
+                        newBal = 0;
+                    }
+
+                    // Broadcast jackpot win to the official group chat in the background
+                    (async () => {
+                        try {
+                            const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
+                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
+                                            `Congratulations! 🥳`;
+                            try {
+                                await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
+                            } catch (e) {
+                                console.error(`Failed to send jackpot broadcast to official group:`, e);
+                            }
+                        } catch (err) {
+                            console.error("Error in jackpot broadcast loop:", err);
+                        }
+                    })();
+                } else {
+                    newBal = await sb.addCoins(userId, amount);
+                }
             }
         } else {
             newBal = await sb.addCoins(userId, amount);

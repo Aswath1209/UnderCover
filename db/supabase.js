@@ -565,10 +565,42 @@ async function checkAndClaimFreeSpin(userId) {
   }
 }
 
+async function checkJackpotClaimed(userId) {
+  if (!supabase) return false;
+  try {
+    const { data } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', 'kl_rahul_jackpot_claimed')
+      .eq('sport', 'jackpot')
+      .maybeSingle();
+    return !!data;
+  } catch (e) {
+    console.error("checkJackpotClaimed error:", e);
+    return false;
+  }
+}
+
+async function recordJackpotClaim(userId) {
+  if (!supabase) return;
+  try {
+    await supabase.from('user_owned_players').insert({
+      user_id: userId,
+      player_id: 'kl_rahul_jackpot_claimed',
+      sport: 'jackpot'
+    });
+  } catch (e) {
+    console.error("recordJackpotClaim error:", e);
+  }
+}
+
 async function getUserOwnedPlayers(userId) {
   if (!supabase) return [];
   try {
-    const { data, error } = await supabase.from('user_owned_players').select('player_id, sport').eq('user_id', userId);
+    const { data, error } = await supabase.from('user_owned_players')
+      .select('player_id, sport')
+      .eq('user_id', userId)
+      .neq('sport', 'jackpot');
     if (error) {
       console.error("Error fetching owned players:", error);
       return [];
@@ -811,5 +843,7 @@ module.exports = {
   buyPlayer,
   sellPlayer,
   awardPlayer,
+  checkJackpotClaimed,
+  recordJackpotClaim,
   DEFAULT_SETTINGS
 };
