@@ -1254,6 +1254,34 @@
             }
         }
 
+        function updateLuckySpinJackpotUI(jackpotClaimed) {
+            const slice9 = document.querySelector('.slice-text[data-i="9"]');
+            const grandPrizeTag = document.querySelector('.grand-prize-tag');
+            if (jackpotClaimed) {
+                if (slice9) {
+                    slice9.innerHTML = '10k';
+                    slice9.style.paddingRight = '25px';
+                }
+                if (grandPrizeTag) {
+                    grandPrizeTag.innerHTML = `
+                        <span class="prize-crown">👑</span>
+                        <span class="prize-tag-text">Grand Prize: <b>10,000 Coins</b> (KL Rahul Claimed)</span>
+                    `;
+                }
+            } else {
+                if (slice9) {
+                    slice9.innerHTML = '<img class="slice-img" src="/assets/players/kl_rahul.jpg" alt="KL">';
+                    slice9.style.paddingRight = '16px';
+                }
+                if (grandPrizeTag) {
+                    grandPrizeTag.innerHTML = `
+                        <span class="prize-crown">👑</span>
+                        <span class="prize-tag-text">Grand Prize: <b>KL Rahul</b> (91 OVR WK)</span>
+                    `;
+                }
+            }
+        }
+
         function checkDropCooldown() {
             fetch(`/api/user-stats?user_id=${userId}`)
                 .then(res => res.json())
@@ -1307,6 +1335,7 @@
                 }
 
                 updateDropCooldownUI(data);
+                updateLuckySpinJackpotUI(data.jackpotClaimed);
 
                 // Handle default tab routing
                 if (defaultTab) {
@@ -1854,6 +1883,10 @@
                             
                             const coinEl = document.getElementById('stat-coins');
                             if (coinEl) coinEl.innerText = data.newBal.toLocaleString();
+
+                            if (data.wonPlayer || (data.isJackpot && data.amount >= 10000)) {
+                                updateLuckySpinJackpotUI(true);
+                            }
 
                             if (!isAd) {
                                 freeBtn.innerHTML = `<span>⏳ Available in 24h</span>`;

@@ -3124,6 +3124,9 @@ app.get('/api/user-stats', async (req, res) => {
             spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
         }
 
+        const jackpotPlayerId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
+        const jackpotClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
+
         res.json({
             name: profile.first_name,
             coins: profile.coins || 0,
@@ -3131,7 +3134,8 @@ app.get('/api/user-stats', async (req, res) => {
             played: profile.matches_played || 0,
             rank: globalRank || "N/A",
             dropCooldown: dropCooldownRemaining,
-            spinCooldown: spinCooldownRemaining
+            spinCooldown: spinCooldownRemaining,
+            jackpotClaimed: jackpotClaimed
         });
     } catch (error) {
         console.error('Stats error:', error);
