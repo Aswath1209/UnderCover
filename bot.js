@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Bot, InlineKeyboard } = require('grammy');
+const { Bot, InlineKeyboard, InputFile } = require('grammy');
 const gameManager = require('./game/gameManager');
 const mafiaManager = require('./game/mafiaManager');
 const liesManager = require('./game/liesManager');
@@ -3179,14 +3179,24 @@ app.get('/api/spin', async (req, res) => {
                 (async () => {
                     try {
                         const groupIds = await sb.getAllGroupIds();
+                        const photoPath = path.join(__dirname, 'assets/players/kl_rahul.jpg');
                         const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
                                         `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
                                         `Congratulations! 🥳`;
                         for (const groupId of groupIds) {
                             try {
-                                await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
+                                await bot.api.sendPhoto(groupId, new InputFile(photoPath), {
+                                    caption: message,
+                                    parse_mode: 'HTML'
+                                });
                             } catch (e) {
-                                console.error(`Failed to send jackpot broadcast to group ${groupId}:`, e);
+                                console.error(`Failed to send jackpot photo broadcast to group ${groupId}:`, e);
+                                // Fallback to plain text message if photo sending fails
+                                try {
+                                    await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
+                                } catch (err) {
+                                    console.error(`Fallback text broadcast also failed for group ${groupId}:`, err);
+                                }
                             }
                             // 100ms non-blocking delay between sends to yield event loop and avoid Telegram rate limits
                             await new Promise(resolve => setTimeout(resolve, 100));
