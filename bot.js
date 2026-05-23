@@ -47,10 +47,10 @@ const pendingSpinReminders = new Map();
 function getRandomSpinReward() {
   const rand = Math.random() * 100;
   if (rand < 40) return 100; // 40%
-  if (rand < 65) return 500; // 25%
-  if (rand < 85) return 1000; // 20%
-  if (rand < 95) return 2000; // 10%
-  return 10000; // 5% Jackpot
+  if (rand < 68) return 500; // 28%
+  if (rand < 88) return 1000; // 20%
+  if (rand < 98) return 2000; // 10%
+  return 10000; // 2% Jackpot
 }
 
 function getRandomReward() {
@@ -3199,24 +3199,14 @@ app.get('/api/spin', async (req, res) => {
                 (async () => {
                     try {
                         const groupIds = await sb.getAllGroupIds();
-                        const photoPath = path.join(__dirname, 'assets/players/kl_rahul.jpg');
                         const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
                                         `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>KL Rahul</b> (91 OVR WK) in the Lucky Spin! 🎡\n\n` +
                                         `Congratulations! 🥳`;
                         for (const groupId of groupIds) {
                             try {
-                                await bot.api.sendPhoto(groupId, new InputFile(photoPath), {
-                                    caption: message,
-                                    parse_mode: 'HTML'
-                                });
+                                await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
                             } catch (e) {
-                                console.error(`Failed to send jackpot photo broadcast to group ${groupId}:`, e);
-                                // Fallback to plain text message if photo sending fails
-                                try {
-                                    await bot.api.sendMessage(groupId, message, { parse_mode: 'HTML' });
-                                } catch (err) {
-                                    console.error(`Fallback text broadcast also failed for group ${groupId}:`, err);
-                                }
+                                console.error(`Failed to send jackpot broadcast to group ${groupId}:`, e);
                             }
                             // 100ms non-blocking delay between sends to yield event loop and avoid Telegram rate limits
                             await new Promise(resolve => setTimeout(resolve, 100));
