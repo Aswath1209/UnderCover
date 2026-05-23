@@ -553,7 +553,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win Bhuvneshwar Kumar!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>KL Rahul</b> (91 OVR WK)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -3153,8 +3153,8 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const bhuviId = '430ed266-0662-4012-835a-4591f071e143';
-            const awardRes = await sb.awardPlayer(userId, bhuviId, 'cricket');
+            const klRahulId = 'ec3eb079-92f5-473b-a72c-10df4cc3a0d9';
+            const awardRes = await sb.awardPlayer(userId, klRahulId, 'cricket');
             if (awardRes.success) {
                 wonPlayer = true;
                 if (awardRes.alreadyOwned) {
@@ -3282,7 +3282,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Bhuvneshwar Kumar" },
+    { command: "spin", description: "🎡 Spin the wheel to win KL Rahul" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },
