@@ -46,11 +46,11 @@ const pendingSpinReminders = new Map();
 
 function getRandomSpinReward() {
   const rand = Math.random() * 100;
-  if (rand < 50) return 100; // 50%
-  if (rand < 80) return 500; // 30%
-  if (rand < 95) return 1000; // 15%
-  if (rand < 99) return 2000; // 4%
-  return 10000; // 1% Jackpot
+  if (rand < 40) return 100; // 40%
+  if (rand < 65) return 500; // 25%
+  if (rand < 85) return 1000; // 20%
+  if (rand < 95) return 2000; // 10%
+  return 10000; // 5% Jackpot
 }
 
 function getRandomReward() {
