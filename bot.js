@@ -425,9 +425,8 @@ bot.command('sell', async (ctx) => {
   const query = ctx.match?.trim();
   if (!query) {
     return ctx.reply(
-      "⚠️ <b>Usage:</b> `/sell &lt;player_name&gt;`\n\n" +
-      "E.g., `/sell Virat Kohli` or `/sell Messi`.\n" +
-      "You will receive <b>75%</b> of the original buy price back.",
+      "⚠️ <b>Please mention a player name.</b>\n" +
+      "Example: `/sell KL Rahul` or `/sell kl`",
       { parse_mode: 'HTML' }
     );
   }
@@ -501,14 +500,14 @@ bot.command('sell', async (ctx) => {
 
     // Exactly one player match
     const player = matches[0];
-    const sellPrice = Math.round(player.buy_price * 0.75);
+    const sellPrice = Math.round(player.buy_price * 0.55);
 
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
                  `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
                  `• OVR: <b>${player.ovr}</b>\n` +
                  `• Sport: <b>${player.sport === 'cricket' ? '🏏 Cricket' : '⚽ Football'}</b>\n` +
                  `• Original Price: 💰 <b>${player.buy_price.toLocaleString()}</b>\n\n` +
-                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b> (75% value).\n\n` +
+                 `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b>.\n\n` +
                  `<i>Do you want to proceed?</i>`;
 
     const kb = new InlineKeyboard()
@@ -2038,7 +2037,7 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
 
-      const sellPrice = Math.round(player.buy_price * 0.75);
+      const sellPrice = Math.round(player.buy_price * 0.55);
       const result = await sb.sellPlayer(userId, player.id, sport, sellPrice);
       
       if (result.success) {
