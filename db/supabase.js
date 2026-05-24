@@ -594,6 +594,39 @@ async function recordJackpotClaim(userId, jackpotPlayerId) {
   }
 }
 
+async function checkIsModerator(userId) {
+  if (!supabase) return false;
+  try {
+    const { data } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', 'moderator')
+      .eq('sport', 'moderator')
+      .maybeSingle();
+    return !!data;
+  } catch (e) {
+    console.error("checkIsModerator error:", e);
+    return false;
+  }
+}
+
+async function addModerator(userId) {
+  if (!supabase) return false;
+  try {
+    const isAlreadyMod = await checkIsModerator(userId);
+    if (isAlreadyMod) return true;
+    const { error } = await supabase.from('user_owned_players').insert({
+      user_id: userId,
+      player_id: 'moderator',
+      sport: 'moderator'
+    });
+    return !error;
+  } catch (e) {
+    console.error("addModerator error:", e);
+    return false;
+  }
+}
+
 async function getUserOwnedPlayers(userId) {
   if (!supabase) return [];
   try {
@@ -845,5 +878,7 @@ module.exports = {
   awardPlayer,
   checkJackpotClaimed,
   recordJackpotClaim,
+  checkIsModerator,
+  addModerator,
   DEFAULT_SETTINGS
 };

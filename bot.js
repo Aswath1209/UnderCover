@@ -638,8 +638,40 @@ bot.command('addcoins', async (ctx) => {
   await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
 });
 
-bot.command('rain', async (ctx) => {
+bot.command('addmod', async (ctx) => {
   if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  let targetUserId = null;
+  let targetFirstName = "User";
+
+  if (ctx.message.reply_to_message) {
+      targetUserId = ctx.message.reply_to_message.from.id;
+      targetFirstName = ctx.message.reply_to_message.from.first_name || "User";
+  } else {
+      const args = ctx.message.text.split(' ');
+      if (args.length < 2) {
+          return ctx.reply("❌ Usage: Reply to a user with `/addmod` or use `/addmod <userId>`", { parse_mode: 'HTML' });
+      }
+      targetUserId = parseInt(args[1]);
+      if (isNaN(targetUserId)) {
+          return ctx.reply("❌ Invalid User ID specified.");
+      }
+  }
+
+  await sb.ensureUser(targetUserId, targetFirstName).catch(() => {});
+  
+  const success = await sb.addModerator(targetUserId);
+  if (success) {
+      await ctx.reply(`✅ Successfully added <b>${escapeHTML(targetFirstName)}</b> (ID: <code>${targetUserId}</code>) as a Moderator!`, { parse_mode: 'HTML' });
+  } else {
+      await ctx.reply("❌ Failed to add Moderator. Please try again.", { parse_mode: 'HTML' });
+  }
+});
+
+bot.command('rain', async (ctx) => {
+  const isMod = await sb.checkIsModerator(ctx.from.id);
+  const isAdmin = ADMIN_IDS.includes(ctx.from.id);
+  if (!isAdmin && !isMod) return;
   
   if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
       return ctx.reply("❌ This command can only be used in group chats.");
