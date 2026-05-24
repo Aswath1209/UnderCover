@@ -665,11 +665,13 @@ bot.command('rain', async (ctx) => {
   
   const results = [];
   for (const u of topUsers) {
-      const reward = Math.min(1000, u.count * 50); // 50 coins per interaction, max 1k coins
+      const baseReward = 40 * Math.pow(u.count, 0.75);
+      const randomFactor = Math.random() * 15;
+      const reward = Math.min(1000, Math.round(baseReward + randomFactor));
       if (reward > 0) {
           await sb.ensureUser(u.userId, u.name).catch(() => {});
           await sb.addCoins(u.userId, reward);
-          results.push({ name: u.name, reward, count: u.count });
+          results.push({ name: u.name, reward });
       }
   }
   
@@ -680,14 +682,11 @@ bot.command('rain', async (ctx) => {
       return ctx.reply("🌧️ <b>No users qualified for the rain reward yet!</b>", { parse_mode: 'HTML' });
   }
   
-  let msg = `🌧️ <b>THE COIN RAIN HAS FALLEN!</b> 🌧️\n\n` +
-            `An admin has summoned a coin rain in this group! The top active users have received rewards based on their activity:\n\n`;
-  
+  let msg = `🌧️ <b>THE COIN RAIN HAS FALLEN!</b> 🌧️\n\n`;
   results.forEach((res, index) => {
-      msg += `${index + 1}. <b>${escapeHTML(res.name)}</b> - received 💰 <b>${res.reward}</b> coins (${res.count} interactions)\n`;
+      msg += `${index + 1}. <b>${escapeHTML(res.name)}</b> - 💰 <b>${res.reward}</b> coins\n`;
   });
   
-  msg += `\n<i>Activity has been reset. Keep interacting to qualify for the next rain! 🚀</i>`;
   await ctx.reply(msg, { parse_mode: 'HTML' });
 });
 
