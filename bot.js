@@ -43,6 +43,7 @@ const claimCooldowns = new Map();
 const spinCooldowns = new Map();
 const adSpinCooldowns = new Map();
 const pendingSpinReminders = new Map();
+const rainCooldowns = new Map();
 
 function getRandomSpinReward() {
   const rand = Math.random() * 100;
@@ -643,6 +644,15 @@ bot.command('rain', async (ctx) => {
   if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
       return ctx.reply("❌ This command can only be used in group chats.");
   }
+
+  // Check 1-hour cooldown
+  const lastRain = rainCooldowns.get(ctx.chat.id);
+  const now = Date.now();
+  const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+  if (lastRain && (now - lastRain < COOLDOWN_MS)) {
+      const remainingMin = Math.ceil((COOLDOWN_MS - (now - lastRain)) / (60 * 1000));
+      return ctx.reply(`❌ <b>Rain is on cooldown!</b> Please wait <b>${remainingMin}</b> more minute(s) before summoning another rain in this group.`, { parse_mode: 'HTML' });
+  }
   
   const chatMap = groupActivity.get(ctx.chat.id);
   if (!chatMap || chatMap.size === 0) {
@@ -665,9 +675,9 @@ bot.command('rain', async (ctx) => {
   
   const results = [];
   for (const u of topUsers) {
-      const baseReward = 40 * Math.pow(u.count, 0.75);
-      const randomFactor = Math.random() * 15;
-      const reward = Math.min(1000, Math.round(baseReward + randomFactor));
+      const base = u.count * 8;
+      const randomOffset = Math.floor(Math.random() * 7) - 3; // -3 to +3
+      const reward = Math.min(1000, Math.max(5, base + randomOffset));
       if (reward > 0) {
           await sb.ensureUser(u.userId, u.name).catch(() => {});
           await sb.addCoins(u.userId, reward);
@@ -675,12 +685,15 @@ bot.command('rain', async (ctx) => {
       }
   }
   
-  // Reset activity for this group chat
-  groupActivity.delete(ctx.chat.id);
-  
   if (results.length === 0) {
       return ctx.reply("🌧️ <b>No users qualified for the rain reward yet!</b>", { parse_mode: 'HTML' });
   }
+
+  // Set cooldown
+  rainCooldowns.set(ctx.chat.id, now);
+  
+  // Reset activity for this group chat
+  groupActivity.delete(ctx.chat.id);
   
   let msg = `🌧️ <b>THE COIN RAIN HAS FALLEN!</b> 🌧️\n\n`;
   results.forEach((res, index) => {
