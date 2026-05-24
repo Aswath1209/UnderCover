@@ -72,6 +72,22 @@ process.on('uncaughtException', (error) => {
 const activity24h = new Map();
 const adCooldowns = new Map();
 
+// --- Group Activity Tracking for /rain ---
+const groupActivity = new Map();
+
+function trackGroupActivity(chatId, userId, firstName) {
+    if (!groupActivity.has(chatId)) {
+        groupActivity.set(chatId, new Map());
+    }
+    const chatMap = groupActivity.get(chatId);
+    if (!chatMap.has(userId)) {
+        chatMap.set(userId, { name: firstName, count: 0 });
+    }
+    const data = chatMap.get(userId);
+    data.name = firstName;
+    data.count++;
+}
+
 
 function trackActivity(userId, name) {
     const now = Date.now();
@@ -120,6 +136,9 @@ function getActiveLobbyForUser(userId) {
 bot.use((ctx, next) => {
   if (ctx.from && !ctx.from.is_bot) {
     trackActivity(ctx.from.id, ctx.from.first_name);
+    if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) {
+      trackGroupActivity(ctx.chat.id, ctx.from.id, ctx.from.first_name);
+    }
   }
   return next();
 });
@@ -616,6 +635,60 @@ bot.command('addcoins', async (ctx) => {
   }
   
   await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
+});
+
+bot.command('rain', async (ctx) => {
+  if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+      return ctx.reply("❌ This command can only be used in group chats.");
+  }
+  
+  const chatMap = groupActivity.get(ctx.chat.id);
+  if (!chatMap || chatMap.size === 0) {
+      return ctx.reply("🌧️ <b>No activity recorded in this chat yet!</b>", { parse_mode: 'HTML' });
+  }
+  
+  const sortedUsers = [];
+  for (const [userId, userStats] of chatMap.entries()) {
+      if (userStats.count > 0) {
+          sortedUsers.push({ userId, name: userStats.name, count: userStats.count });
+      }
+  }
+  
+  if (sortedUsers.length === 0) {
+      return ctx.reply("🌧️ <b>No active users since last rain!</b>", { parse_mode: 'HTML' });
+  }
+  
+  sortedUsers.sort((a, b) => b.count - a.count);
+  const topUsers = sortedUsers.slice(0, 10);
+  
+  const results = [];
+  for (const u of topUsers) {
+      const reward = Math.min(1000, u.count * 50); // 50 coins per interaction, max 1k coins
+      if (reward > 0) {
+          await sb.ensureUser(u.userId, u.name).catch(() => {});
+          await sb.addCoins(u.userId, reward);
+          results.push({ name: u.name, reward, count: u.count });
+      }
+  }
+  
+  // Reset activity for this group chat
+  groupActivity.delete(ctx.chat.id);
+  
+  if (results.length === 0) {
+      return ctx.reply("🌧️ <b>No users qualified for the rain reward yet!</b>", { parse_mode: 'HTML' });
+  }
+  
+  let msg = `🌧️ <b>THE COIN RAIN HAS FALLEN!</b> 🌧️\n\n` +
+            `An admin has summoned a coin rain in this group! The top active users have received rewards based on their activity:\n\n`;
+  
+  results.forEach((res, index) => {
+      msg += `${index + 1}. <b>${escapeHTML(res.name)}</b> - received 💰 <b>${res.reward}</b> coins (${res.count} interactions)\n`;
+  });
+  
+  msg += `\n<i>Activity has been reset. Keep interacting to qualify for the next rain! 🚀</i>`;
+  await ctx.reply(msg, { parse_mode: 'HTML' });
 });
 
 const sendCooldowns = new Map();
