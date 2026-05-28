@@ -385,13 +385,57 @@ bot.command('admin_stats', async (ctx) => {
 bot.command('cancel', async (ctx) => {
   if (ctx.chat.type === 'private') return;
   const chatId = ctx.chat.id;
+  const userId = ctx.from.id;
+  
+  // Check if there is an active cricket lobby or match for this user/chat
+  const cricLobby = activeLobbies[chatId];
+  const cricMatch = matchManager.getActiveMatch(userId);
+
+  if (cricMatch) {
+    if (cricMatch.status === 'completed') {
+        return ctx.reply("❌ Match has already completed.");
+    }
+    const ballsBowled = (cricMatch.innings[0]?.balls || 0) + (cricMatch.innings[1]?.balls || 0);
+    let penalty = 0;
+    if (ballsBowled > 0) {
+        const totalBalls = cricMatch.totalOvers * 12;
+        const ratio = Math.min(1, ballsBowled / totalBalls);
+        penalty = Math.round(ratio * cricMatch.totalOvers * 1000);
+    }
+
+    let penaltyText = penalty > 0 ? `${penalty} coins penalty` : "No penalty";
+    const keyboard = new InlineKeyboard()
+        .text(`⚠️ Confirm Quit (${penalty > 0 ? `-${penalty} Coins` : 'No Penalty'})`, `cric_quit_confirm:${cricMatch.id}:${userId}`)
+        .text(`❌ Cancel`, `cric_quit_cancel:${cricMatch.id}:${userId}`);
+
+    await ctx.reply(
+        `🚨 <b>Are you sure you want to cancel the match?</b>\n\n` +
+        `• Played: <b>${ballsBowled}</b> balls\n` +
+        `• Penalty: <b>${penaltyText}</b>\n\n` +
+        `<i>Opponent will receive compensation coins and the win.</i>`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+    );
+    return;
+  }
+
+  if (cricLobby) {
+    const member = await ctx.getChatMember(userId).catch(() => ({ status: 'member' }));
+    const isAdmin = member.status === 'administrator' || member.status === 'creator' || ADMIN_IDS.includes(userId);
+    if (cricLobby.host.telegramId === userId || isAdmin) {
+        delete activeLobbies[chatId];
+        await ctx.reply("🛑 Cricket match lobby has been cancelled.");
+        return;
+    }
+  }
   
   const lobby = gameManager.getLobby(chatId) || 
                 mafiaManager.getLobby(chatId) || 
                 liesManager.getLobby(chatId) || 
                 guessManager.getGame(chatId);
                 
-  if (!lobby) return ctx.reply("No active game to cancel.");
+  if (!lobby) {
+    return ctx.reply("No active game to cancel.");
+  }
   
   const member = await ctx.getChatMember(ctx.from.id).catch(() => ({ status: 'member' }));
   const isAdmin = member.status === 'administrator' || member.status === 'creator' || ADMIN_IDS.includes(ctx.from.id);
@@ -483,9 +527,18 @@ bot.command('xi', async (ctx) => {
     let msg = `🏏 <u><b>PLAYING XI</b></u> — <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b>\n`;
     msg += `══════════════════════════\n\n`;
 
-    xi.forEach((p, idx) => {
+    const xiWithIndices = xi.map((p, idx) => ({ ...p, originalIdx: idx + 1 }));
+    xiWithIndices.sort((a, b) => {
+      const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
+      const orderA = roleOrder[a.role] || 5;
+      const orderB = roleOrder[b.role] || 5;
+      if (orderA !== orderB) return orderA - orderB;
+      return (b.ovr || 0) - (a.ovr || 0);
+    });
+
+    xiWithIndices.forEach((p) => {
       const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-      msg += `<b>${idx + 1}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
+      msg += `<b>${p.originalIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
     });
 
     const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
@@ -1057,7 +1110,9 @@ bot.command('cric', async (ctx) => {
       overs
     };
 
-    const keyboard = new InlineKeyboard().text('🤝 Join Match', 'cric_join');
+    const keyboard = new InlineKeyboard()
+      .text('🤝 Join Match', 'cric_join')
+      .text('❌ Cancel Lobby', 'cric_cancel_lobby');
     
     await ctx.reply(
       `🏏 <b>CRICKET MATCH LOBBY CREATED!</b> 🏏\n` +
@@ -2190,6 +2245,23 @@ bot.on('callback_query:data', async (ctx) => {
   const user = ctx.from;
 
   // --- CRICKET LOBBY CALLBACKS ---
+  if (data === 'cric_cancel_lobby') {
+    const lobby = activeLobbies[chatId];
+    if (!lobby) return ctx.answerCallbackQuery({ text: "❌ No active lobby in this chat.", show_alert: true });
+
+    const member = await ctx.getChatMember(user.id).catch(() => ({ status: 'member' }));
+    const isAdmin = member.status === 'administrator' || member.status === 'creator' || ADMIN_IDS.includes(user.id);
+    const isMod = await sb.checkIsModerator(user.id);
+
+    if (lobby.host.telegramId !== user.id && !isAdmin && !isMod) {
+      return ctx.answerCallbackQuery({ text: "❌ Only the host or an admin/moderator can cancel this lobby.", show_alert: true });
+    }
+
+    delete activeLobbies[chatId];
+    await ctx.answerCallbackQuery({ text: "Lobby cancelled." });
+    await ctx.editMessageText(`❌ Match lobby has been cancelled.`, { reply_markup: { inline_keyboard: [] } }).catch(()=>{});
+    return;
+  }
   if (data.startsWith('cric_quit_confirm:')) {
     const parts = data.split(':');
     const matchId = parts[1];
@@ -2546,9 +2618,18 @@ bot.on('callback_query:data', async (ctx) => {
       // Playing XI (positions 1-11)
       msg += `<b>━━━ PLAYING XI ━━━</b>\n`;
       const xi = team.slice(0, 11);
-      xi.forEach((p, idx) => {
+      const xiWithIndices = xi.map((p, idx) => ({ ...p, originalIdx: idx + 1 }));
+      xiWithIndices.sort((a, b) => {
+        const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
+        const orderA = roleOrder[a.role] || 5;
+        const orderB = roleOrder[b.role] || 5;
+        if (orderA !== orderB) return orderA - orderB;
+        return (b.ovr || 0) - (a.ovr || 0);
+      });
+
+      xiWithIndices.forEach((p) => {
         const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-        msg += `<b>${idx + 1}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+        msg += `<b>${p.originalIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
       });
 
       // Bench (positions 12+)
