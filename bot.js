@@ -17,6 +17,14 @@ const ai = require('./game/ai');
 const { DEFAULT_XI } = require('./game/matchManager');
 const activeLobbies = {};
 
+function getUserActiveLobby(userId) {
+  for (const lobby of Object.values(activeLobbies)) {
+    if (lobby.host && lobby.host.telegramId === userId) return lobby;
+    if (lobby.guest && lobby.guest.telegramId === userId) return lobby;
+  }
+  return null;
+}
+
 
 function getWebAppUrl(chatId, tab = '') {
   let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
@@ -264,6 +272,7 @@ bot.command('help', async (ctx) => {
                `⚙️ <b>Others:</b>\n` +
                `• /settings — Configure game timers and rules\n` +
                `• /cancel — Stop the current game in a group\n` +
+               `• /quit — Quit the current game\n` +
                `• /feedback — Send a message to the developers\n\n` +
                `📢 <b>Join our community:</b> ${OFFICIAL_GC_USER}`;
   
@@ -812,6 +821,44 @@ bot.command('addmod', async (ctx) => {
   }
 });
 
+bot.command('remove', async (ctx) => {
+  const isMod = await sb.checkIsModerator(ctx.from.id);
+  const isAdmin = ADMIN_IDS.includes(ctx.from.id);
+  if (!isAdmin && !isMod) return;
+
+  let targetUserId = null;
+  if (ctx.message.reply_to_message) {
+    targetUserId = ctx.message.reply_to_message.from.id;
+  } else {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply("❌ Usage: Reply to a user with `/remove` or use `/remove <userId>`", { parse_mode: 'HTML' });
+    }
+    targetUserId = parseInt(args[1]);
+    if (isNaN(targetUserId)) {
+      return ctx.reply("❌ Invalid User ID specified.");
+    }
+  }
+
+  const match = matchManager.getActiveMatch(targetUserId);
+  if (!match) {
+    return ctx.reply(`❌ No active cricket match found for User ID <code>${targetUserId}</code>.`, { parse_mode: 'HTML' });
+  }
+
+  match.status = 'completed';
+  matchManager.saveToDb(match);
+  
+  // Cleanup from activeMatches
+  delete matchManager.activeMatches[match.host.telegramId];
+  delete matchManager.activeMatches[match.id];
+  if (match.guest && match.guest.telegramId !== 'ai') {
+    delete matchManager.activeMatches[match.guest.telegramId];
+  }
+
+  await ctx.reply(`✅ Successfully removed User ID <code>${targetUserId}</code> from active cricket match <code>${match.id}</code>. Match has been cancelled with no penalties or rewards.`, { parse_mode: 'HTML' });
+  await bot.api.sendMessage(match.chatId, `🛠️ Match has been terminated by an Admin/Moderator. No penalties or rewards applied.`, { parse_mode: 'HTML' }).catch(()=>{});
+});
+
 bot.command('rain', async (ctx) => {
   const isMod = await sb.checkIsModerator(ctx.from.id);
   const isAdmin = ADMIN_IDS.includes(ctx.from.id);
@@ -989,8 +1036,11 @@ bot.command('cric', async (ctx) => {
     }
     const xi = xiResult.xi;
 
-    if (matchManager.getActiveMatch(ctx.chat.id) || matchManager.getActiveMatch(telegramId)) {
-      return ctx.reply("⚠️ You or this chat already has an active match running!");
+    if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
+      return ctx.reply("⚠️ You already have an active match or lobby running!");
+    }
+    if (activeLobbies[ctx.chat.id]) {
+      return ctx.reply("⚠️ There is already a match lobby waiting to be joined in this chat!");
     }
 
     activeLobbies[ctx.chat.id] = {
@@ -1420,6 +1470,35 @@ bot.command('quit', async (ctx) => {
       if (hiloState.messageId && hiloState.chatId) {
           bot.api.editMessageText(hiloState.chatId, hiloState.messageId, `💰 <b>Withdrawn via /quit!</b>\n\nYou walked away with ${payout} coins!${penaltyMsg}`, { parse_mode: 'HTML' }).catch(()=>{});
       }
+      return;
+  }
+
+  // Check for Cricket match
+  const cricMatch = matchManager.getActiveMatch(userId);
+  if (cricMatch) {
+      if (cricMatch.status === 'completed') {
+          return ctx.reply("❌ Match has already completed.");
+      }
+      const ballsBowled = (cricMatch.innings[0]?.balls || 0) + (cricMatch.innings[1]?.balls || 0);
+      let penalty = 0;
+      if (ballsBowled > 0) {
+          const totalBalls = cricMatch.totalOvers * 12;
+          const ratio = Math.min(1, ballsBowled / totalBalls);
+          penalty = Math.round(ratio * cricMatch.totalOvers * 1000);
+      }
+
+      let penaltyText = penalty > 0 ? `${penalty} coins penalty` : "No penalty";
+      const keyboard = new InlineKeyboard()
+          .text(`⚠️ Confirm Quit (${penalty > 0 ? `-${penalty} Coins` : 'No Penalty'})`, `cric_quit_confirm:${cricMatch.id}:${userId}`)
+          .text(`❌ Cancel`, `cric_quit_cancel:${cricMatch.id}:${userId}`);
+
+      await ctx.reply(
+          `🚨 <b>Are you sure you want to quit the match?</b>\n\n` +
+          `• Played: <b>${ballsBowled}</b> balls\n` +
+          `• Penalty: <b>${penaltyText}</b>\n\n` +
+          `<i>Opponent will receive compensation coins and the win.</i>`,
+          { parse_mode: 'HTML', reply_markup: keyboard }
+      );
       return;
   }
 
@@ -2111,6 +2190,47 @@ bot.on('callback_query:data', async (ctx) => {
   const user = ctx.from;
 
   // --- CRICKET LOBBY CALLBACKS ---
+  if (data.startsWith('cric_quit_confirm:')) {
+    const parts = data.split(':');
+    const matchId = parts[1];
+    const targetUserId = parts[2];
+
+    if (user.id.toString() !== targetUserId.toString()) {
+      return ctx.answerCallbackQuery({ text: "❌ Only the player who requested to quit can confirm.", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery();
+    try {
+      await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+      await ctx.editMessageText(`🔄 Processing quit request...`).catch(()=>{});
+    } catch (e) {}
+
+    const match = matchManager.getMatch(matchId);
+    if (!match || match.status === 'completed') {
+      return ctx.editMessageText("❌ Match is already completed or not found.").catch(()=>{});
+    }
+
+    await handleMatchTermination(match, user.id, "quit");
+    return;
+  }
+
+  if (data.startsWith('cric_quit_cancel:')) {
+    const parts = data.split(':');
+    const matchId = parts[1];
+    const targetUserId = parts[2];
+
+    if (user.id.toString() !== targetUserId.toString()) {
+      return ctx.answerCallbackQuery({ text: "❌ Only the player who requested to quit can cancel.", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery({ text: "Quit cancelled." });
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      await ctx.editMessageText("❌ Quit cancelled.").catch(()=>{});
+    }
+    return;
+  }
   if (data === 'cric_join') {
     const lobby = activeLobbies[chatId];
     if (!lobby) return ctx.answerCallbackQuery({ text: "❌ No active lobby in this chat.", show_alert: true });
@@ -2121,6 +2241,10 @@ bot.on('callback_query:data', async (ctx) => {
 
     if (lobby.guest) {
       return ctx.answerCallbackQuery({ text: "❌ Lobby is already full.", show_alert: true });
+    }
+
+    if (matchManager.getActiveMatch(user.id) || getUserActiveLobby(user.id)) {
+      return ctx.answerCallbackQuery({ text: "❌ You are already in an active match or lobby!", show_alert: true });
     }
 
     const guestId = user.id;
@@ -4595,6 +4719,161 @@ async function processBallAndProgress(ctx, match) {
   }, 1500);
 }
 
+async function handleMatchTermination(match, quittingUserId = null, reason = "quit") {
+  try {
+    const ballsBowled = (match.innings[0]?.balls || 0) + (match.innings[1]?.balls || 0);
+    const hostId = match.host.telegramId.toString();
+    const guestId = match.guest.telegramId.toString();
+
+    let inactiveId = null;
+    let activeId = null;
+
+    if (reason === "quit" && quittingUserId) {
+      inactiveId = quittingUserId.toString();
+      activeId = (inactiveId === hostId) ? guestId : hostId;
+    } else {
+      // Inactivity timeout: determine whose turn it was
+      if (match.status === 'xi_selection') {
+        const isHostBatting = match.innings[0].battingId && match.host.telegramId && (match.innings[0].battingId.toString() === match.host.telegramId.toString());
+        const battingConfirmed = match.strikerIdx !== null && match.nonStrikerIdx !== null;
+        const bowlingConfirmed = match.currentBowlerIdx !== null;
+        const hostConfirmed = isHostBatting ? battingConfirmed : bowlingConfirmed;
+        const guestConfirmed = isHostBatting ? bowlingConfirmed : battingConfirmed;
+
+        if (hostConfirmed && !guestConfirmed) {
+          inactiveId = guestId;
+          activeId = hostId;
+        } else if (guestConfirmed && !hostConfirmed) {
+          inactiveId = hostId;
+          activeId = guestId;
+        } else {
+          // Both or neither have confirmed in 20 minutes: terminate without penalty
+          inactiveId = null;
+          activeId = null;
+        }
+      } else {
+        // Active play phase (innings1, innings2)
+        const battingId = match.currentInnings.battingId?.toString();
+        const bowlingId = match.currentInnings.bowlingId?.toString();
+        if (match.turnState === 'bowling_delivery' || match.turnState === 'selecting_over_bowler') {
+          inactiveId = bowlingId;
+          activeId = battingId;
+        } else {
+          inactiveId = battingId;
+          activeId = bowlingId;
+        }
+      }
+    }
+
+    const hostName = match.host.username || "Host";
+    const guestName = match.guest ? (match.guest.username || "Guest") : "Guest";
+    const inactiveName = inactiveId === hostId ? hostName : guestName;
+    const activeName = activeId === hostId ? hostName : guestName;
+
+    if (!inactiveId || !activeId) {
+      // Terminate with no penalties
+      const msg = reason === "quit"
+        ? `🚪 Match has been ended by a player before any balls were bowled. No penalties or rewards applied.`
+        : `⏱️ Match has been cancelled due to inactivity of 20 minutes. No penalties or rewards applied.`;
+
+      await sendTelegramMessage(match, msg);
+
+      // Cleanup
+      match.status = 'completed';
+      matchManager.saveToDb(match);
+      cleanupActiveMatch(match);
+      return;
+    }
+
+    if (ballsBowled === 0) {
+      // No balls bowled: no penalty, no reward
+      const msg = reason === "quit"
+        ? `🚪 @${inactiveName} has quit the match. Since no balls were bowled, no penalties or rewards are applied.`
+        : `⏱️ Match terminated due to inactivity. Since no balls were bowled, no penalties or rewards are applied.`;
+
+      await sendTelegramMessage(match, msg);
+
+      // Cleanup
+      match.status = 'completed';
+      matchManager.saveToDb(match);
+      cleanupActiveMatch(match);
+      return;
+    }
+
+    // Balls bowled > 0: calculate penalty and compensation
+    const totalBalls = match.totalOvers * 12;
+    const ratio = Math.min(1, ballsBowled / totalBalls);
+    const rewardCap = match.totalOvers * 1000;
+    const compensation = Math.round(ratio * rewardCap);
+    const penalty = compensation;
+
+    // Apply database updates
+    try {
+      // Deduct coins from inactive/quitting player
+      await sb.addCoins(inactiveId, -penalty);
+      // Award coins to active player
+      await sb.addCoins(activeId, compensation);
+      // Record win/loss
+      await sb.recordLoss(inactiveId, 'cricket');
+      await sb.recordWin(activeId, 'cricket');
+    } catch (dbErr) {
+      console.error("Failed to update database for match termination:", dbErr);
+    }
+
+    const message = reason === "quit"
+      ? `🚪 <b>@${inactiveName} has quit the match!</b>\n\n` +
+        `• Penalty: <b>-${penalty}</b> coins deducted from @${inactiveName}.\n` +
+        `• Compensation: <b>+${compensation}</b> coins awarded to @${activeName} for <b>${ballsBowled}</b> balls played.`
+      : `⏱️ <b>Match Terminated due to Inactivity (20 minutes)!</b>\n\n` +
+        `• Inactive Player: @${inactiveName} has been penalized <b>-${penalty}</b> coins.\n` +
+        `• Compensation: <b>+${compensation}</b> coins awarded to @${activeName} for <b>${ballsBowled}</b> balls played.`;
+
+    await sendTelegramMessage(match, message);
+
+    // Cleanup
+    match.status = 'completed';
+    matchManager.saveToDb(match);
+    cleanupActiveMatch(match);
+
+  } catch (err) {
+    console.error("Error inside handleMatchTermination:", err);
+  }
+}
+
+function cleanupActiveMatch(match) {
+  delete matchManager.activeMatches[match.host.telegramId];
+  delete matchManager.activeMatches[match.id];
+  if (match.guest && match.guest.telegramId !== 'ai') {
+    delete matchManager.activeMatches[match.guest.telegramId];
+  }
+}
+
+// Check for inactive cricket matches every 1 minute
+setInterval(async () => {
+  try {
+    const processedIds = new Set();
+    const now = Date.now();
+
+    for (const match of Object.values(matchManager.activeMatches)) {
+      if (processedIds.has(match.id)) continue;
+      processedIds.add(match.id);
+
+      // We only care about active PvP matches
+      if (match.type !== 'pvp') continue;
+      if (match.status === 'completed') continue;
+
+      // Inactivity limit is 20 minutes
+      const lastAct = match.lastActivity || now;
+      if (now - lastAct > 20 * 60 * 1000) {
+        console.log(`[Inactivity] Match ${match.id} in chat ${match.chatId} is inactive for 20+ minutes.`);
+        await handleMatchTermination(match, null, "inactivity");
+      }
+    }
+  } catch (err) {
+    console.error("Error in cricket inactivity loop:", err);
+  }
+}, 60 * 1000);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Dummy web server running on port ${PORT}`);
@@ -4640,6 +4919,7 @@ if (require.main === module) {
     { command: "send", description: "Send coins to another user" },
     { command: "myword", description: "Re-send your secret word to DM" },
     { command: "settings", description: "Configure game settings" },
+    { command: "remove", description: "Admin: Remove user from active cricket match" },
     { command: "cancel", description: "Cancel current game" },
     { command: "quit", description: "Quit current game" },
     { command: "help", description: "Show bot help" },

@@ -94,6 +94,7 @@ class Match {
     this.hostConfirmed = false;
     this.guestConfirmed = false;
     this.activeScorecardMessageId = null;
+    this.lastActivity = Date.now();
   }
 
   get currentInnings() {
@@ -449,7 +450,6 @@ class Match {
     saveToDb(this);
 
     // Cleanup active match
-    delete activeMatches[this.chatId];
     delete activeMatches[this.host.telegramId];
     delete activeMatches[this.id];
     if (this.guest && this.guest.telegramId !== 'ai') {
@@ -458,7 +458,6 @@ class Match {
 
     // Cache completed match for 5 minutes
     completedMatches[this.id] = this;
-    completedMatches[this.chatId] = this;
     completedMatches[this.host.telegramId] = this;
     if (this.guest && this.guest.telegramId !== 'ai') {
       completedMatches[this.guest.telegramId] = this;
@@ -466,7 +465,6 @@ class Match {
 
     setTimeout(() => {
       delete completedMatches[this.id];
-      delete completedMatches[this.chatId];
       delete completedMatches[this.host.telegramId];
       if (this.guest && this.guest.telegramId !== 'ai') {
         delete completedMatches[this.guest.telegramId];
@@ -523,7 +521,8 @@ class Match {
       lastBowlerId: this.lastBowlerId,
       hostConfirmed: this.hostConfirmed,
       guestConfirmed: this.guestConfirmed,
-      activeScorecardMessageId: this.activeScorecardMessageId
+      activeScorecardMessageId: this.activeScorecardMessageId,
+      lastActivity: this.lastActivity
     };
   }
 }
@@ -559,10 +558,12 @@ function deserializeMatch(data) {
   match.hostConfirmed = data.hostConfirmed;
   match.guestConfirmed = data.guestConfirmed;
   match.activeScorecardMessageId = data.activeScorecardMessageId;
+  match.lastActivity = data.lastActivity || Date.now();
   return match;
 }
 
 function saveToDb(match) {
+  match.lastActivity = Date.now();
   sb.saveCricketMatch(
     match.id, 
     match.chatId, 
@@ -583,7 +584,6 @@ async function loadActiveMatchesFromDb() {
         if (state) {
           const match = deserializeMatch(state);
           activeMatches[match.id] = match;
-          activeMatches[match.chatId] = match;
           activeMatches[match.host.telegramId] = match;
           if (match.guest && match.guest.telegramId !== 'ai') {
             activeMatches[match.guest.telegramId] = match;
@@ -622,7 +622,6 @@ function createMatchFromLobby({ dbMatchId, lobby }) {
   match.tossDecision = lobby.tossDecision;
 
   // Add to activeMatches maps
-  activeMatches[lobby.chatId] = match;
   activeMatches[lobby.host.telegramId] = match;
   activeMatches[lobby.guest.telegramId] = match;
   activeMatches[match.id] = match;
