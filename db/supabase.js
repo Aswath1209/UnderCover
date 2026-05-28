@@ -694,6 +694,16 @@ async function buyPlayer(userId, playerId, sport, price) {
       return { success: false, error: 'You already own this player!' };
     }
 
+    // For cricket: enforce 25 player squad cap and assign squad_order
+    if (sport === 'cricket') {
+      const { data: cricketOwned } = await supabase.from('user_owned_players')
+        .select('squad_order')
+        .eq('user_id', userId).eq('sport', 'cricket');
+      if (cricketOwned && cricketOwned.length >= 25) {
+        return { success: false, error: 'Your cricket squad is full (max 25 players)! Sell a player first.' };
+      }
+    }
+
     // Check coins balance
     const { data: profile } = await supabase.from('profiles').select('coins').eq('user_id', userId).single();
     if (!profile) return { success: false, error: 'User profile not found.' };
@@ -703,11 +713,24 @@ async function buyPlayer(userId, playerId, sport, price) {
       return { success: false, error: `Insufficient coins! You need ${price.toLocaleString()} coins.` };
     }
 
+    // Determine next squad_order for cricket
+    let nextOrder = 0;
+    if (sport === 'cricket') {
+      const { data: maxRow } = await supabase.from('user_owned_players')
+        .select('squad_order')
+        .eq('user_id', userId).eq('sport', 'cricket')
+        .order('squad_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      nextOrder = (maxRow ? maxRow.squad_order : 0) + 1;
+    }
+
     // Insert into user_owned_players
     const { error: insertError } = await supabase.from('user_owned_players').insert({
       user_id: userId,
       player_id: playerId,
-      sport: sport
+      sport: sport,
+      squad_order: nextOrder
     });
 
     if (insertError) {
@@ -787,10 +810,23 @@ async function awardPlayer(userId, playerId, sport) {
       return { success: true, alreadyOwned: true };
     }
 
+    // Determine next squad_order for cricket
+    let nextOrder = 0;
+    if (sport === 'cricket') {
+      const { data: maxRow } = await supabase.from('user_owned_players')
+        .select('squad_order')
+        .eq('user_id', userId).eq('sport', 'cricket')
+        .order('squad_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      nextOrder = (maxRow ? maxRow.squad_order : 0) + 1;
+    }
+
     const { error: insertError } = await supabase.from('user_owned_players').insert({
       user_id: userId,
       player_id: playerId,
-      sport: sport
+      sport: sport,
+      squad_order: nextOrder
     });
 
     if (insertError) {
@@ -812,9 +848,10 @@ async function getUserCricketTeam(userId) {
   try {
     const { data: owned, error: ownedError } = await supabase
       .from('user_owned_players')
-      .select('player_id')
+      .select('player_id, squad_order')
       .eq('user_id', userId)
-      .eq('sport', 'cricket');
+      .eq('sport', 'cricket')
+      .order('squad_order', { ascending: true });
 
     if (ownedError) {
       console.error("Error fetching user owned cricket players:", ownedError);
@@ -823,6 +860,8 @@ async function getUserCricketTeam(userId) {
     if (!owned || owned.length === 0) return [];
 
     const playerIds = owned.map(o => o.player_id);
+    const orderMap = {};
+    owned.forEach(o => { orderMap[o.player_id] = o.squad_order || 0; });
 
     const { data: players, error: playersError } = await supabase
       .from('cricketplayers')
@@ -834,10 +873,242 @@ async function getUserCricketTeam(userId) {
       return [];
     }
 
-    return players || [];
+    // Attach squad_order to each player and sort
+    const result = (players || []).map(p => ({ ...p, squad_order: orderMap[p.id] || 0 }));
+    result.sort((a, b) => a.squad_order - b.squad_order);
+    return result;
   } catch (e) {
     console.error("Failed to get user cricket team:", e);
     return [];
+  }
+}
+
+async function swapSquadOrder(userId, pos1, pos2) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    // Find the two records
+    const { data: rec1 } = await supabase.from('user_owned_players')
+      .select('id, player_id, squad_order')
+      .eq('user_id', userId).eq('sport', 'cricket').eq('squad_order', pos1)
+      .maybeSingle();
+    const { data: rec2 } = await supabase.from('user_owned_players')
+      .select('id, player_id, squad_order')
+      .eq('user_id', userId).eq('sport', 'cricket').eq('squad_order', pos2)
+      .maybeSingle();
+
+    if (!rec1) return { success: false, error: `No player found at position ${pos1}.` };
+    if (!rec2) return { success: false, error: `No player found at position ${pos2}.` };
+
+    // Swap their squad_order values
+    await supabase.from('user_owned_players').update({ squad_order: pos2 }).eq('id', rec1.id);
+    await supabase.from('user_owned_players').update({ squad_order: pos1 }).eq('id', rec2.id);
+
+    return { success: true };
+  } catch (e) {
+    console.error("swapSquadOrder error:", e);
+    return { success: false, error: 'Database error during swap.' };
+  } finally {
+    releaseLock(release);
+  }
+}
+
+async function getCricketMatchById(matchId) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('cricket_matches')
+      .select('*')
+      .eq('id', matchId)
+      .single();
+    if (error) {
+      console.error("[DB] Error fetching cricket match by id:", error);
+      return null;
+    }
+    return data || null;
+  } catch (e) {
+    console.error("[DB] Error fetching cricket match by id:", e);
+    return null;
+  }
+}
+
+async function saveCricketMatch(matchId, chatId, hostId, guestId, status, stateJson) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('cricket_matches')
+      .upsert({
+        id: matchId,
+        chat_id: chatId,
+        host_id: hostId,
+        guest_id: guestId,
+        status: status,
+        state_json: stateJson,
+        updated_at: new Date().toISOString()
+      });
+    if (error) {
+      console.error("[DB] Error saving cricket match:", error);
+    }
+  } catch (e) {
+    console.error("[DB] Error saving cricket match:", e);
+  }
+}
+
+async function getActiveCricketMatches() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('cricket_matches')
+      .select('*')
+      .neq('status', 'completed');
+    if (error) {
+      console.error("[DB] Error fetching active cricket matches:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("[DB] Error fetching active cricket matches:", e);
+    return [];
+  }
+}
+
+async function getUserCricketMatchHistory(userId) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('cricket_matches')
+      .select('*')
+      .eq('status', 'completed')
+      .or(`host_id.eq.${userId},guest_id.eq.${userId}`)
+      .order('updated_at', { ascending: false })
+      .limit(10);
+    if (error) {
+      console.error("[DB] Error fetching user match history:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("[DB] Error fetching user match history:", e);
+    return [];
+  }
+}
+
+async function getCricketProfile(userId) {
+  if (!supabase) return null;
+  try {
+    const profile = await getProfile(userId);
+    if (!profile) return null;
+    return {
+      id: userId,
+      telegramId: userId,
+      username: profile.first_name,
+      coins: profile.coins || 0,
+      team_name: profile.team_name || `${profile.first_name || 'Player'}'s XI`
+    };
+  } catch (e) {
+    console.error("[DB] Error getting cricket profile:", e);
+    return null;
+  }
+}
+
+async function updateCricketTeamName(userId, teamName) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ team_name: teamName })
+      .eq('user_id', userId);
+    if (error) {
+      console.error("[DB] Error updating team name:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("[DB] Exception updating team name:", e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function claimStarterPack(userId) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  
+  const release = await acquireLock(userId);
+  try {
+    // 1. Check if user already claimed
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('claimed_starter')
+      .eq('user_id', userId)
+      .maybeSingle();
+      
+    if (profileError) {
+      console.error("Error fetching profile for starter pack:", profileError);
+      return { success: false, error: 'Database error fetching profile.' };
+    }
+    
+    if (profile && profile.claimed_starter) {
+      return { success: false, error: 'ALREADY_CLAIMED' };
+    }
+    
+    // 2. Fetch all cricket players
+    const players = await getCricketPlayers();
+    if (!players || players.length === 0) {
+      return { success: false, error: 'No players available in database.' };
+    }
+    
+    // 3. Filter players
+    // Low OVR players: OVR <= 75
+    // Star players: OVR == 84
+    const lowPlayers = players.filter(p => p.ovr && p.ovr <= 75);
+    const starPlayers = players.filter(p => p.ovr === 84);
+    
+    if (lowPlayers.length < 6) {
+      return { success: false, error: 'Insufficient low OVR players in database.' };
+    }
+    if (starPlayers.length < 1) {
+      return { success: false, error: 'No 84 OVR star players found in database.' };
+    }
+    
+    // 4. Randomly pick 6 unique low OVR players
+    const shuffledLow = [...lowPlayers].sort(() => 0.5 - Math.random());
+    const selectedLow = shuffledLow.slice(0, 6);
+    
+    // 5. Randomly pick 1 star player
+    const selectedStar = starPlayers[Math.floor(Math.random() * starPlayers.length)];
+    
+    const allSelected = [...selectedLow, selectedStar];
+    
+    // 6. Insert players into user_owned_players with squad_order 1-7
+    const inserts = allSelected.map((p, idx) => ({
+      user_id: userId,
+      player_id: p.id,
+      sport: 'cricket',
+      squad_order: idx + 1
+    }));
+    
+    const { error: insertError } = await supabase.from('user_owned_players').insert(inserts);
+    if (insertError) {
+      console.error("Error inserting starter pack players:", insertError);
+      return { success: false, error: 'Failed to record awarded players.' };
+    }
+    
+    // 7. Update profile to mark claimed_starter as true
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ claimed_starter: true })
+      .eq('user_id', userId);
+      
+    if (updateError) {
+      console.error("Error updating profile starter claim state:", updateError);
+      return { success: false, error: 'Failed to update starter pack claim status.' };
+    }
+    
+    return { success: true, players: allSelected };
+  } catch (e) {
+    console.error("claimStarterPack exception:", e);
+    return { success: false, error: 'An unexpected database error occurred.' };
+  } finally {
+    releaseLock(release);
   }
 }
 
@@ -880,5 +1151,13 @@ module.exports = {
   recordJackpotClaim,
   checkIsModerator,
   addModerator,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  saveCricketMatch,
+  getCricketMatchById,
+  getActiveCricketMatches,
+  getUserCricketMatchHistory,
+  getCricketProfile,
+  updateCricketTeamName,
+  claimStarterPack,
+  swapSquadOrder
 };

@@ -11,6 +11,12 @@ const { normalizeWord, escapeHTML } = require('./utils');
 const sb = require('./db/supabase');
 const path = require('path');
 const footballPlayers = require('./data/footballPlayers.json');
+const matchManager = require('./game/matchManager');
+const gameConstants = require('./constants/game');
+const ai = require('./game/ai');
+const { DEFAULT_XI } = require('./game/matchManager');
+const activeLobbies = {};
+
 
 function getWebAppUrl(chatId, tab = '') {
   let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
@@ -19,6 +25,15 @@ function getWebAppUrl(chatId, tab = '') {
   }
   const cleanHost = host.replace(/^https?:\/\//, '');
   return `https://${cleanHost}/bonus-app?msg_id=0&chat_id=${chatId}${tab ? `&tab=${tab}` : ''}`;
+}
+
+function getMatchPlayUrl(match) {
+  let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  if (host === 'undefined' || !host) {
+    host = 'undercover-bot.onrender.com';
+  }
+  const cleanHost = host.replace(/^https?:\/\//, '');
+  return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}`;
 }
 
 function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") {
@@ -238,7 +253,10 @@ bot.command('help', async (ctx) => {
                `• /shop — Browse & buy cricket/football players\n\n` +
                `👤 <b>User Info:</b>\n` +
                `• /profile — Check your wins, losses, and coins\n` +
-               `• /myteam — Show your owned club squads (Cricket & Football)\n` +
+               `• /myteam — Show your full squad (Cricket & Football)\n` +
+               `• /xi — Show your Playing XI with roles\n` +
+               `• /swap — Swap squad positions (/swap 4 12)\n` +
+               `• /claim — Claim your free starter pack\n` +
                `• /sell — Sell a player back for 75% value\n` +
                `• /leaderboard — View top players globally\n` +
                `• /balance — Check your coin balance\n` +
@@ -430,6 +448,83 @@ bot.command('myteam', async (ctx) => {
   await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
 });
 
+bot.command('xi', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  const user = ctx.message.reply_to_message?.from || ctx.from;
+  await sb.ensureUser(user.id, user.first_name).catch(() => {});
+
+  try {
+    const squad = await sb.getUserCricketTeam(user.id);
+    if (!squad || squad.length === 0) {
+      return ctx.reply("🏏 You don't have any cricket players yet! Use /claim to get your starter pack.", { parse_mode: 'HTML' });
+    }
+    if (squad.length < 11) {
+      return ctx.reply(`🏏 You only have <b>${squad.length}</b> player(s). You need at least 11 to form a Playing XI.\n\nUse /claim or /shop to get more players.`, { parse_mode: 'HTML' });
+    }
+
+    const xi = squad.slice(0, 11);
+    const roleIcon = (role) => {
+      if (role === 'batsman') return '🏏 BAT';
+      if (role === 'wicket_keeper') return '🧤 WK';
+      if (role === 'all_rounder') return '⚡ ALR';
+      if (role === 'bowler') return '🥎 BOWL';
+      return '👤';
+    };
+
+    let msg = `🏏 <u><b>PLAYING XI</b></u> — <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b>\n`;
+    msg += `══════════════════════════\n\n`;
+
+    xi.forEach((p, idx) => {
+      const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+      msg += `<b>${idx + 1}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
+    });
+
+    const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
+    msg += `\n📊 <b>XI Rating:</b> ${teamRating} OVR`;
+    msg += `\n\n💡 <i>Use /swap &lt;pos1&gt; &lt;pos2&gt; to rearrange your squad.</i>`;
+
+    await ctx.reply(msg, { parse_mode: 'HTML' });
+  } catch (e) {
+    console.error("Error in /xi command:", e);
+    await ctx.reply("❌ An error occurred while fetching your Playing XI.");
+  }
+});
+
+bot.command('swap', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+
+  const userId = ctx.from.id;
+  const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
+  
+  if (args.length < 2) {
+    return ctx.reply("ℹ️ <b>Usage:</b> <code>/swap &lt;pos1&gt; &lt;pos2&gt;</code>\n\nExample: <code>/swap 4 12</code> swaps the player at position 4 with the one at position 12.", { parse_mode: 'HTML' });
+  }
+
+  const pos1 = parseInt(args[0]);
+  const pos2 = parseInt(args[1]);
+
+  if (isNaN(pos1) || isNaN(pos2) || pos1 < 1 || pos2 < 1 || pos1 > 25 || pos2 > 25) {
+    return ctx.reply("❌ Positions must be numbers between 1 and 25.");
+  }
+  if (pos1 === pos2) {
+    return ctx.reply("❌ You can't swap a player with themselves!");
+  }
+
+  await sb.ensureUser(userId, ctx.from.first_name).catch(() => {});
+
+  try {
+    const result = await sb.swapSquadOrder(userId, pos1, pos2);
+    if (result.success) {
+      await ctx.reply(`✅ Swapped position <b>${pos1}</b> ↔ <b>${pos2}</b> successfully!\n\n💡 Use /xi to see your updated Playing XI.`, { parse_mode: 'HTML' });
+    } else {
+      await ctx.reply(`❌ ${result.error}`);
+    }
+  } catch (e) {
+    console.error("Error in /swap command:", e);
+    await ctx.reply("❌ An error occurred while swapping players.");
+  }
+});
+
 bot.command('shop', async (ctx) => {
   const kb = addShopButton(new InlineKeyboard(), ctx, "🛒 Open Player Shop", "shop");
   
@@ -575,6 +670,55 @@ bot.command('spin', async (ctx) => {
         "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Shreyas Iyer</b> (86 OVR Batsman)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
+});
+
+bot.command('claim', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  
+  const userId = ctx.from.id;
+  const firstName = ctx.from.first_name || 'Player';
+  
+  await sb.ensureUser(userId, firstName).catch(() => {});
+  
+  try {
+    const result = await sb.claimStarterPack(userId);
+    
+    if (result.success) {
+      const starPlayer = result.players.find(p => p.ovr === 84);
+      const lowPlayers = result.players.filter(p => p.ovr !== 84);
+      
+      let msg = `🎁 <b>Starter Pack Claimed!</b> 🎁\n`;
+      msg += `══════════════════════════\n`;
+      msg += `Congratulations <a href="tg://user?id=${userId}">${escapeHTML(firstName)}</a>! You have successfully claimed your Cricket Starter Pack.\n\n`;
+      
+      msg += `🌟 <b>STAR PLAYER (1):</b>\n`;
+      if (starPlayer) {
+        msg += `• 🏆 <b>${escapeHTML(starPlayer.name)}</b> (${starPlayer.ovr} OVR) - <i>${escapeHTML(starPlayer.role || 'All-Rounder')}</i>\n\n`;
+      } else {
+        msg += `• None (Error fetching star player)\n\n`;
+      }
+      
+      msg += `🏏 <b>LOW OVR PLAYERS (6):</b>\n`;
+      lowPlayers.forEach(p => {
+        msg += `• 👤 <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR) - <i>${escapeHTML(p.role || 'Player')}</i>\n`;
+      });
+      
+      msg += `\n🎯 Build your Playing XI and start challenging players using <code>/cric</code>!`;
+      
+      await ctx.reply(msg, { parse_mode: 'HTML' });
+    } else {
+      if (result.error === 'ALREADY_CLAIMED') {
+        await ctx.reply("⚠️ You have already claimed your starter pack!");
+      } else if (result.error === 'NO_PLAYERS' || result.error === 'INSUFFICIENT_LOW_POOL' || result.error === 'INSUFFICIENT_STAR_POOL') {
+        await ctx.reply(`❌ <b>Claim Failed:</b> There are not enough players in the database pool to generate a starter pack.`);
+      } else {
+        await ctx.reply(`❌ <b>Claim Failed:</b> ${escapeHTML(result.error || 'An error occurred while claiming.')}`);
+      }
+    }
+  } catch (e) {
+    console.error("Error in /claim command:", e);
+    await ctx.reply("❌ An error occurred while processing your starter pack claim.");
+  }
 });
 
 bot.command('daily', async (ctx) => {
@@ -813,6 +957,171 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
   }
   return ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 }
+
+bot.command('cric', async (ctx) => {
+  const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
+  const overs = args[0] ? parseInt(args[0]) : 1;
+  
+  if (isNaN(overs) || overs < 1 || overs > 5) {
+    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-5)&gt;</code> to start a match lobby.", { parse_mode: 'HTML' });
+  }
+
+  const telegramId = ctx.from.id;
+  const username = ctx.from.username || ctx.from.first_name || 'Host';
+
+  if (sb.supabase) {
+    await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
+  }
+
+  try {
+    let teamName = `${username}'s XI`;
+    let squad = [];
+    if (sb.supabase) {
+      squad = await sb.getUserCricketTeam(telegramId);
+      const profile = await sb.getCricketProfile(telegramId);
+      if (profile && profile.team_name) {
+        teamName = profile.team_name;
+      }
+    }
+    const xiResult = ai.selectValidPlayingXI(squad);
+    if (!xiResult.success) {
+      return ctx.reply(`❌ <b>Lobby Creation Failed!</b>\n\n${xiResult.error}`, { parse_mode: 'HTML' });
+    }
+    const xi = xiResult.xi;
+
+    if (matchManager.getActiveMatch(ctx.chat.id) || matchManager.getActiveMatch(telegramId)) {
+      return ctx.reply("⚠️ You or this chat already has an active match running!");
+    }
+
+    activeLobbies[ctx.chat.id] = {
+      chatId: ctx.chat.id,
+      host: {
+        telegramId,
+        username,
+        teamName,
+        squad,
+        xi
+      },
+      guest: null,
+      status: 'waiting_join',
+      overs
+    };
+
+    const keyboard = new InlineKeyboard().text('🤝 Join Match', 'cric_join');
+    
+    await ctx.reply(
+      `🏏 <b>CRICKET MATCH LOBBY CREATED!</b> 🏏\n` +
+      `═════════════════════════════\n` +
+      `• <b>Host:</b> @${escapeHTML(username)}\n` +
+      `• <b>Length:</b> ${overs} Over(s)\n\n` +
+      `Click the button below to join the match!`,
+      { parse_mode: 'HTML', reply_markup: keyboard }
+    );
+  } catch (err) {
+    console.error("Lobby creation error:", err);
+    ctx.reply("❌ Failed to create lobby: " + err.message);
+  }
+});
+
+bot.command('history', async (ctx) => {
+  const telegramId = ctx.from.id;
+  
+  if (!sb.supabase) {
+    return ctx.reply("Database is currently disabled.");
+  }
+
+  try {
+    const userMatches = await sb.getUserCricketMatchHistory(telegramId);
+
+    if (!userMatches || userMatches.length === 0) {
+      return ctx.reply("📜 <b>Match History</b>\n\nNo matches found in your history yet! Start playing using `/cric`.", { parse_mode: 'HTML' });
+    }
+
+    let text = `📜 <b>Match History (Last ${userMatches.length} Games)</b>\n`;
+    text += `═════════════════════════════\n\n`;
+
+    const inlineKeyboard = new InlineKeyboard();
+
+    let hostStr = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+    const cleanHost = hostStr.replace(/^https?:\/\//, '');
+
+    userMatches.forEach((row, idx) => {
+      const m = row.state_json;
+      if (!m) return;
+      
+      const isHost = m.host.telegramId.toString() === telegramId.toString();
+      const opponentName = isHost ? (m.guest ? m.guest.username : 'AI Bot') : m.host.username;
+      
+      // Find scores
+      const hostInn = m.innings.find(i => i.battingId === m.host.telegramId) || { runs: 0, wickets: 0 };
+      const guestInn = m.guest ? (m.innings.find(i => i.battingId === m.guest.telegramId) || { runs: 0, wickets: 0 }) : { runs: 0, wickets: 0 };
+
+      const hostScore = `${hostInn.runs}/${hostInn.wickets}`;
+      const guestScore = `${guestInn.runs}/${guestInn.wickets}`;
+
+      let resultText = "Tie";
+      const inn1 = m.innings[0];
+      const inn2 = m.innings[1];
+      let matchWinner = null;
+
+      if (inn2.runs >= inn2.target) {
+        matchWinner = inn2.battingId === m.host.telegramId ? m.host : m.guest;
+      } else if (inn2.runs < inn1.runs) {
+        matchWinner = inn1.battingId === m.host.telegramId ? m.host : m.guest;
+      }
+
+      if (matchWinner) {
+        const isWinner = matchWinner.telegramId.toString() === telegramId.toString();
+        resultText = isWinner ? "🟢 Win" : "🔴 Loss";
+      }
+
+      const matchSummary = `${idx + 1}. vs ${opponentName} [${resultText}]`;
+      const scoreSummary = `Host: ${hostScore} | Guest: ${guestScore}`;
+      text += `👉 <b>${matchSummary}</b>\n   <code>${scoreSummary}</code>\n\n`;
+
+      const playUrl = `https://${cleanHost}/cricket?match_id=${m.id}&chat_id=${m.chatId}`;
+      inlineKeyboard.url(`↗️ View Match ${idx + 1}`, playUrl);
+      inlineKeyboard.row();
+    });
+
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+  } catch (err) {
+    console.error("Failed to load match history:", err);
+    ctx.reply("❌ Failed to retrieve match history: " + err.message);
+  }
+});
+
+bot.command('setteamname', async (ctx) => {
+  if (!sb.supabase) {
+    return ctx.reply("Database is currently disabled.");
+  }
+
+  const telegramId = ctx.from.id;
+  const match = ctx.message.text.match(/^\/setteamname\s+(.+)$/i);
+  
+  if (!match) {
+    return ctx.reply("❌ <b>Usage:</b> <code>/setteamname &lt;your_team_name&gt;</code>\nExample: <code>/setteamname Mumbai Indians</code>", { parse_mode: 'HTML' });
+  }
+
+  let teamName = match[1].trim();
+
+  if (teamName.length < 2 || teamName.length > 25) {
+    return ctx.reply("⚠️ Team name must be between 2 and 25 characters long.");
+  }
+
+  try {
+    await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
+    const res = await sb.updateCricketTeamName(telegramId, teamName);
+    if (res.success) {
+      await ctx.reply(`✅ Your cricket team name has been set to: <b>${escapeHTML(teamName)}</b>`, { parse_mode: 'HTML' });
+    } else {
+      await ctx.reply(`❌ Failed to update team name: ${res.error}`);
+    }
+  } catch (err) {
+    console.error("Set team name error:", err);
+    ctx.reply("❌ An error occurred while setting your team name.");
+  }
+});
 
 bot.command('hilo', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database disabled.");
@@ -1801,6 +2110,132 @@ bot.on('callback_query:data', async (ctx) => {
   const chatId = ctx.chat.id;
   const user = ctx.from;
 
+  // --- CRICKET LOBBY CALLBACKS ---
+  if (data === 'cric_join') {
+    const lobby = activeLobbies[chatId];
+    if (!lobby) return ctx.answerCallbackQuery({ text: "❌ No active lobby in this chat.", show_alert: true });
+
+    if (lobby.host.telegramId === user.id) {
+      return ctx.answerCallbackQuery({ text: "❌ You cannot join your own lobby!", show_alert: true });
+    }
+
+    if (lobby.guest) {
+      return ctx.answerCallbackQuery({ text: "❌ Lobby is already full.", show_alert: true });
+    }
+
+    const guestId = user.id;
+    const guestUsername = user.username || user.first_name || 'Guest';
+
+    if (sb.supabase) {
+      await sb.ensureUser(guestId, user.first_name).catch(() => {});
+    }
+
+    try {
+      let guestTeamName = `${guestUsername}'s XI`;
+      let squad = [];
+      if (sb.supabase) {
+        squad = await sb.getUserCricketTeam(guestId);
+        const profile = await sb.getCricketProfile(guestId);
+        if (profile && profile.team_name) {
+          guestTeamName = profile.team_name;
+        }
+      }
+      const xiResult = ai.selectValidPlayingXI(squad);
+      if (!xiResult.success) {
+        const cleanError = xiResult.error.replace(/<[^>]*>/g, '').replace(/\n\n/g, '\n');
+        return ctx.answerCallbackQuery({ text: `❌ Join Failed:\n${cleanError}`, show_alert: true });
+      }
+      const xi = xiResult.xi;
+
+      lobby.guest = {
+        telegramId: guestId,
+        username: guestUsername,
+        teamName: guestTeamName,
+        squad,
+        xi
+      };
+
+      lobby.status = 'toss_decision';
+      
+      const tossWinner = Math.random() < 0.5 ? lobby.host : lobby.guest;
+      lobby.tossWinner = tossWinner;
+
+      const text = 
+        `🪙 <b>TOSS COMPLETED!</b> 🪙\n` +
+        `═════════════════════════════\n` +
+        `• Host: @${escapeHTML(lobby.host.username)}\n` +
+        `• Guest: @${escapeHTML(lobby.guest.username)}\n\n` +
+        `🎉 <b>@${escapeHTML(tossWinner.username)}</b> won the toss!\n` +
+        `Choose your decision:`;
+
+      const keyboard = new InlineKeyboard()
+        .text('Bat First 🏏', 'cric_decision:bat')
+        .text('Bowl First 🎳', 'cric_decision:bowl');
+
+      await ctx.answerCallbackQuery({ text: '✅ Joined match lobby!' });
+      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+    } catch (err) {
+      console.error("Lobby join error:", err);
+      ctx.reply("❌ Error joining lobby: " + err.message);
+    }
+    return;
+  }
+
+  if (data.startsWith('cric_decision:')) {
+    const decision = data.split(':')[1];
+    const lobby = activeLobbies[chatId];
+    if (!lobby) return ctx.answerCallbackQuery({ text: "❌ No active lobby in this chat.", show_alert: true });
+
+    if (user.id !== lobby.tossWinner.telegramId) {
+      return ctx.answerCallbackQuery({ text: "⚠️ Only the toss winner can make the decision!", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery();
+    lobby.tossDecision = decision;
+
+    if (decision === 'bat') {
+      lobby.battingPlayer = lobby.tossWinner;
+      lobby.bowlingPlayer = lobby.tossWinner.telegramId === lobby.host.telegramId ? lobby.guest : lobby.host;
+    } else {
+      lobby.bowlingPlayer = lobby.tossWinner;
+      lobby.battingPlayer = lobby.tossWinner.telegramId === lobby.host.telegramId ? lobby.guest : lobby.host;
+    }
+
+    try {
+      const dbMatchId = `c_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+      const match = matchManager.createMatchFromLobby({
+        dbMatchId: dbMatchId,
+        lobby: lobby
+      });
+      match.status = 'xi_selection';
+
+      try {
+        await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+      } catch (e) {}
+
+      const keyboard = new InlineKeyboard().url("🎮 Play Match", getMatchPlayUrl(match));
+
+      const sentMsg = await ctx.reply(
+        `🏏 <b>MATCH IS READY!</b>\n` +
+        `═══════════════════════════════\n` +
+        `• Host: <b>${escapeHTML(match.host.username)}</b>\n` +
+        `• Guest: <b>${escapeHTML(match.guest.username)}</b>\n` +
+        `• Pitch: <b>${match.pitch.toUpperCase()}</b>\n` +
+        `• Length: <b>${match.totalOvers} Over(s)</b>\n\n` +
+        `🪙 <b>Toss:</b> @${escapeHTML(lobby.tossWinner.username)} elected to <b>${decision.toUpperCase()} first</b>.\n\n` +
+        `👉 Tap <b>Play Match</b> to start!`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+      );
+
+      match.activeScorecardMessageId = sentMsg.message_id;
+      delete activeLobbies[chatId];
+    } catch (err) {
+      console.error("Match creation error:", err);
+      ctx.reply("❌ Error starting match: " + err.message);
+    }
+    return;
+  }
+
   // --- DICE BET CALLBACKS ---
   if (data.startsWith('dice_bet:')) {
     const parts = data.split(':');
@@ -1956,7 +2391,7 @@ bot.on('callback_query:data', async (ctx) => {
       
       if (!team || team.length === 0) {
         const text = `🏏 <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b> does not have any cricket players in their squad yet!\n\n` +
-                     `<blockquote>Go to the Shop tab in the Mini App to sign cricket players for your team.</blockquote>`;
+                     `<blockquote>Use /claim to get your starter pack or visit the Shop to sign players.</blockquote>`;
         const kb = new InlineKeyboard()
           .text("⬅️ Back", `myteam:home:${targetUserId}`);
         
@@ -1966,63 +2401,48 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
       
-      // Categorize cricket players: batsman, wicket_keeper, all_rounder, bowler
-      // Sort each category descending by OVR
-      const batsmen = team.filter(p => p.role === 'batsman').sort((a, b) => b.ovr - a.ovr);
-      const wks = team.filter(p => p.role === 'wicket_keeper').sort((a, b) => b.ovr - a.ovr);
-      const alrs = team.filter(p => p.role === 'all_rounder').sort((a, b) => b.ovr - a.ovr);
-      const bowlers = team.filter(p => p.role === 'bowler').sort((a, b) => b.ovr - a.ovr);
-      
-      let msg = `🏏 <u><b>CRICKET SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n\n`;
-      msg += `<blockquote>⚡ "Champions keep playing until they get it right."</blockquote>\n`;
-      
-      const renderPlayer = (p) => {
-        const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-        return `• <b>${escapeHTML(p.name)}</b> (OVR: <b>${p.ovr}</b>)${tierIndicator}`;
+      const roleIcon = (role) => {
+        if (role === 'batsman') return '🏏';
+        if (role === 'wicket_keeper') return '🧤';
+        if (role === 'all_rounder') return '⚡';
+        if (role === 'bowler') return '🥎';
+        return '👤';
       };
-      
-      msg += `🏏 <b>BATSMEN</b>\n`;
-      if (batsmen.length > 0) {
-        batsmen.forEach(p => msg += `${renderPlayer(p)}\n`);
-      } else {
-        msg += `<i>No batsmen signed yet.</i>\n`;
+      const roleLabel = (role) => {
+        if (role === 'batsman') return 'BAT';
+        if (role === 'wicket_keeper') return 'WK';
+        if (role === 'all_rounder') return 'ALR';
+        if (role === 'bowler') return 'BOWL';
+        return '';
+      };
+
+      let msg = `🏏 <u><b>CRICKET SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n`;
+      msg += `<blockquote>⚡ "Champions keep playing until they get it right."</blockquote>\n`;
+
+      // Playing XI (positions 1-11)
+      msg += `<b>━━━ PLAYING XI ━━━</b>\n`;
+      const xi = team.slice(0, 11);
+      xi.forEach((p, idx) => {
+        const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+        msg += `<b>${idx + 1}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+      });
+
+      // Bench (positions 12+)
+      if (team.length > 11) {
+        msg += `\n<b>━━━ BENCH ━━━</b>\n`;
+        const bench = team.slice(11);
+        bench.forEach((p, idx) => {
+          const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+          msg += `<b>${idx + 12}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+        });
       }
-      msg += `\n`;
       
-      msg += `🧤 <b>WICKET KEEPERS</b>\n`;
-      if (wks.length > 0) {
-        wks.forEach(p => msg += `${renderPlayer(p)}\n`);
-      } else {
-        msg += `<i>No wicket keepers signed yet.</i>\n`;
+      msg += `\n📊 <b>Squad:</b> ${team.length}/25`;
+      if (xi.length >= 11) {
+        const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
+        msg += ` • <b>XI Rating:</b> ${teamRating} OVR`;
       }
-      msg += `\n`;
-      
-      msg += `⚡ <b>ALL ROUNDERS</b>\n`;
-      if (alrs.length > 0) {
-        alrs.forEach(p => msg += `${renderPlayer(p)}\n`);
-      } else {
-        msg += `<i>No all rounders signed yet.</i>\n`;
-      }
-      msg += `\n`;
-      
-      msg += `🥎 <b>BOWLERS</b>\n`;
-      if (bowlers.length > 0) {
-        bowlers.forEach(p => msg += `${renderPlayer(p)}\n`);
-      } else {
-        msg += `<i>No bowlers signed yet.</i>\n`;
-      }
-      msg += `\n`;
-      
-      const totalPlayers = team.length;
-      const sortedByOvr = [...team].sort((a, b) => b.ovr - a.ovr);
-      const top11 = sortedByOvr.slice(0, 11);
-      const teamRating = Math.round(top11.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
-      const bestPlayer = sortedByOvr[0];
-      
-      msg += `📊 <b>Squad Stats:</b>\n`;
-      msg += `👥 <b>Players:</b> ${totalPlayers}\n`;
-      msg += `📈 <b>Team Rating:</b> ${teamRating} OVR\n`;
-      msg += `🔥 <b>Star Player:</b> ${escapeHTML(bestPlayer.name)} (${bestPlayer.ovr} OVR)`;
+      msg += `\n💡 <i>Use /swap &lt;pos1&gt; &lt;pos2&gt; to rearrange.</i>`;
       
       const kb = new InlineKeyboard()
         .text("⬅️ Back", `myteam:home:${targetUserId}`);
@@ -3165,6 +3585,11 @@ app.get('/assets/players/:filename', (req, res) => {
 
 app.get('/', (req, res) => res.send('Bot is safely running!'));
 
+app.use('/cricket', express.static(path.join(__dirname, 'public', 'cricket')));
+app.get('/cricket', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'cricket', 'index.html'));
+});
+
 // Serve Mini App (Adsgram)
 app.get('/bonus-app', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -3434,6 +3859,742 @@ app.get('/api/shop/buy', async (req, res) => {
     }
 });
 
+// =============================================
+// CRICKET GAME REST API ENDPOINTS
+// =============================================
+
+app.get('/api/match', async (req, res) => {
+  const clean = (val) => {
+    if (!val || val === 'null' || val === 'undefined') return null;
+    return val.toString().trim();
+  };
+
+  const userId = clean(req.query.userId);
+  const matchId = clean(req.query.matchId);
+
+  if (!userId && !matchId) {
+    return res.status(400).json({ error: 'userId or matchId is required' });
+  }
+
+  let match = matchManager.getMatch(matchId || userId);
+  if (!match) {
+    if (sb.supabase && matchId) {
+      try {
+        const row = await sb.getCricketMatchById(matchId);
+        if (row && row.state_json) {
+          const deserialized = matchManager.deserializeMatch(row.state_json);
+          const serialized = serializeMatchState(deserialized, userId);
+          return res.json(serialized);
+        }
+      } catch (err) {
+        console.error("Failed to fetch match from Supabase:", err);
+      }
+    }
+    return res.status(404).json({ error: 'No active match found.' });
+  }
+
+  const serialized = serializeMatchState(match, userId);
+  res.json(serialized);
+});
+
+app.post('/api/match/select-players', async (req, res) => {
+  const clean = (val) => {
+    if (!val || val === 'null' || val === 'undefined') return null;
+    return val.toString().trim();
+  };
+
+  const { userId, strikerIdx, nonStrikerIdx, bowlerIdx } = req.body;
+  const sanitizedUserId = clean(userId);
+  if (!sanitizedUserId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const match = matchManager.getActiveMatch(sanitizedUserId);
+  if (!match) {
+    return res.status(404).json({ error: 'No active match found.' });
+  }
+
+  if (match.status !== 'xi_selection') {
+    return res.status(400).json({ error: 'Match is not in team selection phase.' });
+  }
+
+  if (strikerIdx !== undefined && nonStrikerIdx !== undefined && parseInt(strikerIdx) === parseInt(nonStrikerIdx)) {
+    return res.status(400).json({ error: 'Striker and non-striker must be different players!' });
+  }
+
+  // Determine current batting team ID
+  let battingTeamId = null;
+  if (match.currentInningsIdx === 1) {
+    battingTeamId = match.innings[1].battingId;
+  } else {
+    if (match.tossWinnerId && match.host.telegramId) {
+      battingTeamId = match.tossWinnerId.toString() === match.host.telegramId.toString()
+        ? (match.tossDecision === 'bat' ? match.host.telegramId : match.guest.telegramId)
+        : (match.tossDecision === 'bat' ? match.guest.telegramId : match.host.telegramId);
+    } else {
+      battingTeamId = match.host.telegramId;
+    }
+  }
+
+  const isBatting = battingTeamId && (battingTeamId.toString() === sanitizedUserId);
+
+  if (isBatting) {
+    if (strikerIdx !== undefined) match.strikerIdx = parseInt(strikerIdx);
+    if (nonStrikerIdx !== undefined) match.nonStrikerIdx = parseInt(nonStrikerIdx);
+    if (match.type === 'pve' && match.bowlingTeam.telegramId === 'ai') {
+      match.currentBowlerIdx = 10;
+    }
+  } else {
+    if (bowlerIdx !== undefined) match.currentBowlerIdx = parseInt(bowlerIdx);
+    if (match.type === 'pve' && match.battingTeam.telegramId === 'ai') {
+      match.strikerIdx = 0;
+      match.nonStrikerIdx = 1;
+    }
+  }
+
+  // If BOTH players have selected their players, start the match/innings!
+  if (match.strikerIdx !== null && match.nonStrikerIdx !== null && match.currentBowlerIdx !== null) {
+    if (match.currentInningsIdx === 0) {
+      match.startFirstInnings({
+        strikerIdx: match.strikerIdx,
+        nonStrikerIdx: match.nonStrikerIdx,
+        bowlerIdx: match.currentBowlerIdx
+      });
+
+      if (match.type !== 'pvp') {
+        const striker = match.battingTeam.xi[match.strikerIdx];
+        const nonStriker = match.battingTeam.xi[match.nonStrikerIdx];
+        const bowler = match.bowlingTeam.xi[match.currentBowlerIdx];
+
+        await sendTelegramMessage(match,
+          `👉 <b>Striker:</b> <b>${escapeHTML(striker.name)}</b> (${striker.ovr} OVR)\n` +
+          `👉 <b>Non-Striker:</b> <b>${escapeHTML(nonStriker.name)}</b> (${nonStriker.ovr} OVR)\n` +
+          `👉 <b>Bowler:</b> <b>${escapeHTML(bowler.name)}</b> (${bowler.ovr} OVR)\n\n` +
+          `🏏 <b>MATCH STARTED!</b> 🏏\n` +
+          `Host: <b>${escapeHTML(match.host.username)}</b> vs Guest: <b>${escapeHTML(match.guest ? match.guest.username : 'AI')}</b>\n` +
+          `Pitch: <b>${match.pitch.toUpperCase()}</b> | Length: <b>${match.totalOvers} Over(s)</b>`
+        );
+      }
+    } else {
+      match.status = 'innings2';
+      match.nextBatsmanIdx = 2;
+      while (match.nextBatsmanIdx === match.strikerIdx || match.nextBatsmanIdx === match.nonStrikerIdx) {
+        match.nextBatsmanIdx++;
+      }
+      match.turnState = 'bowling_delivery';
+
+      if (match.type !== 'pvp') {
+        const striker = match.battingTeam.xi[match.strikerIdx];
+        const nonStriker = match.battingTeam.xi[match.nonStrikerIdx];
+        const bowler = match.bowlingTeam.xi[match.currentBowlerIdx];
+
+        await sendTelegramMessage(match,
+          `🏏 <b>SECOND INNINGS BEGINS!</b>\n` +
+          `═════════════════════════════\n` +
+          `👉 <b>Striker:</b> <b>${escapeHTML(striker.name)}</b> (${striker.ovr} OVR)\n` +
+          `👉 <b>Non-Striker:</b> <b>${escapeHTML(nonStriker.name)}</b> (${nonStriker.ovr} OVR)\n` +
+          `🎳 <b>Bowler:</b> <b>${escapeHTML(bowler.name)}</b> (${bowler.ovr} OVR)\n\n` +
+          `🎯 <b>Target:</b> <b>${match.innings[1].target} runs</b> to win!`
+        );
+      }
+    }
+
+    matchManager.saveToDb(match);
+    await runGameLoopStep(null, match, true);
+  } else {
+    matchManager.saveToDb(match);
+  }
+
+  res.json({ success: true });
+});
+
+app.post('/api/match/action', async (req, res) => {
+  const clean = (val) => {
+    if (!val || val === 'null' || val === 'undefined') return null;
+    return val.toString().trim();
+  };
+
+  const { userId, type, action } = req.body;
+  const sanitizedUserId = clean(userId);
+  if (!sanitizedUserId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const match = matchManager.getActiveMatch(sanitizedUserId);
+  if (!match) {
+    return res.status(404).json({ error: 'No active match found.' });
+  }
+
+  const isHost = match.host.telegramId.toString() === sanitizedUserId;
+  const isGuest = match.guest && match.guest.telegramId && match.guest.telegramId.toString() === sanitizedUserId;
+  if (!isHost && !isGuest) {
+    return res.status(403).json({ error: 'You are not a player in this match.' });
+  }
+
+  if (match.isProcessing) {
+    return res.status(400).json({ error: 'Processing previous action, please wait.' });
+  }
+
+  const battingTeamId = match.innings[match.currentInningsIdx].battingId;
+  const isBatting = battingTeamId.toString() === sanitizedUserId;
+
+  if (type === 'delivery') {
+    if (isBatting) return res.status(400).json({ error: 'You are batting, cannot bowl!' });
+    if (match.turnState !== 'bowling_delivery') return res.status(400).json({ error: 'Not in bowling delivery phase.' });
+
+    match.currentDelivery = action.delivery;
+    match.currentSpeed = action.speed || 'normal';
+    match.lastDeliveryKmph = generateDeliveryKmph(match.currentBowler.bowler_type || 'fast', match.currentSpeed);
+    match.turnState = 'batting_shot';
+
+    matchManager.saveToDb(match);
+
+    if (match.type === 'pve' && match.battingTeam.telegramId === 'ai') {
+      match.currentShot = ai.getAIShot(match.striker, match.currentDelivery, match.currentSpeed);
+      await processBallAndProgress(null, match);
+    } else {
+      await runGameLoopStep(null, match, false);
+    }
+  } else if (type === 'shot') {
+    if (!isBatting) return res.status(400).json({ error: 'You are bowling, cannot bat!' });
+    if (match.turnState !== 'batting_shot') return res.status(400).json({ error: 'Not in batting shot phase.' });
+
+    match.currentShot = action.shot;
+    await processBallAndProgress(null, match);
+  } else if (type === 'wicket_batsman') {
+    if (!isBatting) return res.status(400).json({ error: 'Only batsman can choose new batsman.' });
+    if (match.turnState !== 'selecting_wicket_batsman') return res.status(400).json({ error: 'Not in wicket batsman selection state.' });
+
+    const index = parseInt(action.index);
+    const nextPlayer = match.battingTeam.xi[index];
+    if (!nextPlayer) {
+      return res.status(400).json({ error: 'Invalid batsman index.' });
+    }
+
+    if (index === match.strikerIdx || index === match.nonStrikerIdx) {
+      return res.status(400).json({ error: 'This player is already batting at the crease.' });
+    }
+
+    const stats = match.stats[nextPlayer.id];
+    if (stats && stats.isOut) {
+      return res.status(400).json({ error: 'This player is already dismissed.' });
+    }
+
+    match.strikerIdx = index;
+    match.turnState = 'bowling_delivery';
+
+    const overCompleted = match.currentInnings.balls % 6 === 0;
+    if (overCompleted && match.currentInnings.balls > 0) {
+      const temp = match.strikerIdx;
+      match.strikerIdx = match.nonStrikerIdx;
+      match.nonStrikerIdx = temp;
+
+      match.turnState = 'selecting_over_bowler';
+    }
+
+    matchManager.saveToDb(match);
+
+    if (match.type !== 'pvp') {
+      await sendTelegramMessage(match, `👉 <b>New Batsman:</b> <b>${escapeHTML(nextPlayer.name)}</b> (${nextPlayer.ovr} OVR) has walked out to bat.`);
+    }
+    await runGameLoopStep(null, match, true);
+  } else if (type === 'over_bowler') {
+    if (isBatting) return res.status(400).json({ error: 'Only bowler can choose new bowler.' });
+    if (match.turnState !== 'selecting_over_bowler') return res.status(400).json({ error: 'Not in bowler selection state.' });
+
+    const index = parseInt(action.index);
+    if (!match.isBowlerEligible(index)) {
+      return res.status(400).json({ error: 'This bowler is not eligible (consecutive over or over limit reached).' });
+    }
+    match.currentBowlerIdx = index;
+    
+    const nextBowler = match.bowlingTeam.xi[index];
+    match.turnState = 'bowling_delivery';
+
+    matchManager.saveToDb(match);
+
+    if (match.type !== 'pvp') {
+      await sendTelegramMessage(match, `👉 <b>New Bowler:</b> <b>${escapeHTML(nextBowler.name)}</b> (${nextBowler.ovr} OVR) will bowl the next over.`);
+    }
+    await runGameLoopStep(null, match, true);
+  } else {
+    return res.status(400).json({ error: 'Invalid action type.' });
+  }
+
+  res.json({ success: true });
+});
+
+// =============================================
+// CRICKET GAMEPLAY HELPERS AND STATE LOOP
+// =============================================
+
+function generateDeliveryKmph(bowlerType, speed) {
+  if (bowlerType === 'fast') {
+    if (speed === 'fast') return Math.floor(Math.random() * 11) + 142; // 142 - 152
+    if (speed === 'slow') return Math.floor(Math.random() * 11) + 115; // 115 - 125
+    return Math.floor(Math.random() * 7) + 135; // 135 - 141
+  } else {
+    return Math.floor(Math.random() * 17) + 82; // 82 - 98
+  }
+}
+
+function serializeMatchState(match, userId) {
+  const isHost = userId && (match.host.telegramId.toString() === userId.toString());
+  const isGuest = userId && match.guest && (match.guest.telegramId.toString() === userId.toString());
+
+  let battingTeamId = null;
+  if (match.currentInningsIdx === 1) {
+    battingTeamId = match.innings[1].battingId;
+  } else if (match.status === 'xi_selection') {
+    if (match.tossWinnerId && match.host.telegramId) {
+      battingTeamId = match.tossWinnerId.toString() === match.host.telegramId.toString()
+        ? (match.tossDecision === 'bat' ? match.host.telegramId : match.guest.telegramId)
+        : (match.tossDecision === 'bat' ? match.guest.telegramId : match.host.telegramId);
+    } else {
+      battingTeamId = match.host.telegramId;
+    }
+  } else {
+    battingTeamId = match.innings[0].battingId;
+  }
+
+  const isPlayer = isHost || isGuest;
+  const isBatting = userId && battingTeamId && (battingTeamId.toString() === userId.toString());
+  const myRole = isPlayer ? (isBatting ? 'batting' : 'bowling') : 'spectator';
+
+  let isMyTurn = false;
+  if (isPlayer) {
+    if (match.status === 'xi_selection') {
+      if (isBatting) {
+        isMyTurn = match.strikerIdx === null || match.nonStrikerIdx === null;
+      } else {
+        isMyTurn = match.currentBowlerIdx === null;
+      }
+    } else if (match.status === 'innings1' || match.status === 'innings2') {
+      if (match.turnState === 'bowling_delivery') {
+        isMyTurn = !isBatting;
+      } else if (match.turnState === 'batting_shot') {
+        isMyTurn = isBatting;
+      } else if (match.turnState === 'selecting_wicket_batsman') {
+        isMyTurn = isBatting;
+      } else if (match.turnState === 'selecting_over_bowler') {
+        isMyTurn = !isBatting;
+      }
+    }
+  }
+
+  const isHostBatting = battingTeamId && match.host.telegramId && (battingTeamId.toString() === match.host.telegramId.toString());
+  const battingConfirmed = match.strikerIdx !== null && match.nonStrikerIdx !== null;
+  const bowlingConfirmed = match.currentBowlerIdx !== null;
+
+  const hostConfirmed = isHostBatting ? battingConfirmed : bowlingConfirmed;
+  const guestConfirmed = isHostBatting ? bowlingConfirmed : battingConfirmed;
+
+  const striker = match.strikerIdx !== null ? match.battingTeam.xi[match.strikerIdx] : null;
+  const nonStriker = match.nonStrikerIdx !== null ? match.battingTeam.xi[match.nonStrikerIdx] : null;
+  const bowler = match.currentBowlerIdx !== null ? match.bowlingTeam.xi[match.currentBowlerIdx] : null;
+
+  let resultData = null;
+  if (match.status === 'completed') {
+    const inn1 = match.innings[0];
+    const inn2 = match.innings[1];
+    
+    let winner = null;
+    let loser = null;
+    if (inn2.runs >= inn2.target) {
+      winner = inn2.battingId === match.host.telegramId ? match.host : match.guest;
+      loser = winner.telegramId === match.host.telegramId ? match.guest : match.host;
+    } else if (inn2.runs < inn1.runs) {
+      winner = inn1.battingId === match.host.telegramId ? match.host : match.guest;
+      loser = winner.telegramId === match.host.telegramId ? match.guest : match.host;
+    }
+
+    let bestPlayerId = null;
+    let bestScore = -1;
+    const winningPlayerIds = new Set((winner && winner.xi) ? winner.xi.map(p => p.id) : []);
+
+    for (const [pid, pStats] of Object.entries(match.stats)) {
+      if (winningPlayerIds.size > 0 && !winningPlayerIds.has(pid)) {
+        continue;
+      }
+      const score = pStats.runs + pStats.wickets * 25;
+      if (score > bestScore) {
+        bestScore = score;
+        bestPlayerId = pid;
+      }
+    }
+
+    let motmPlayer = null;
+    let motmStats = null;
+    if (bestPlayerId) {
+      motmPlayer = match.host.xi.find(p => p.id === bestPlayerId) || 
+                   (match.guest ? match.guest.xi.find(p => p.id === bestPlayerId) : null);
+      motmStats = match.stats[bestPlayerId];
+    }
+
+    resultData = {
+      winner: winner ? { username: winner.username, teamName: winner.teamName } : null,
+      winnerReward: match.totalOvers * gameConstants.WINNER_REWARD_PER_OVER,
+      loserReward: match.totalOvers * gameConstants.LOSER_REWARD_PER_OVER,
+      motm: motmPlayer ? {
+        name: motmPlayer.name,
+        runs: motmStats.runs,
+        balls: motmStats.balls,
+        wickets: motmStats.wickets,
+        overs: motmStats.overs
+      } : null
+    };
+  }
+
+  return {
+    id: match.id,
+    type: match.type,
+    chatId: match.chatId,
+    pitch: match.pitch,
+    totalOvers: match.totalOvers,
+    status: match.status,
+    tossWinnerId: match.tossWinnerId,
+    tossDecision: match.tossDecision,
+    turnState: match.turnState,
+    isProcessing: match.isProcessing,
+    myRole,
+    isMyTurn,
+    result: resultData,
+    host: {
+      telegramId: match.host.telegramId,
+      username: match.host.username,
+      teamName: match.host.teamName,
+      xi: match.host.xi,
+      confirmed: hostConfirmed
+    },
+    guest: {
+      telegramId: match.guest ? match.guest.telegramId : 'ai',
+      username: match.guest ? match.guest.username : 'AI Bot',
+      teamName: match.guest ? match.guest.teamName : 'AI XI',
+      xi: match.guest ? match.guest.xi : [],
+      confirmed: guestConfirmed
+    },
+    currentInningsIdx: match.currentInningsIdx,
+    innings: match.innings.map(inn => ({
+      battingId: inn.battingId,
+      bowlingId: inn.bowlingId,
+      runs: inn.runs,
+      wickets: inn.wickets,
+      balls: inn.balls % 6,
+      overs: Math.floor(inn.balls / 6),
+      extras: inn.extras || 0,
+      target: inn.target
+    })),
+    score: {
+      runs: match.currentInnings ? match.currentInnings.runs : 0,
+      wickets: match.currentInnings ? match.currentInnings.wickets : 0,
+      balls: match.currentInnings ? (match.currentInnings.balls % 6) : 0,
+      overs: match.currentInnings ? Math.floor(match.currentInnings.balls / 6) : 0,
+      target: match.currentInnings ? match.currentInnings.target : null
+    },
+    striker: striker ? {
+      ...striker,
+      stats: match.stats[striker.id] || { runs: 0, balls: 0, fours: 0, sixes: 0 }
+    } : null,
+    nonStriker: nonStriker ? {
+      ...nonStriker,
+      stats: match.stats[nonStriker.id] || { runs: 0, balls: 0, fours: 0, sixes: 0 }
+    } : null,
+    bowler: bowler ? {
+      ...bowler,
+      stats: match.stats[bowler.id] || { runsConceded: 0, wickets: 0, overs: 0 }
+    } : null,
+    battingXI: match.battingTeam ? match.battingTeam.xi : [],
+    bowlingXI: match.bowlingTeam ? match.bowlingTeam.xi : [],
+    stats: match.stats,
+    commentary: match.commentary,
+    currentDelivery: match.currentDelivery,
+    currentSpeed: match.currentSpeed,
+    lastBall: match.lastBallOutcome ? {
+      runs: match.lastBallOutcome.runs,
+      isWicket: match.lastBallOutcome.isWicket,
+      isBoundary: match.lastBallOutcome.isSix || (match.lastBallOutcome.runs === 4),
+      commentary: match.lastBallOutcome.commentary,
+      delivery: match.lastBallOutcome.delivery || ''
+    } : null,
+    partnership: match.partnership
+  };
+}
+
+async function sendTelegramMessage(match, text, options = {}) {
+  try {
+    return await bot.api.sendMessage(match.chatId, text, { parse_mode: 'HTML', ...options });
+  } catch (err) {
+    console.error("Failed to send telegram message:", err);
+  }
+}
+
+function renderScorecardScreen(match) {
+  const current = match.currentInnings;
+  const bTeam = match.battingTeam;
+  const bowlTeam = match.bowlingTeam;
+
+  const runs = current.runs;
+  const wickets = current.wickets;
+  const balls = current.balls;
+  const oversFormatted = `${Math.floor(balls / 6)}.${balls % 6}`;
+
+  const striker = match.striker;
+  const nonStriker = match.nonStriker;
+  const bowler = match.currentBowler;
+
+  const strikerStats = striker ? (match.stats[striker.id] || { runs: 0, balls: 0 }) : { runs: 0, balls: 0 };
+  const nonStrikerStats = nonStriker ? (match.stats[nonStriker.id] || { runs: 0, balls: 0 }) : { runs: 0, balls: 0 };
+  const bowlerStats = bowler ? (match.stats[bowler.id] || { overs: 0, runsConceded: 0, wickets: 0 }) : { overs: 0, runsConceded: 0, wickets: 0 };
+
+  const bNameEsc = escapeHTML(bTeam.teamName || bTeam.username);
+  const strikerNameEsc = striker ? escapeHTML(striker.name) : 'TBD';
+  const nonStrikerNameEsc = nonStriker ? escapeHTML(nonStriker.name) : 'TBD';
+  const bowlerNameEsc = bowler ? escapeHTML(bowler.name) : 'TBD';
+
+  let header = `🏏 <b>LIVE SCORECARD</b>\n` +
+               `══════════════════════════════\n` +
+               `• <b>Batting:</b> ${bNameEsc}\n` +
+               `• <b>Score:</b> <b>${runs}/${wickets}</b> in <b>${oversFormatted}/${match.totalOvers} overs</b>\n`;
+
+  if (match.status === 'innings2') {
+    const target = current.target;
+    const runsNeeded = target - runs;
+    const ballsRemaining = (match.totalOvers * 6) - balls;
+    header += `• <b>Target:</b> <b>${target}</b> (Need <b>${runsNeeded}</b> off <b>${ballsRemaining}</b> balls)\n`;
+  }
+
+  header += `══════════════════════════════\n` +
+            `<b>🪓 Batsmen:</b>\n` +
+            `👉 <b>${strikerNameEsc}</b> : <b>${strikerStats.runs}</b> (${strikerStats.balls}b)\n` +
+            `• <b>${nonStrikerNameEsc}</b> : <b>${nonStrikerStats.runs}</b> (${nonStrikerStats.balls}b)\n\n` +
+            `<b>🎳 Bowler:</b>\n` +
+            `• <b>${bowlerNameEsc}</b> : <b>${bowlerStats.wickets}-${bowlerStats.runsConceded}</b> (${bowlerStats.overs} ov)\n` +
+            `══════════════════════════════\n`;
+
+  if (match.status === 'completed') {
+    header += `🏆 <b>Match Completed!</b>`;
+  } else if (match.status === 'xi_selection') {
+    header += `⏳ <b>Xi Selection Phase:</b> Select openers/bowler in the Mini App.`;
+  } else {
+    if (match.turnState === 'bowling_delivery' || match.turnState === 'bowling_speed') {
+      header += `🎳 <b>Bowler's Turn:</b> Waiting for @${escapeHTML(bowlTeam.username)} to deliver...`;
+    } else if (match.turnState === 'batting_shot') {
+      header += `🏏 <b>Batsman's Turn:</b> Waiting for @${escapeHTML(bTeam.username)} to play shot...`;
+    } else if (match.turnState === 'selecting_wicket_batsman') {
+      header += `☝️ <b>WICKET!</b> Waiting for @${escapeHTML(bTeam.username)} to choose next batsman...`;
+    } else if (match.turnState === 'selecting_over_bowler') {
+      header += `🔚 <b>End of Over!</b> Waiting for @${escapeHTML(bowlTeam.username)} to choose next bowler...`;
+    }
+  }
+
+  const keyboard = new InlineKeyboard();
+  keyboard.url("🎮 Play Match", getMatchPlayUrl(match));
+
+  return { text: header, keyboard };
+}
+
+async function runGameLoopStep(ctx, match, forceNewMessage = false) {
+  match.isProcessing = false;
+
+  if (match.type === 'pvp') {
+    matchManager.saveToDb(match);
+  } else if (match.type === 'pve') {
+    if (match.status === 'xi_selection') {
+      if (match.strikerIdx !== null && match.nonStrikerIdx !== null && match.currentBowlerIdx !== null) {
+        match.startFirstInnings({
+          strikerIdx: match.strikerIdx,
+          nonStrikerIdx: match.nonStrikerIdx,
+          bowlerIdx: match.currentBowlerIdx
+        });
+        forceNewMessage = true;
+      }
+    }
+
+    if (match.status === 'innings1' || match.status === 'innings2') {
+      if (match.turnState === 'bowling_delivery') {
+        const bowlTeam = match.bowlingTeam;
+        if (bowlTeam.telegramId === 'ai') {
+          const aiBowl = ai.getAIDelivery(match.currentBowler);
+          match.currentDelivery = aiBowl.delivery;
+          match.currentSpeed = aiBowl.speed;
+          match.lastDeliveryKmph = generateDeliveryKmph(match.currentBowler.bowler_type || 'fast', aiBowl.speed);
+          match.turnState = 'batting_shot';
+        }
+      }
+      
+      if (match.turnState === 'batting_shot') {
+        const bTeam = match.battingTeam;
+        if (bTeam.telegramId === 'ai') {
+          match.currentShot = ai.getAIShot(match.striker, match.currentDelivery, match.currentSpeed);
+          matchManager.saveToDb(match);
+          await processBallAndProgress(ctx, match);
+          return;
+        }
+      }
+    }
+
+    matchManager.saveToDb(match);
+  }
+
+  const { text, keyboard } = renderScorecardScreen(match);
+
+  if (!forceNewMessage && match.activeScorecardMessageId && ctx && ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      return;
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  if (match.activeScorecardMessageId) {
+    try {
+      await bot.api.editMessageReplyMarkup(match.chatId, match.activeScorecardMessageId, { reply_markup: { inline_keyboard: [] } });
+    } catch (e) {}
+  }
+
+  try {
+    const sentMsg = await bot.api.sendMessage(match.chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    match.activeScorecardMessageId = sentMsg.message_id;
+    matchManager.saveToDb(match);
+  } catch (err) {
+    console.error("Failed to send scorecard message:", err);
+  }
+}
+
+async function processBallAndProgress(ctx, match) {
+  match.isProcessing = true;
+  const activeBatsmanName = match.striker.name;
+
+  const outcome = match.bowlBall();
+
+  match.commentary.unshift({
+    over: `${Math.floor((match.currentInnings.balls - 1) / 6)}.${(match.currentInnings.balls - 1) % 6 + 1}`,
+    text: outcome.commentary,
+    runs: outcome.runs,
+    isWicket: outcome.isWicket
+  });
+
+  if (match.currentInnings.balls % 6 === 0) {
+    const overNum = Math.floor(match.currentInnings.balls / 6);
+    const lastEndRuns = match.lastOverEndRuns || 0;
+    const runsThisOver = match.currentInnings.runs - lastEndRuns;
+    match.lastOverEndRuns = match.currentInnings.runs;
+
+    const bStats = match.stats[match.currentBowlerIdx !== null ? match.bowlingTeam.xi[match.currentBowlerIdx].id : ''] || { runsConceded: 0, wickets: 0, overs: 0 };
+    const activeBowler = match.currentBowlerIdx !== null ? match.bowlingTeam.xi[match.currentBowlerIdx] : { name: 'Bowler' };
+
+    match.commentary.unshift({
+      type: 'end_of_over',
+      overNumber: overNum,
+      runsScored: runsThisOver,
+      totalRuns: match.currentInnings.runs,
+      totalWickets: match.currentInnings.wickets,
+      striker: match.striker ? {
+        name: match.striker.name,
+        runs: match.stats[match.striker.id]?.runs || 0,
+        balls: match.stats[match.striker.id]?.balls || 0
+      } : null,
+      nonStriker: match.nonStriker ? {
+        name: match.nonStriker.name,
+        runs: match.stats[match.nonStriker.id]?.runs || 0,
+        balls: match.stats[match.nonStriker.id]?.balls || 0
+      } : null,
+      bowler: {
+        name: activeBowler.name,
+        runsConceded: bStats.runsConceded,
+        wickets: bStats.wickets,
+        overs: bStats.overs
+      }
+    });
+  }
+
+  if (match.type !== 'pvp') {
+    const commentaryText = `<blockquote expandable>🎤 <b>Commentary:</b> ${escapeHTML(outcome.commentary)}</blockquote>`;
+    await sendTelegramMessage(match, commentaryText);
+  }
+
+  matchManager.saveToDb(match);
+
+  setTimeout(async () => {
+    if (match.checkInningsEnded()) {
+      match.activeScorecardMessageId = null;
+
+      if (match.status === 'innings1') {
+        const inn = match.innings[0];
+        match.commentary.unshift({
+          type: 'end_of_innings',
+          inningsIdx: 0,
+          runs: inn.runs,
+          wickets: inn.wickets,
+          overs: `${Math.floor(inn.balls / 6)}.${inn.balls % 6}`,
+          target: inn.runs + 1
+        });
+
+        if (match.type !== 'pvp') {
+          await sendTelegramMessage(match, `🛎️ <b>Innings Complete!</b> \n\nScore: <b>${inn.runs}/${inn.wickets}</b> in <b>${Math.floor(inn.balls / 6)}.${inn.balls % 6} overs</b>.\n\nTarget is <b>${inn.runs + 1} runs</b>.`);
+        }
+        match.startSecondInnings();
+        await runGameLoopStep(null, match, true);
+      } else {
+        const result = await match.finalizeMatch();
+        
+        match.commentary.unshift({
+          type: 'end_of_innings',
+          inningsIdx: 1,
+          runs: result.inn2Runs,
+          wickets: result.inn2Wickets,
+          overs: result.inn2Overs,
+          winner: result.winner ? result.winner.username : 'Tie Match',
+          motm: result.motm
+        });
+
+        const summary = 
+          `🏆 <b>MATCH COMPLETED!</b>\n` +
+          `• <b>Winner:</b> ${result.winner ? escapeHTML(result.winner.username) : 'Tie Match'}\n` +
+          `• <b>Score:</b> ${result.inn1Runs}/${result.inn1Wickets} vs ${result.inn2Runs}/${result.inn2Wickets}`;
+
+        const playUrl = getMatchPlayUrl(match);
+        const reply_markup = {
+          inline_keyboard: [
+            [{ text: "↗️ View Match Details", url: playUrl }]
+          ]
+        };
+        await sendTelegramMessage(match, summary, { reply_markup });
+      }
+    } else {
+      if (outcome.isWicket) {
+        match.lastOutBatsmanName = activeBatsmanName;
+        if (match.battingTeam.telegramId === 'ai') {
+          match.turnState = 'bowling_delivery';
+        } else {
+          match.turnState = 'selecting_wicket_batsman';
+        }
+      }
+      
+      const overCompleted = match.currentInnings.balls % 6 === 0;
+      if (overCompleted && match.currentInnings.balls > 0) {
+        if (match.bowlingTeam.telegramId === 'ai') {
+          match.selectBestBowler();
+          if (match.turnState !== 'selecting_wicket_batsman') {
+            match.turnState = 'bowling_delivery';
+          }
+        } else {
+          if (match.turnState !== 'selecting_wicket_batsman') {
+            match.turnState = 'selecting_over_bowler';
+          }
+        }
+      }
+
+      if (!match.turnState || match.turnState === 'batting_shot') {
+        match.turnState = 'bowling_delivery';
+      }
+
+      await runGameLoopStep(null, match, true);
+    }
+  }, 1500);
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Dummy web server running on port ${PORT}`);
@@ -3467,6 +4628,12 @@ if (require.main === module) {
     { command: "profile", description: "Check your stats" },
     { command: "shop", description: "🛒 Browse and buy team players" },
     { command: "myteam", description: "👥 Show your club squads" },
+    { command: "xi", description: "🏏 Show your Playing XI" },
+    { command: "swap", description: "🔄 Swap squad positions" },
+    { command: "claim", description: "🎁 Claim your starter pack" },
+    { command: "cric", description: "🏏 Start a cricket match lobby" },
+    { command: "history", description: "📜 View match history" },
+    { command: "setteamname", description: "✏️ Set your cricket team name" },
     { command: "sell", description: "💰 Sell a squad member (75% value)" },
     { command: "leaderboard", description: "Global leaderboard" },
     { command: "balance", description: "Check your coin balance" },
@@ -3483,6 +4650,7 @@ if (require.main === module) {
   bot.api.getMe().then(info => {
     botInfo = info;
     console.log(`Bot started as @${info.username}`);
+    matchManager.loadActiveMatchesFromDb().catch(e => console.error("Match recovery failed:", e));
   });
   bot.start(); 
 
