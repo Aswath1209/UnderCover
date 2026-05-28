@@ -31,9 +31,9 @@ async function init() {
 
   // 1. Fallback / direct URL parsing
   const urlParams = new URLSearchParams(window.location.search);
-  matchId = cleanParam(urlParams.get('matchId'));
-  chatId = cleanParam(urlParams.get('chatId'));
-  userId = cleanParam(urlParams.get('userId'));
+  matchId = cleanParam(urlParams.get('matchId') || urlParams.get('match_id'));
+  chatId = cleanParam(urlParams.get('chatId') || urlParams.get('chat_id'));
+  userId = cleanParam(urlParams.get('userId') || urlParams.get('user_id'));
 
   // 2. Parse from Telegram WebApp SDK (Deep Link start_param)
   if (tg && tg.initDataUnsafe) {
