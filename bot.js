@@ -359,13 +359,20 @@ bot.command('admin_stats', async (ctx) => {
   const mafCount = mafiaManager.getActiveGamesCount();
   const liesCount = liesManager.getActiveGamesCount();
   const hiloCount = hiloManager.getActiveGamesCount();
+  const cricLiveCount = new Set(Object.values(matchManager.activeMatches).map(m => m.id)).size;
+
   const stats = await sb.getGlobalStats().catch(() => ({ 
       totalUsers: "Error", 
       totalGroups: "Error", 
       totalBonusClaims: 0, 
-      uniqueBonusClaimers: 0 
+      uniqueBonusClaimers: 0,
+      completedCricketMatches: 0,
+      activeCricketMatches: 0
   }));
   
+  const completedCric = stats.completedCricketMatches ?? 0;
+  const activeCricDb = stats.activeCricketMatches ?? 0;
+
   // Build 24h stats
   const active24 = Array.from(activity24h.values());
   const activeUsers24Count = active24.length;
@@ -380,6 +387,9 @@ bot.command('admin_stats', async (ctx) => {
   const text = `📊 <b>Admin Activity Dashboard</b>\n\n` +
                `👥 <b>Total Users (DB):</b> ${stats.totalUsers}\n` +
                `🏘️ <b>Total Groups (DB):</b> ${stats.totalGroups}\n\n` +
+               `🏏 <b>Crickidex Matches:</b>\n` +
+               `  Active (DB): ${activeCricDb}\n` +
+               `  Completed (DB): ${completedCric}\n\n` +
                `💰 <b>Drop Rewards:</b>\n` +
                `  Total Claims: ${stats.totalBonusClaims}\n` +
                `  Unique Claimers: ${stats.uniqueBonusClaimers}\n\n` +
@@ -390,7 +400,8 @@ bot.command('admin_stats', async (ctx) => {
                `- Undercover: ${ucCount}\n` +
                `- Mafia: ${mafCount}\n` +
                `- Lies: ${liesCount}\n` +
-               `- Hilo: ${hiloCount}\n\n` +
+               `- Hilo: ${hiloCount}\n` +
+               `- Cricket: ${cricLiveCount}\n\n` +
                `⏳ <i>Cleanup interval: 30m</i>`;
                  
   await ctx.reply(text, { parse_mode: 'HTML' });
