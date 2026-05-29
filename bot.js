@@ -3791,6 +3791,7 @@ bot.catch((err) => {
 const fs = require('fs');
 const express = require('express');
 const app = express();
+app.use(express.json());
 
 const cricketImageCache = new Map();
 const crickidexPlayersDir = path.join(__dirname, 'assets', 'players');
