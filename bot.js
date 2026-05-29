@@ -546,17 +546,17 @@ bot.command('xi', async (ctx) => {
     };
 
     const profile = await sb.getProfile(user.id);
-    let msg = `🏏 <u><b>PLAYING XI</b></u> — <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b>\n`;
+    let msg = `🏏 <b><u>PLAYING XI</u></b> — <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b>\n`;
     if (profile && profile.team_name) {
-      msg += `🏷️ <b>Team:</b> ${escapeHTML(profile.team_name)}\n`;
+      msg += `<blockquote>🏷️ <b>"${escapeHTML(profile.team_name)}"</b></blockquote>\n`;
     }
-    msg += `══════════════════════════\n`;
+    msg += `═════════════════════════════\n`;
 
     const roleGroups = {
-      batsman: { title: '🏏 <b>BATSMEN</b>', players: [] },
-      wicket_keeper: { title: '🧤 <b>WICKET KEEPERS</b>', players: [] },
-      all_rounder: { title: '⚡ <b>ALL-ROUNDERS</b>', players: [] },
-      bowler: { title: '🥎 <b>BOWLERS</b>', players: [] }
+      batsman: { title: '<b>━━━ 🏏 BATSMEN ━━━</b>', players: [] },
+      wicket_keeper: { title: '<b>━━━ 🧤 WICKET KEEPERS ━━━</b>', players: [] },
+      all_rounder: { title: '<b>━━━ ⚡ ALL-ROUNDERS ━━━</b>', players: [] },
+      bowler: { title: '<b>━━━ 🥎 BOWLERS ━━━</b>', players: [] }
     };
 
     xi.forEach((p, idx) => {
@@ -575,14 +575,15 @@ bot.command('xi', async (ctx) => {
         msg += `\n${group.title}\n`;
         group.players.forEach(p => {
           const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-          msg += `<b>${p.displayIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
+          msg += `• <b>${p.displayIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}\n`;
         });
       }
     });
 
     const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
-    msg += `\n📊 <b>XI Rating:</b> ${teamRating} OVR`;
-    msg += `\n\n💡 <i>Use /swap &lt;pos1&gt; &lt;pos2&gt; to rearrange your squad.</i>`;
+    msg += `═════════════════════════════\n`;
+    msg += `📊 <b>XI Rating:</b> <code>${teamRating} OVR</code>`;
+    msg += `\n\n💡 <i>Use <code>/swap [pos1] [pos2]</code> to rearrange your playing 11.</i>`;
 
     await ctx.reply(msg, { parse_mode: 'HTML' });
   } catch (e) {
@@ -2659,21 +2660,21 @@ bot.on('callback_query:data', async (ctx) => {
         return '';
       };
 
-      let msg = `🏏 <u><b>CRICKET SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n`;
+      let msg = `🏏 <b><u>CRICKET SQUAD</u></b> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n`;
       if (profile && profile.team_name) {
-        msg += `🏷️ <b>Team:</b> ${escapeHTML(profile.team_name)}\n`;
+        msg += `<blockquote>🏷️ <b>"${escapeHTML(profile.team_name)}"</b></blockquote>\n`;
       }
-      msg += `══════════════════════════\n`;
+      msg += `═════════════════════════════\n`;
 
       // Playing XI (positions 1-11)
       msg += `<b>━━━ PLAYING XI ━━━</b>\n`;
       const xi = team.slice(0, 11);
 
       const roleGroups = {
-        batsman: { title: '🏏 <b>BATSMEN</b>', players: [] },
-        wicket_keeper: { title: '🧤 <b>WICKET KEEPERS</b>', players: [] },
-        all_rounder: { title: '⚡ <b>ALL-ROUNDERS</b>', players: [] },
-        bowler: { title: '🥎 <b>BOWLERS</b>', players: [] }
+        batsman: { title: '<b>━━━ 🏏 BATSMEN ━━━</b>', players: [] },
+        wicket_keeper: { title: '<b>━━━ 🧤 WICKET KEEPERS ━━━</b>', players: [] },
+        all_rounder: { title: '<b>━━━ ⚡ ALL-ROUNDERS ━━━</b>', players: [] },
+        bowler: { title: '<b>━━━ 🥎 BOWLERS ━━━</b>', players: [] }
       };
 
       xi.forEach((p, idx) => {
@@ -2692,27 +2693,28 @@ bot.on('callback_query:data', async (ctx) => {
           msg += `\n${group.title}\n`;
           group.players.forEach(p => {
             const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-            msg += `<b>${p.displayIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+            msg += `• <b>${p.displayIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}\n`;
           });
         }
       });
 
       // Bench (positions 12+)
       if (team.length > 11) {
-        msg += `\n<b>━━━ BENCH ━━━</b>\n`;
+        msg += `\n<b>━━━ 🪑 BENCH ━━━</b>\n`;
         const bench = team.slice(11);
         bench.forEach((p, idx) => {
           const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-          msg += `<b>${idx + 12}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+          msg += `• <b>${idx + 12}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}\n`;
         });
       }
       
-      msg += `\n📊 <b>Squad:</b> ${team.length}/25`;
+      msg += `═════════════════════════════\n`;
+      msg += `📊 <b>Squad:</b> <code>${team.length}/25</code>`;
       if (xi.length >= 11) {
         const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
-        msg += ` • <b>XI Rating:</b> ${teamRating} OVR`;
+        msg += ` • <b>XI Rating:</b> <code>${teamRating} OVR</code>`;
       }
-      msg += `\n💡 <i>Use /swap &lt;pos1&gt; &lt;pos2&gt; to rearrange.</i>`;
+      msg += `\n💡 <i>Use <code>/swap [pos1] [pos2]</code> to rearrange your squad.</i>`;
       
       const kb = new InlineKeyboard()
         .text("⬅️ Back", `myteam:home:${targetUserId}`);
@@ -4820,10 +4822,27 @@ async function processBallAndProgress(ctx, match) {
           motm: result.motm
         });
 
-        const summary = 
-          `🏆 <b>MATCH COMPLETED!</b>\n` +
-          `• <b>Winner:</b> ${result.winner ? escapeHTML(result.winner.username) : 'Tie Match'}\n` +
-          `• <b>Score:</b> ${result.inn1Runs}/${result.inn1Wickets} vs ${result.inn2Runs}/${result.inn2Wickets}`;
+        let marginText = '';
+        if (result.winner) {
+          const inn1 = match.innings[0];
+          const inn2 = match.innings[1];
+          const isWinnerInn2 = result.winner.telegramId.toString() === inn2.battingId.toString();
+          
+          if (isWinnerInn2) {
+            const wicketsWonBy = 10 - inn2.wickets;
+            marginText = `won by ${wicketsWonBy} wicket${wicketsWonBy > 1 ? 's' : ''}`;
+          } else {
+            const runsWonBy = inn1.runs - inn2.runs;
+            marginText = `won by ${runsWonBy} run${runsWonBy > 1 ? 's' : ''}`;
+          }
+        }
+
+        let summary;
+        if (result.winner) {
+          summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🎉 <b>${escapeHTML(result.winner.username)}</b> ${marginText}!`;
+        } else {
+          summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🤝 <b>Match Tied!</b>`;
+        }
 
         const botUsername = botInfo?.username || 'Imposter0_bot';
         const playUrl = getMatchPlayUrl(match);
