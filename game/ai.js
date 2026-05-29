@@ -156,6 +156,29 @@ function selectValidPlayingXI(squad) {
     };
   }
 
+  // 1. Validate if the ENTIRE squad even has enough players of each required role
+  const totalBatsmen = squad.filter(p => p.role === 'batsman').length;
+  const totalKeepers = squad.filter(p => p.role === 'wicket_keeper').length;
+  const totalAllRounders = squad.filter(p => p.role === 'all_rounder').length;
+  const totalBowlers = squad.filter(p => p.role === 'bowler').length;
+
+  const missingRoles = [];
+  if (totalBatsmen < 3) missingRoles.push(`Batsmen (have ${totalBatsmen}, need at least 3)`);
+  if (totalKeepers < 1) missingRoles.push(`Wicket Keepers (have ${totalKeepers}, need at least 1)`);
+  if (totalAllRounders < 1) missingRoles.push(`All-Rounders (have ${totalAllRounders}, need at least 1)`);
+  if (totalBowlers < 3) missingRoles.push(`Bowlers (have ${totalBowlers}, need at least 3)`);
+
+  if (missingRoles.length > 0) {
+    return {
+      success: false,
+      error: `❌ <b>Insufficient Players in Entire Squad!</b>\n\n` +
+             `Your squad does not have enough players of specific roles to satisfy the match requirements.\n\n` +
+             `<b>Missing Roles:</b>\n` +
+             missingRoles.map(r => `• ${r}`).join('\n') + `\n\n` +
+             `🛒 Please visit the <b>/shop</b> to buy additional players with the missing roles so you can play!`
+    };
+  }
+
   // The squad is already sorted by squad_order from the DB.
   // The first 11 players are the Playing XI.
   const xi = squad.slice(0, 11).map(item => item.player ? item.player : item);

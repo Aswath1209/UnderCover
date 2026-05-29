@@ -517,28 +517,53 @@ bot.command('xi', async (ctx) => {
 
     const xi = squad.slice(0, 11);
     const roleIcon = (role) => {
-      if (role === 'batsman') return '🏏 BAT';
-      if (role === 'wicket_keeper') return '🧤 WK';
-      if (role === 'all_rounder') return '⚡ ALR';
-      if (role === 'bowler') return '🥎 BOWL';
+      if (role === 'batsman') return '🏏';
+      if (role === 'wicket_keeper') return '🧤';
+      if (role === 'all_rounder') return '⚡';
+      if (role === 'bowler') return '🥎';
       return '👤';
     };
+    const roleLabel = (role) => {
+      if (role === 'batsman') return 'BAT';
+      if (role === 'wicket_keeper') return 'WK';
+      if (role === 'all_rounder') return 'ALR';
+      if (role === 'bowler') return 'BOWL';
+      return '';
+    };
 
+    const profile = await sb.getProfile(user.id);
     let msg = `🏏 <u><b>PLAYING XI</b></u> — <b><a href="tg://user?id=${user.id}">${escapeHTML(user.first_name)}</a></b>\n`;
-    msg += `══════════════════════════\n\n`;
+    if (profile && profile.team_name) {
+      msg += `🏷️ <b>Team:</b> ${escapeHTML(profile.team_name)}\n`;
+    }
+    msg += `══════════════════════════\n`;
 
-    const xiWithIndices = xi.map((p, idx) => ({ ...p, originalIdx: idx + 1 }));
-    xiWithIndices.sort((a, b) => {
-      const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
-      const orderA = roleOrder[a.role] || 5;
-      const orderB = roleOrder[b.role] || 5;
-      if (orderA !== orderB) return orderA - orderB;
-      return (b.ovr || 0) - (a.ovr || 0);
+    const roleGroups = {
+      batsman: { title: '🏏 <b>BATSMEN</b>', players: [] },
+      wicket_keeper: { title: '🧤 <b>WICKET KEEPERS</b>', players: [] },
+      all_rounder: { title: '⚡ <b>ALL-ROUNDERS</b>', players: [] },
+      bowler: { title: '🥎 <b>BOWLERS</b>', players: [] }
+    };
+
+    xi.forEach((p, idx) => {
+      const role = p.role || 'bowler';
+      if (roleGroups[role]) {
+        roleGroups[role].players.push({ ...p, displayIdx: idx + 1 });
+      } else {
+        roleGroups.bowler.players.push({ ...p, displayIdx: idx + 1 });
+      }
     });
 
-    xiWithIndices.forEach((p) => {
-      const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-      msg += `<b>${p.originalIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
+    const rolesOrder = ['batsman', 'wicket_keeper', 'all_rounder', 'bowler'];
+    rolesOrder.forEach(roleKey => {
+      const group = roleGroups[roleKey];
+      if (group.players.length > 0) {
+        msg += `\n${group.title}\n`;
+        group.players.forEach(p => {
+          const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+          msg += `<b>${p.displayIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR)${tierIndicator}\n`;
+        });
+      }
     });
 
     const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
@@ -1185,7 +1210,7 @@ bot.command('history', async (ctx) => {
       text += `👉 <b>${matchSummary}</b>\n   <code>${scoreSummary}</code>\n\n`;
 
       const playUrl = `https://${cleanHost}/cricket?match_id=${m.id}&chat_id=${m.chatId}`;
-      inlineKeyboard.url(`↗️ View Match ${idx + 1}`, playUrl);
+      inlineKeyboard.webApp(`↗️ View Match ${idx + 1}`, playUrl);
       inlineKeyboard.row();
     });
 
@@ -2409,7 +2434,7 @@ bot.on('callback_query:data', async (ctx) => {
         await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
       } catch (e) {}
 
-      const keyboard = new InlineKeyboard().url("🎮 Play Match", getMatchPlayUrl(match));
+      const keyboard = new InlineKeyboard().webApp("🎮 Play Match", getMatchPlayUrl(match));
 
       const sentMsg = await ctx.reply(
         `🏏 <b>MATCH IS READY!</b>\n` +
@@ -2613,23 +2638,41 @@ bot.on('callback_query:data', async (ctx) => {
       };
 
       let msg = `🏏 <u><b>CRICKET SQUAD</b></u> — <b><a href="tg://user?id=${targetUserId}">${escapeHTML(name)}</a></b>\n`;
-      msg += `<blockquote>⚡ "Champions keep playing until they get it right."</blockquote>\n`;
+      if (profile && profile.team_name) {
+        msg += `🏷️ <b>Team:</b> ${escapeHTML(profile.team_name)}\n`;
+      }
+      msg += `══════════════════════════\n`;
 
       // Playing XI (positions 1-11)
       msg += `<b>━━━ PLAYING XI ━━━</b>\n`;
       const xi = team.slice(0, 11);
-      const xiWithIndices = xi.map((p, idx) => ({ ...p, originalIdx: idx + 1 }));
-      xiWithIndices.sort((a, b) => {
-        const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
-        const orderA = roleOrder[a.role] || 5;
-        const orderB = roleOrder[b.role] || 5;
-        if (orderA !== orderB) return orderA - orderB;
-        return (b.ovr || 0) - (a.ovr || 0);
+
+      const roleGroups = {
+        batsman: { title: '🏏 <b>BATSMEN</b>', players: [] },
+        wicket_keeper: { title: '🧤 <b>WICKET KEEPERS</b>', players: [] },
+        all_rounder: { title: '⚡ <b>ALL-ROUNDERS</b>', players: [] },
+        bowler: { title: '🥎 <b>BOWLERS</b>', players: [] }
+      };
+
+      xi.forEach((p, idx) => {
+        const role = p.role || 'bowler';
+        if (roleGroups[role]) {
+          roleGroups[role].players.push({ ...p, displayIdx: idx + 1 });
+        } else {
+          roleGroups.bowler.players.push({ ...p, displayIdx: idx + 1 });
+        }
       });
 
-      xiWithIndices.forEach((p) => {
-        const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-        msg += `<b>${p.originalIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+      const rolesOrder = ['batsman', 'wicket_keeper', 'all_rounder', 'bowler'];
+      rolesOrder.forEach(roleKey => {
+        const group = roleGroups[roleKey];
+        if (group.players.length > 0) {
+          msg += `\n${group.title}\n`;
+          group.players.forEach(p => {
+            const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
+            msg += `<b>${p.displayIdx}.</b> ${roleIcon(p.role)} ${roleLabel(p.role)} <b>${escapeHTML(p.name)}</b> (${p.ovr})${tierIndicator}\n`;
+          });
+        }
       });
 
       // Bench (positions 12+)
@@ -4593,7 +4636,7 @@ function renderScorecardScreen(match) {
   }
 
   const keyboard = new InlineKeyboard();
-  keyboard.url("🎮 Play Match", getMatchPlayUrl(match));
+  keyboard.webApp("🎮 Play Match", getMatchPlayUrl(match));
 
   return { text: header, keyboard };
 }
@@ -4762,7 +4805,7 @@ async function processBallAndProgress(ctx, match) {
         const playUrl = getMatchPlayUrl(match);
         const reply_markup = {
           inline_keyboard: [
-            [{ text: "↗️ View Match Details", url: playUrl }]
+            [{ text: "↗️ View Match Details", web_app: { url: playUrl } }]
           ]
         };
         await sendTelegramMessage(match, summary, { reply_markup });

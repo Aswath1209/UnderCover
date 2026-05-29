@@ -876,6 +876,20 @@ async function getUserCricketTeam(userId) {
     // Attach squad_order to each player and sort
     const result = (players || []).map(p => ({ ...p, squad_order: orderMap[p.id] || 0 }));
     result.sort((a, b) => a.squad_order - b.squad_order);
+
+    // Dynamically sort first 11 elements by role and OVR descending on the fly
+    if (result.length >= 11) {
+      const xi = result.slice(0, 11);
+      const bench = result.slice(11);
+      xi.sort((a, b) => {
+        const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
+        const orderA = roleOrder[a.role] || 5;
+        const orderB = roleOrder[b.role] || 5;
+        if (orderA !== orderB) return orderA - orderB;
+        return (b.ovr || 0) - (a.ovr || 0);
+      });
+      return [...xi, ...bench];
+    }
     return result;
   } catch (e) {
     console.error("Failed to get user cricket team:", e);
@@ -887,22 +901,68 @@ async function swapSquadOrder(userId, pos1, pos2) {
   if (!supabase) return { success: false, error: 'Database disabled' };
   const release = await acquireLock(userId);
   try {
-    // Find the two records
-    const { data: rec1 } = await supabase.from('user_owned_players')
+    // 1. Get current squad sorted by squad_order ascending
+    const { data: owned, error: ownedError } = await supabase
+      .from('user_owned_players')
       .select('id, player_id, squad_order')
-      .eq('user_id', userId).eq('sport', 'cricket').eq('squad_order', pos1)
-      .maybeSingle();
-    const { data: rec2 } = await supabase.from('user_owned_players')
-      .select('id, player_id, squad_order')
-      .eq('user_id', userId).eq('sport', 'cricket').eq('squad_order', pos2)
-      .maybeSingle();
+      .eq('user_id', userId)
+      .eq('sport', 'cricket')
+      .order('squad_order', { ascending: true });
 
-    if (!rec1) return { success: false, error: `No player found at position ${pos1}.` };
-    if (!rec2) return { success: false, error: `No player found at position ${pos2}.` };
+    if (ownedError || !owned || owned.length === 0) {
+      return { success: false, error: 'No players found in squad.' };
+    }
 
-    // Swap their squad_order values
-    await supabase.from('user_owned_players').update({ squad_order: pos2 }).eq('id', rec1.id);
-    await supabase.from('user_owned_players').update({ squad_order: pos1 }).eq('id', rec2.id);
+    if (pos1 < 1 || pos1 > owned.length || pos2 < 1 || pos2 > owned.length) {
+      return { success: false, error: `Invalid swap positions: 1 to ${owned.length} only.` };
+    }
+
+    // 2. Fetch details for role and OVR
+    const playerIds = owned.map(o => o.player_id);
+    const { data: details, error: detailsError } = await supabase
+      .from('cricketplayers')
+      .select('id, role, ovr')
+      .in('id', playerIds);
+
+    if (detailsError) {
+      console.error("Error fetching player details during swap:", detailsError);
+      return { success: false, error: 'Database error fetching player details.' };
+    }
+
+    const detailsMap = {};
+    (details || []).forEach(d => {
+      detailsMap[d.id] = d;
+    });
+
+    // 3. Swap the players in the array
+    const temp = owned[pos1 - 1];
+    owned[pos1 - 1] = owned[pos2 - 1];
+    owned[pos2 - 1] = temp;
+
+    // 4. Sort the Playing XI (first 11) by role and OVR descending
+    const xi = owned.slice(0, 11);
+    const bench = owned.slice(11);
+
+    xi.sort((a, b) => {
+      const detA = detailsMap[a.player_id] || { role: 'bowler', ovr: 0 };
+      const detB = detailsMap[b.player_id] || { role: 'bowler', ovr: 0 };
+      const roleOrder = { 'batsman': 1, 'wicket_keeper': 2, 'all_rounder': 3, 'bowler': 4 };
+      const orderA = roleOrder[detA.role] || 5;
+      const orderB = roleOrder[detB.role] || 5;
+      if (orderA !== orderB) return orderA - orderB;
+      return (detB.ovr || 0) - (detA.ovr || 0);
+    });
+
+    const newOwnedList = [...xi, ...bench];
+
+    // 5. Update squad_order values in the database in a single batch
+    const updates = newOwnedList.map((item, idx) => {
+      return supabase
+        .from('user_owned_players')
+        .update({ squad_order: idx + 1 })
+        .eq('id', item.id);
+    });
+    await Promise.all(updates);
 
     return { success: true };
   } catch (e) {
