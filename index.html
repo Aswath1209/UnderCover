@@ -1205,13 +1205,24 @@
         tg.setHeaderColor('#0f0c29'); 
         tg.setBackgroundColor('#0f0c29');
 
+        // Check if launching a cricket match from a group chat deep link
+        const startParam = tg.initDataUnsafe?.start_param;
+        if (startParam && startParam.startsWith('cricket_')) {
+            const parts = startParam.split('_');
+            const cricketMatchId = parts[1];
+            const cricketChatId = parts[2];
+            if (cricketMatchId && cricketChatId) {
+                window.location.replace(`/cricket?match_id=${cricketMatchId}&chat_id=${cricketChatId}`);
+                throw new Error("Redirecting to cricket match...");
+            }
+        }
+
         const userId = tg.initDataUnsafe?.user?.id;
         const urlParams = new URLSearchParams(window.location.search);
         let msgId = urlParams.get('msg_id') || '0';
         let defaultTab = urlParams.get('tab');
         let chatIdUrl = urlParams.get('chat_id');
 
-        const startParam = tg.initDataUnsafe?.start_param;
         if (startParam) {
             if (startParam.startsWith('drop_')) {
                 const parts = startParam.split('_');

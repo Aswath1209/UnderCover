@@ -58,6 +58,20 @@ function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") 
   return kb;
 }
 
+function addMatchPlayButton(kb, match, ctx = null) {
+  const isPrivate = ctx ? (ctx.chat?.type === 'private') : (match.chatId > 0);
+  const botUsername = ctx?.me?.username || botInfo?.username || 'Imposter0_bot';
+  const playUrl = getMatchPlayUrl(match);
+
+  if (isPrivate) {
+    kb.webApp("🎮 Play Match", playUrl);
+  } else {
+    const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${match.id}_${match.chatId}`;
+    kb.url("🎮 Play Match", directLink);
+  }
+  return kb;
+}
+
 
 
 const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
@@ -1210,7 +1224,14 @@ bot.command('history', async (ctx) => {
       text += `👉 <b>${matchSummary}</b>\n   <code>${scoreSummary}</code>\n\n`;
 
       const playUrl = `https://${cleanHost}/cricket?match_id=${m.id}&chat_id=${m.chatId}`;
-      inlineKeyboard.webApp(`↗️ View Match ${idx + 1}`, playUrl);
+      const isPrivate = ctx.chat?.type === 'private';
+      if (isPrivate) {
+        inlineKeyboard.webApp(`↗️ View Match ${idx + 1}`, playUrl);
+      } else {
+        const botUsername = ctx.me?.username || botInfo?.username || 'Imposter0_bot';
+        const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${m.id}_${m.chatId}`;
+        inlineKeyboard.url(`↗️ View Match ${idx + 1}`, directLink);
+      }
       inlineKeyboard.row();
     });
 
@@ -2434,7 +2455,8 @@ bot.on('callback_query:data', async (ctx) => {
         await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
       } catch (e) {}
 
-      const keyboard = new InlineKeyboard().webApp("🎮 Play Match", getMatchPlayUrl(match));
+      const keyboard = new InlineKeyboard();
+      addMatchPlayButton(keyboard, match, ctx);
 
       const sentMsg = await ctx.reply(
         `🏏 <b>MATCH IS READY!</b>\n` +
@@ -4636,7 +4658,7 @@ function renderScorecardScreen(match) {
   }
 
   const keyboard = new InlineKeyboard();
-  keyboard.webApp("🎮 Play Match", getMatchPlayUrl(match));
+  addMatchPlayButton(keyboard, match);
 
   return { text: header, keyboard };
 }
@@ -4802,10 +4824,21 @@ async function processBallAndProgress(ctx, match) {
           `• <b>Winner:</b> ${result.winner ? escapeHTML(result.winner.username) : 'Tie Match'}\n` +
           `• <b>Score:</b> ${result.inn1Runs}/${result.inn1Wickets} vs ${result.inn2Runs}/${result.inn2Wickets}`;
 
+        const botUsername = botInfo?.username || 'Imposter0_bot';
         const playUrl = getMatchPlayUrl(match);
+        const isPrivate = match.chatId > 0;
+        
+        let buttonObj;
+        if (isPrivate) {
+          buttonObj = { text: "↗️ View Match Details", web_app: { url: playUrl } };
+        } else {
+          const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${match.id}_${match.chatId}`;
+          buttonObj = { text: "↗️ View Match Details", url: directLink };
+        }
+
         const reply_markup = {
           inline_keyboard: [
-            [{ text: "↗️ View Match Details", web_app: { url: playUrl } }]
+            [buttonObj]
           ]
         };
         await sendTelegramMessage(match, summary, { reply_markup });
