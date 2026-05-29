@@ -860,6 +860,27 @@ function renderBowlerVariations() {
       { id: 'bouncer', name: 'Bouncer' }
     ];
     document.getElementById('bowling-speed-section').classList.remove('hidden');
+    
+    // Dynamically render speed variations for fast bowlers only
+    const speedGroup = document.querySelector('.speed-button-group');
+    if (speedGroup) {
+      speedGroup.innerHTML = `
+        <button class="btn btn-speed${selectedSpeed === 'fast' ? ' active' : ''}" data-speed="fast">Fast</button>
+        <button class="btn btn-speed${selectedSpeed === 'normal' ? ' active' : ''}" data-speed="normal">Normal</button>
+        <button class="btn btn-speed${selectedSpeed === 'slow' ? ' active' : ''}" data-speed="slow">Slow</button>
+        <button class="btn btn-speed${selectedSpeed === 'inswinger' ? ' active' : ''}" data-speed="inswinger">Inswing</button>
+        <button class="btn btn-speed${selectedSpeed === 'outswinger' ? ' active' : ''}" data-speed="outswinger">Outswing</button>
+      `;
+      // Re-bind listeners for speed buttons
+      const speedButtons = speedGroup.querySelectorAll('.btn-speed');
+      speedButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          speedButtons.forEach(b => b.classList.remove('active'));
+          e.currentTarget.classList.add('active');
+          selectedSpeed = e.currentTarget.dataset.speed;
+        });
+      });
+    }
   }
 
   deliveryGrid.innerHTML = '';

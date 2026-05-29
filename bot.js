@@ -4405,6 +4405,7 @@ function generateDeliveryKmph(bowlerType, speed) {
   if (bowlerType === 'fast') {
     if (speed === 'fast') return Math.floor(Math.random() * 11) + 142; // 142 - 152
     if (speed === 'slow') return Math.floor(Math.random() * 11) + 115; // 115 - 125
+    if (speed === 'inswinger' || speed === 'outswinger') return Math.floor(Math.random() * 10) + 128; // 128 - 137
     return Math.floor(Math.random() * 7) + 135; // 135 - 141
   } else {
     return Math.floor(Math.random() * 17) + 82; // 82 - 98
@@ -4671,6 +4672,7 @@ async function runGameLoopStep(ctx, match, forceNewMessage = false) {
 
   if (match.type === 'pvp') {
     matchManager.saveToDb(match);
+    return;
   } else if (match.type === 'pve') {
     if (match.status === 'xi_selection') {
       if (match.strikerIdx !== null && match.nonStrikerIdx !== null && match.currentBowlerIdx !== null) {

@@ -178,6 +178,8 @@ const SPEED_FACTORS = {
   fast: { wicket_mult: 1.2, run_mult: 1.1 },
   normal: { wicket_mult: 1.0, run_mult: 1.0 },
   slow: { wicket_mult: 0.9, run_mult: 0.8 },
+  inswinger: { wicket_mult: 1.15, run_mult: 0.9 },
+  outswinger: { wicket_mult: 1.15, run_mult: 0.9 },
 };
 
 const SHOT_BALL_COMPATIBILITY = {

@@ -212,7 +212,11 @@ function generateCommentary(type, value, batsman, bowler, context) {
   const deliveryFormatted = delivery ? delivery.toLowerCase().replace(/_/g, ' ') : 'delivery';
   
   // Speed values mapping
-  const speedStr = speed === 'fast' ? 'searing fast' : (speed === 'slow' ? 'slower' : 'normal');
+  const speedStr = speed === 'fast' ? 'searing fast' : 
+                   speed === 'slow' ? 'slower' : 
+                   speed === 'inswinger' ? 'swinging in' : 
+                   speed === 'outswinger' ? 'swinging out' : 
+                   'normal';
 
   // Random picker helper
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];

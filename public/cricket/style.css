@@ -945,6 +945,7 @@ body {
 
 .speed-button-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
