@@ -1205,26 +1205,52 @@ async function claimStarterPack(userId) {
     // 3. Filter players
     // Low OVR players: OVR <= 75
     // Star players: OVR == 84
-    const lowPlayers = players.filter(p => p.ovr && p.ovr <= 75);
+    const lowKeepers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'wicket_keeper');
+    const lowBatsmen = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'batsman');
+    const lowAllRounders = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'all_rounder');
+    const lowBowlers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'bowler');
     const starPlayers = players.filter(p => p.ovr === 84);
     
-    if (lowPlayers.length < 6) {
+    if (lowKeepers.length < 1 || lowBatsmen.length < 4 || lowAllRounders.length < 2 || lowBowlers.length < 4) {
       return { success: false, error: 'Insufficient low OVR players in database.' };
     }
     if (starPlayers.length < 1) {
       return { success: false, error: 'No 84 OVR star players found in database.' };
     }
     
-    // 4. Randomly pick 6 unique low OVR players
-    const shuffledLow = [...lowPlayers].sort(() => 0.5 - Math.random());
-    const selectedLow = shuffledLow.slice(0, 6);
-    
-    // 5. Randomly pick 1 star player
+    // 4. Pick 1 star player
     const selectedStar = starPlayers[Math.floor(Math.random() * starPlayers.length)];
+    const starRole = selectedStar.role;
     
-    const allSelected = [...selectedLow, selectedStar];
+    // Target counts for the final Playing XI:
+    // Wicket Keepers: 1, Batsmen: 4, All-Rounders: 2, Bowlers: 4
+    let neededKeepers = 1;
+    let neededBatsmen = 4;
+    let neededAllRounders = 2;
+    let neededBowlers = 4;
     
-    // 6. Insert players into user_owned_players with squad_order 1-7
+    if (starRole === 'wicket_keeper') neededKeepers--;
+    else if (starRole === 'batsman') neededBatsmen--;
+    else if (starRole === 'all_rounder') neededAllRounders--;
+    else if (starRole === 'bowler') neededBowlers--;
+    
+    // Shuffle helper
+    const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
+    
+    const selectedKeepers = shuffle(lowKeepers).slice(0, neededKeepers);
+    const selectedBatsmen = shuffle(lowBatsmen).slice(0, neededBatsmen);
+    const selectedAllRounders = shuffle(lowAllRounders).slice(0, neededAllRounders);
+    const selectedBowlers = shuffle(lowBowlers).slice(0, neededBowlers);
+    
+    const allSelected = [
+      selectedStar,
+      ...selectedKeepers,
+      ...selectedBatsmen,
+      ...selectedAllRounders,
+      ...selectedBowlers
+    ];
+    
+    // 5. Insert players into user_owned_players with squad_order 1-11
     const inserts = allSelected.map((p, idx) => ({
       user_id: userId,
       player_id: p.id,

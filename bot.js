@@ -813,7 +813,7 @@ bot.command('claim', async (ctx) => {
         msg += `• None (Error fetching star player)\n\n`;
       }
       
-      msg += `🏏 <b>LOW OVR PLAYERS (6):</b>\n`;
+      msg += `🏏 <b>LOW OVR PLAYERS (10):</b>\n`;
       lowPlayers.forEach(p => {
         msg += `• 👤 <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR) - <i>${escapeHTML(p.role || 'Player')}</i>\n`;
       });
