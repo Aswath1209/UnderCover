@@ -1066,6 +1066,79 @@ async function getUserCricketMatchHistory(userId) {
   }
 }
 
+async function getAllUserCompletedMatches(userId) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('cricket_matches')
+      .select('*')
+      .eq('status', 'completed')
+      .or(`host_id.eq.${userId},guest_id.eq.${userId}`)
+      .order('updated_at', { ascending: false });
+    if (error) {
+      console.error("[DB] Error fetching all completed matches for user:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("[DB] Error fetching all completed matches for user:", e);
+    return [];
+  }
+}
+
+async function getAllCompletedMatches() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('cricket_matches')
+      .select('*')
+      .eq('status', 'completed');
+    if (error) {
+      console.error("[DB] Error fetching all completed matches globally:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("[DB] Error fetching all completed matches globally:", e);
+    return [];
+  }
+}
+
+async function removePlayerFromSquad(userId, playerId, sport) {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  const release = await acquireLock(userId);
+  try {
+    const { data: existing, error: findError } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', playerId)
+      .eq('sport', sport)
+      .maybeSingle();
+
+    if (findError || !existing) {
+      return { success: false, error: "Player is not in the user's squad." };
+    }
+
+    const { error: deleteError } = await supabase.from('user_owned_players')
+      .delete()
+      .eq('user_id', userId)
+      .eq('player_id', playerId)
+      .eq('sport', sport);
+
+    if (deleteError) {
+      console.error("[DB] Delete owned player error:", deleteError);
+      return { success: false, error: 'Failed to delete player from database.' };
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error("[DB] Remove player exception:", e);
+    return { success: false, error: 'An unexpected database error occurred.' };
+  } finally {
+    releaseLock(release);
+  }
+}
+
 async function getCricketProfile(userId) {
   if (!supabase) return null;
   try {
@@ -1185,8 +1258,23 @@ async function claimStarterPack(userId) {
   }
 }
 
+async function getUserTeamRating(userId) {
+  if (!supabase) return 0;
+  const { data: owned } = await supabase.from('user_owned_players').select('player_id').eq('user_id', userId).eq('sport', 'cricket');
+  if (!owned || owned.length === 0) return 0;
+  const cricket = await getCricketPlayers();
+  const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
+  
+  const playerOvrs = owned.map(o => ovrMap.get(o.player_id) || 0);
+  playerOvrs.sort((a, b) => b - a);
+  const top11 = playerOvrs.slice(0, 11);
+  if (top11.length === 0) return 0;
+  return Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
+}
+
 module.exports = {
   supabase,
+  getUserTeamRating,
   getUserCricketTeam,
   recordWin,
   recordLoss,
@@ -1232,5 +1320,8 @@ module.exports = {
   getCricketProfile,
   updateCricketTeamName,
   claimStarterPack,
-  swapSquadOrder
+  swapSquadOrder,
+  getAllUserCompletedMatches,
+  getAllCompletedMatches,
+  removePlayerFromSquad
 };

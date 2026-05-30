@@ -280,6 +280,8 @@ bot.command('help', async (ctx) => {
                `• /swap — Swap squad positions (/swap 4 12)\n` +
                `• /claim — Claim your free starter pack\n` +
                `• /sell — Sell a player back for 75% value\n` +
+               `• /ps — Show player team stats (/ps Virat Kohli)\n` +
+               `• /cs — Show player global stats (/cs Virat Kohli)\n` +
                `• /leaderboard — View top players globally\n` +
                `• /balance — Check your coin balance\n` +
                `• /send — Send coins to a friend (reply to them)\n\n` +
@@ -1179,6 +1181,442 @@ bot.command('cric', async (ctx) => {
   }
 });
 
+async function resolveCricketPlayer(ctx, query) {
+  if (!sb.supabase) {
+    await ctx.reply("❌ Database stats are currently disabled.", { parse_mode: 'HTML' });
+    return null;
+  }
+  
+  if (!query) {
+    return null;
+  }
+
+  try {
+    const cricketFromDb = await sb.getCricketPlayers();
+    if (!cricketFromDb || cricketFromDb.length === 0) {
+      await ctx.reply("❌ No players found in the database.", { parse_mode: 'HTML' });
+      return null;
+    }
+
+    const matches = cricketFromDb.filter(p => 
+      p.name.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (matches.length === 0) {
+      await ctx.reply(`❌ No player matches your search for "<b>${escapeHTML(query)}</b>".`, { parse_mode: 'HTML' });
+      return null;
+    }
+
+    if (matches.length > 1) {
+      const exactMatch = matches.find(p => p.name.toLowerCase() === query.toLowerCase());
+      if (exactMatch) {
+        return exactMatch;
+      } else {
+        const list = matches.slice(0, 10).map(p => `• <b>${escapeHTML(p.name)}</b> (OVR: ${p.ovr})`).join('\n');
+        const truncated = matches.length > 10 ? `\n...and ${matches.length - 10} more.` : '';
+        await ctx.reply(
+          `🔍 <b>Multiple players found matching "${escapeHTML(query)}":</b>\n\n${list}${truncated}\n\n` +
+          `<i>Please specify a more precise name.</i>`,
+          { parse_mode: 'HTML' }
+        );
+        return null;
+      }
+    }
+
+    return matches[0];
+  } catch (error) {
+    console.error("Error resolving player name:", error);
+    await ctx.reply("❌ An error occurred while searching for the player.", { parse_mode: 'HTML' });
+    return null;
+  }
+}
+
+bot.command('cs', async (ctx) => {
+  const query = ctx.match?.trim();
+  if (!query) {
+    return ctx.reply("❌ Usage: <code>/cs &lt;player name&gt;</code>\nExample: <code>/cs Virat Kohli</code>", { parse_mode: 'HTML' });
+  }
+
+  const player = await resolveCricketPlayer(ctx, query);
+  if (!player) return;
+
+  const completedMatches = await sb.getAllCompletedMatches();
+  
+  let matchesPlayed = 0;
+  let runs = 0;
+  let balls = 0;
+  let fours = 0;
+  let sixes = 0;
+  let dismissals = 0;
+  let highestScore = { runs: 0, isOut: true };
+  
+  let runsConceded = 0;
+  let wickets = 0;
+  let ballsBowled = 0;
+  let bestBowling = { wickets: 0, runsConceded: Infinity };
+
+  const cleanPlayerId = (pid) => pid.replace(/^(host_|guest_)+/, '');
+
+  completedMatches.forEach(match => {
+    const state = match.state_json;
+    if (!state) return;
+
+    let foundInXI = null;
+    if (state.host && state.host.xi) {
+      foundInXI = state.host.xi.find(p => cleanPlayerId(p.id) === player.id || p.name.toLowerCase() === player.name.toLowerCase());
+    }
+    if (!foundInXI && state.guest && state.guest.xi) {
+      foundInXI = state.guest.xi.find(p => cleanPlayerId(p.id) === player.id || p.name.toLowerCase() === player.name.toLowerCase());
+    }
+
+    if (foundInXI && state.stats) {
+      matchesPlayed++;
+      const pStats = state.stats[foundInXI.id];
+      if (pStats) {
+        const currentRuns = pStats.runs || 0;
+        const currentBalls = pStats.balls || 0;
+        const currentFours = pStats.fours || 0;
+        const currentSixes = pStats.sixes || 0;
+        const isOut = !!pStats.isOut;
+
+        runs += currentRuns;
+        balls += currentBalls;
+        fours += currentFours;
+        sixes += currentSixes;
+        if (isOut) dismissals++;
+
+        if (currentRuns > highestScore.runs) {
+          highestScore = { runs: currentRuns, isOut };
+        } else if (currentRuns === highestScore.runs && !isOut && highestScore.isOut) {
+          highestScore = { runs: currentRuns, isOut };
+        }
+
+        const currentWickets = pStats.wickets || 0;
+        const currentRunsConceded = pStats.runsConceded || 0;
+        const oversVal = pStats.overs || 0;
+        const oversInt = Math.floor(oversVal);
+        const ballsFraction = Math.round((oversVal % 1) * 10);
+        const matchBallsBowled = (oversInt * 6) + ballsFraction;
+
+        runsConceded += currentRunsConceded;
+        wickets += currentWickets;
+        ballsBowled += matchBallsBowled;
+
+        if (matchBallsBowled > 0 || currentRunsConceded > 0 || currentWickets > 0) {
+          if (currentWickets > bestBowling.wickets) {
+            bestBowling = { wickets: currentWickets, runsConceded: currentRunsConceded };
+          } else if (currentWickets === bestBowling.wickets && currentRunsConceded < bestBowling.runsConceded) {
+            bestBowling = { wickets: currentWickets, runsConceded: currentRunsConceded };
+          }
+        }
+      }
+    }
+  });
+
+  const battingAvg = dismissals > 0 ? (runs / dismissals).toFixed(2) : (runs > 0 ? `${runs}*` : '0.00');
+  const battingSR = balls > 0 ? ((runs / balls) * 100).toFixed(2) : '0.00';
+  const highestScoreStr = highestScore.runs > 0 ? `${highestScore.runs}${highestScore.isOut ? '' : '*'}` : '0';
+
+  const oversBowled = `${Math.floor(ballsBowled / 6)}.${ballsBowled % 6}`;
+  const bowlingAvg = wickets > 0 ? (runsConceded / wickets).toFixed(2) : 'N/A';
+  const bowlingEcon = ballsBowled > 0 ? ((runsConceded / ballsBowled) * 6).toFixed(2) : '0.00';
+  const bestBowlingStr = bestBowling.runsConceded !== Infinity ? `${bestBowling.wickets}/${bestBowling.runsConceded}` : 'N/A';
+
+  const roleIcon = (role) => {
+    if (role === 'batsman') return '🏏';
+    if (role === 'wicket_keeper') return '🧤';
+    if (role === 'all_rounder') return '⚡';
+    if (role === 'bowler') return '🥎';
+    return '👤';
+  };
+
+  const formattedPrice = player.buy_price ? player.buy_price.toLocaleString() : 'N/A';
+  const tierIcon = player.tier === 'Legendary' ? ' 💎' : player.tier === 'Gold' ? ' ⭐' : '';
+
+  let message = `🌎 <b>GLOBAL PLAYER STATS</b> 🌎\n` +
+                `═════════════════════════════\n` +
+                `👤 <b>Name:</b> <b>${escapeHTML(player.name)}</b>${tierIcon}\n` +
+                `📊 <b>OVR:</b> <code>${player.ovr}</code>\n` +
+                `🏷️ <b>Role:</b> ${roleIcon(player.role)} ${player.role ? player.role.toUpperCase().replace('_', ' ') : 'N/A'}\n` +
+                `🏳️ <b>Country:</b> ${escapeHTML(player.country || 'N/A')}\n` +
+                `💰 <b>Buy Price:</b> 💰 ${formattedPrice} coins\n`;
+
+  if (player.batting_archetype) {
+    message += `🏏 <b>Batting Archetype:</b> ${escapeHTML(player.batting_archetype)}\n`;
+  }
+  if (player.bowling_archetype) {
+    message += `🥎 <b>Bowling Archetype:</b> ${escapeHTML(player.bowling_archetype)}\n`;
+  }
+  if (player.bowler_type) {
+    message += `⚙️ <b>Bowler Type:</b> ${escapeHTML(player.bowler_type.toUpperCase().replace('_', ' '))}\n`;
+  }
+
+  message += `═════════════════════════════\n` +
+             `🎮 <b>Global Matches Played:</b> <code>${matchesPlayed}</code>\n\n` +
+             `🏏 <b>BATTING STATS:</b>\n` +
+             `• <b>Runs:</b> <code>${runs}</code>\n` +
+             `• <b>Balls Faced:</b> <code>${balls}</code>\n` +
+             `• <b>Average:</b> <code>${battingAvg}</code>\n` +
+             `• <b>Strike Rate:</b> <code>${battingSR}</code>\n` +
+             `• <b>Highest Score:</b> <code>${highestScoreStr}</code>\n` +
+             `• <b>Boundaries:</b> 4s: <code>${fours}</code> | 6s: <code>${sixes}</code>\n\n` +
+             `🥎 <b>BOWLING STATS:</b>\n` +
+             `• <b>Overs Bowled:</b> <code>${oversBowled}</code>\n` +
+             `• <b>Wickets:</b> <code>${wickets}</code>\n` +
+             `• <b>Runs Conceded:</b> <code>${runsConceded}</code>\n` +
+             `• <b>Economy:</b> <code>${bowlingEcon}</code>\n` +
+             `• <b>Average:</b> <code>${bowlingAvg}</code>\n` +
+             `• <b>Best Figures:</b> <code>${bestBowlingStr}</code>\n` +
+             `═════════════════════════════`;
+
+  await ctx.reply(message, { parse_mode: 'HTML' });
+});
+
+bot.command('ps', async (ctx) => {
+  const query = ctx.match?.trim();
+  if (!query) {
+    return ctx.reply("❌ Usage: <code>/ps &lt;player name&gt;</code>\nExample: <code>/ps Virat Kohli</code>", { parse_mode: 'HTML' });
+  }
+
+  const targetUserId = ctx.message.reply_to_message?.from?.id || ctx.from.id;
+  const targetFirstName = ctx.message.reply_to_message?.from?.first_name || ctx.from.first_name || "User";
+
+  const player = await resolveCricketPlayer(ctx, query);
+  if (!player) return;
+
+  if (sb.supabase) {
+    await sb.ensureUser(targetUserId, targetFirstName).catch(() => {});
+  }
+
+  const userMatches = await sb.getAllUserCompletedMatches(targetUserId);
+
+  let matchesPlayed = 0;
+  let runs = 0;
+  let balls = 0;
+  let fours = 0;
+  let sixes = 0;
+  let dismissals = 0;
+  let highestScore = { runs: 0, isOut: true };
+  
+  let runsConceded = 0;
+  let wickets = 0;
+  let ballsBowled = 0;
+  let bestBowling = { wickets: 0, runsConceded: Infinity };
+
+  const cleanPlayerId = (pid) => pid.replace(/^(host_|guest_)+/, '');
+
+  userMatches.forEach(match => {
+    const state = match.state_json;
+    if (!state) return;
+
+    const isHost = match.host_id.toString() === targetUserId.toString();
+    const isGuest = match.guest_id && match.guest_id.toString() === targetUserId.toString();
+
+    let foundInXI = null;
+    if (isHost && state.host && state.host.xi) {
+      foundInXI = state.host.xi.find(p => cleanPlayerId(p.id) === player.id || p.name.toLowerCase() === player.name.toLowerCase());
+    } else if (isGuest && state.guest && state.guest.xi) {
+      foundInXI = state.guest.xi.find(p => cleanPlayerId(p.id) === player.id || p.name.toLowerCase() === player.name.toLowerCase());
+    }
+
+    if (foundInXI && state.stats) {
+      matchesPlayed++;
+      const pStats = state.stats[foundInXI.id];
+      if (pStats) {
+        const currentRuns = pStats.runs || 0;
+        const currentBalls = pStats.balls || 0;
+        const currentFours = pStats.fours || 0;
+        const currentSixes = pStats.sixes || 0;
+        const isOut = !!pStats.isOut;
+
+        runs += currentRuns;
+        balls += currentBalls;
+        fours += currentFours;
+        sixes += currentSixes;
+        if (isOut) dismissals++;
+
+        if (currentRuns > highestScore.runs) {
+          highestScore = { runs: currentRuns, isOut };
+        } else if (currentRuns === highestScore.runs && !isOut && highestScore.isOut) {
+          highestScore = { runs: currentRuns, isOut };
+        }
+
+        const currentWickets = pStats.wickets || 0;
+        const currentRunsConceded = pStats.runsConceded || 0;
+        const oversVal = pStats.overs || 0;
+        const oversInt = Math.floor(oversVal);
+        const ballsFraction = Math.round((oversVal % 1) * 10);
+        const matchBallsBowled = (oversInt * 6) + ballsFraction;
+
+        runsConceded += currentRunsConceded;
+        wickets += currentWickets;
+        ballsBowled += matchBallsBowled;
+
+        if (matchBallsBowled > 0 || currentRunsConceded > 0 || currentWickets > 0) {
+          if (currentWickets > bestBowling.wickets) {
+            bestBowling = { wickets: currentWickets, runsConceded: currentRunsConceded };
+          } else if (currentWickets === bestBowling.wickets && currentRunsConceded < bestBowling.runsConceded) {
+            bestBowling = { wickets: currentWickets, runsConceded: currentRunsConceded };
+          }
+        }
+      }
+    }
+  });
+
+  const profile = await sb.getProfile(targetUserId);
+  const teamName = profile?.team_name ? `"${profile.team_name}"` : `${targetFirstName}'s XI`;
+
+  if (matchesPlayed === 0) {
+    return ctx.reply(`🏏 <b>${escapeHTML(player.name)}</b> hasn't played any matches for <b>${escapeHTML(teamName)}</b> yet!`, { parse_mode: 'HTML' });
+  }
+
+  const battingAvg = dismissals > 0 ? (runs / dismissals).toFixed(2) : (runs > 0 ? `${runs}*` : '0.00');
+  const battingSR = balls > 0 ? ((runs / balls) * 100).toFixed(2) : '0.00';
+  const highestScoreStr = highestScore.runs > 0 ? `${highestScore.runs}${highestScore.isOut ? '' : '*'}` : '0';
+
+  const oversBowled = `${Math.floor(ballsBowled / 6)}.${ballsBowled % 6}`;
+  const bowlingAvg = wickets > 0 ? (runsConceded / wickets).toFixed(2) : 'N/A';
+  const bowlingEcon = ballsBowled > 0 ? ((runsConceded / ballsBowled) * 6).toFixed(2) : '0.00';
+  const bestBowlingStr = bestBowling.runsConceded !== Infinity ? `${bestBowling.wickets}/${bestBowling.runsConceded}` : 'N/A';
+
+  const roleIcon = (role) => {
+    if (role === 'batsman') return '🏏';
+    if (role === 'wicket_keeper') return '🧤';
+    if (role === 'all_rounder') return '⚡';
+    if (role === 'bowler') return '🥎';
+    return '👤';
+  };
+
+  const tierIcon = player.tier === 'Legendary' ? ' 💎' : player.tier === 'Gold' ? ' ⭐' : '';
+
+  const message = `🏏 <b>PLAYER TEAM STATS</b> 🏏\n` +
+                  `═════════════════════════════\n` +
+                  `👤 <b>Name:</b> <b>${escapeHTML(player.name)}</b>${tierIcon}\n` +
+                  `👥 <b>Team:</b> <b>${escapeHTML(teamName)}</b> (Owner: <a href="tg://user?id=${targetUserId}">${escapeHTML(targetFirstName)}</a>)\n` +
+                  `🏷️ <b>Role:</b> ${roleIcon(player.role)} ${player.role ? player.role.toUpperCase().replace('_', ' ') : 'N/A'}\n` +
+                  `═════════════════════════════\n` +
+                  `🎮 <b>Matches Played:</b> <code>${matchesPlayed}</code>\n\n` +
+                  `🏏 <b>BATTING STATS:</b>\n` +
+                  `• <b>Runs:</b> <code>${runs}</code>\n` +
+                  `• <b>Balls Faced:</b> <code>${balls}</code>\n` +
+                  `• <b>Average:</b> <code>${battingAvg}</code>\n` +
+                  `• <b>Strike Rate:</b> <code>${battingSR}</code>\n` +
+                  `• <b>Highest Score:</b> <code>${highestScoreStr}</code>\n` +
+                  `• <b>Boundaries:</b> 4s: <code>${fours}</code> | 6s: <code>${sixes}</code>\n\n` +
+                  `🥎 <b>BOWLING STATS:</b>\n` +
+                  `• <b>Overs Bowled:</b> <code>${oversBowled}</code>\n` +
+                  `• <b>Wickets:</b> <code>${wickets}</code>\n` +
+                  `• <b>Runs Conceded:</b> <code>${runsConceded}</code>\n` +
+                  `• <b>Economy:</b> <code>${bowlingEcon}</code>\n` +
+                  `• <b>Average:</b> <code>${bowlingAvg}</code>\n` +
+                  `• <b>Best Figures:</b> <code>${bestBowlingStr}</code>\n` +
+                  `═════════════════════════════`;
+
+  await ctx.reply(message, { parse_mode: 'HTML' });
+});
+
+bot.command('addplayer', async (ctx) => {
+  const isMod = await sb.checkIsModerator(ctx.from.id);
+  const isAdmin = ADMIN_IDS.includes(ctx.from.id);
+  if (!isAdmin && !isMod) return;
+
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+
+  let targetUserId = null;
+  let targetFirstName = "User";
+  let playerQuery = "";
+
+  if (ctx.message.reply_to_message) {
+    targetUserId = ctx.message.reply_to_message.from.id;
+    targetFirstName = ctx.message.reply_to_message.from.first_name || "User";
+    playerQuery = ctx.match?.trim() || "";
+  } else {
+    const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
+    if (args.length < 2) {
+      return ctx.reply("❌ <b>Usage:</b> Reply to a user with <code>/addplayer &lt;player name&gt;</code> or use <code>/addplayer &lt;userId&gt; &lt;player name&gt;</code>", { parse_mode: 'HTML' });
+    }
+    targetUserId = parseInt(args[0]);
+    if (isNaN(targetUserId)) {
+      return ctx.reply("❌ Invalid User ID specified.");
+    }
+    playerQuery = args.slice(1).join(" ");
+  }
+
+  if (!playerQuery) {
+    return ctx.reply("❌ Please specify a player name.");
+  }
+
+  const player = await resolveCricketPlayer(ctx, playerQuery);
+  if (!player) return;
+
+  await sb.ensureUser(targetUserId, targetFirstName).catch(() => {});
+
+  try {
+    const result = await sb.awardPlayer(targetUserId, player.id, 'cricket');
+    if (result.success) {
+      if (result.alreadyOwned) {
+        await ctx.reply(`⚠️ User <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a> already owns <b>${escapeHTML(player.name)}</b>.`, { parse_mode: 'HTML' });
+      } else {
+        await ctx.reply(`✅ Successfully added <b>${escapeHTML(player.name)}</b> (OVR: ${player.ovr}) to <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a>'s team!`, { parse_mode: 'HTML' });
+      }
+    } else {
+      await ctx.reply(`❌ Failed to add player: ${result.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error("Error in /addplayer:", error);
+    await ctx.reply("❌ An error occurred while adding the player.");
+  }
+});
+
+bot.command('removeplayer', async (ctx) => {
+  const isMod = await sb.checkIsModerator(ctx.from.id);
+  const isAdmin = ADMIN_IDS.includes(ctx.from.id);
+  if (!isAdmin && !isMod) return;
+
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+
+  let targetUserId = null;
+  let targetFirstName = "User";
+  let playerQuery = "";
+
+  if (ctx.message.reply_to_message) {
+    targetUserId = ctx.message.reply_to_message.from.id;
+    targetFirstName = ctx.message.reply_to_message.from.first_name || "User";
+    playerQuery = ctx.match?.trim() || "";
+  } else {
+    const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
+    if (args.length < 2) {
+      return ctx.reply("❌ <b>Usage:</b> Reply to a user with <code>/removeplayer &lt;player name&gt;</code> or use <code>/removeplayer &lt;userId&gt; &lt;player name&gt;</code>", { parse_mode: 'HTML' });
+    }
+    targetUserId = parseInt(args[0]);
+    if (isNaN(targetUserId)) {
+      return ctx.reply("❌ Invalid User ID specified.");
+    }
+    playerQuery = args.slice(1).join(" ");
+  }
+
+  if (!playerQuery) {
+    return ctx.reply("❌ Please specify a player name.");
+  }
+
+  const player = await resolveCricketPlayer(ctx, playerQuery);
+  if (!player) return;
+
+  await sb.ensureUser(targetUserId, targetFirstName).catch(() => {});
+
+  try {
+    const result = await sb.removePlayerFromSquad(targetUserId, player.id, 'cricket');
+    if (result.success) {
+      await ctx.reply(`✅ Successfully removed <b>${escapeHTML(player.name)}</b> from <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a>'s team!`, { parse_mode: 'HTML' });
+    } else {
+      await ctx.reply(`❌ Failed to remove player: ${result.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error("Error in /removeplayer:", error);
+    await ctx.reply("❌ An error occurred while removing the player.");
+  }
+});
+
 bot.command('history', async (ctx) => {
   const telegramId = ctx.from.id;
   
@@ -1897,18 +2335,17 @@ bot.command('leaderboard', async (ctx) => {
   
   const user = ctx.from;
   const chatId = ctx.chat.id;
-  const sortBy = 'wins';
+  const sortBy = 'rating';
   const isGlobal = true;
 
   const records = await sb.getGlobalLeaderboard(sortBy);
   
-  let text = `🌍 <b>Global Top 10 — Wins</b> 🌍\n\n`;
+  let text = `🌍 <b>Global Top 10 — Rating</b> 🌍\n\n`;
   if (!records || records.length === 0) {
      text += "<i>No records found yet!</i>\n";
   } else {
      records.forEach((r, i) => {
-        const winRate = r.matches_played > 0 ? Math.round((r.wins / r.matches_played) * 100) : 0;
-        text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.wins} Wins <i>(${winRate}% WR)</i>\n`;
+        text += `${i+1}. <a href="tg://user?id=${r.user_id}"><b>${r.first_name || 'Player'}</b></a> - ${r.rating || 0} Rating 📈\n`;
      });
   }
 
@@ -1918,8 +2355,8 @@ bot.command('leaderboard', async (ctx) => {
   }
 
   const kb = new InlineKeyboard();
-  kb.text("● Global", "lb_global_wins").text("Group", "lb_group_wins").row();
-  kb.text("● Wins", "lb_global_wins").text("Coins", "lb_global_coins").text("Rating", "lb_global_rating");
+  kb.text("● Global", "lb_global_rating").text("Group", "lb_group_rating").row();
+  kb.text("● Rating", "lb_global_rating").text("Wins", "lb_global_wins").text("Coins", "lb_global_coins");
 
   await ctx.reply(text, { reply_markup: kb, parse_mode: 'HTML' });
 });
@@ -3030,9 +3467,9 @@ bot.on('callback_query:data', async (ctx) => {
        .text(!isGlobal ? "● Group" : "Group", `lb_group_${sortBy}`).row();
      
      // Sort Selector Row
-     kb.text(sortBy === 'wins' ? "● Wins" : "Wins", `lb_${scope}_wins`)
-       .text(sortBy === 'coins' ? "● Coins" : "Coins", `lb_${scope}_coins`)
-       .text(sortBy === 'rating' ? "● Rating" : "Rating", `lb_${scope}_rating`);
+     kb.text(sortBy === 'rating' ? "● Rating" : "Rating", `lb_${scope}_rating`)
+       .text(sortBy === 'wins' ? "● Wins" : "Wins", `lb_${scope}_wins`)
+       .text(sortBy === 'coins' ? "● Coins" : "Coins", `lb_${scope}_coins`);
        
      try {
        await ctx.editMessageText(text, { reply_markup: kb, parse_mode: 'HTML' });
@@ -3936,7 +4373,8 @@ app.get('/api/user-stats', async (req, res) => {
         const profile = await sb.getProfile(userId);
         if (!profile) return res.status(404).send('User not found');
 
-        const globalRank = await sb.getUserGlobalRank(userId);
+        const globalRank = await sb.getUserGlobalRank(userId, 'rating');
+        const rating = await sb.getUserTeamRating(userId);
         
         const lastClaim = claimCooldowns.get(userId) || 0;
         const remainingMs = (60 * 60 * 1000) - (Date.now() - lastClaim);
@@ -3958,6 +4396,7 @@ app.get('/api/user-stats', async (req, res) => {
             wins: profile.wins || 0,
             played: profile.matches_played || 0,
             rank: globalRank || "N/A",
+            rating: rating || 0,
             dropCooldown: dropCooldownRemaining,
             spinCooldown: spinCooldownRemaining,
             jackpotClaimed: jackpotClaimed
@@ -4062,8 +4501,8 @@ app.get('/api/spin', async (req, res) => {
 
 // Leaderboard Endpoint for Mini App
 app.get('/api/leaderboard', async (req, res) => {
-    const { sort } = req.query; // 'coins' or 'wins'
-    const sortBy = sort === 'wins' ? 'wins' : 'coins';
+    const { sort } = req.query; // 'rating', 'wins', or 'coins'
+    const sortBy = (sort === 'wins' || sort === 'coins') ? sort : 'rating';
     
     try {
         const topPlayers = await sb.getGlobalLeaderboard(sortBy);
@@ -4071,7 +4510,8 @@ app.get('/api/leaderboard', async (req, res) => {
             id: p.user_id,
             name: p.first_name,
             coins: p.coins || 0,
-            wins: p.wins || 0
+            wins: p.wins || 0,
+            rating: p.rating || 0
         }));
         res.json(formatted);
     } catch (error) {

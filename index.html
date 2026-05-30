@@ -109,13 +109,13 @@
         /* Stats Cards */
         .stats-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
             margin-bottom: 30px;
         }
 
         .stat-card {
-            padding: 20px;
+            padding: 12px 6px;
             text-align: center;
             transition: transform 0.2s;
         }
@@ -125,7 +125,7 @@
         }
 
         .stat-val {
-            font-size: 26px;
+            font-size: 20px;
             font-weight: 800;
             display: block;
             margin-top: 6px;
@@ -136,10 +136,10 @@
         }
 
         .stat-label {
-            font-size: 13px;
+            font-size: 10px;
             color: var(--hint);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             font-weight: 600;
         }
 
@@ -391,7 +391,7 @@
         }
         .modal-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
         }
         .modal-stat {
@@ -942,6 +942,10 @@
 
             <div class="stats-grid">
                 <div class="stat-card glass-panel">
+                    <span class="stat-label">Team Rating</span>
+                    <span class="stat-val" id="stat-rating">--</span>
+                </div>
+                <div class="stat-card glass-panel">
                     <span class="stat-label">Total Coins</span>
                     <span class="stat-val" id="stat-coins">--</span>
                 </div>
@@ -1032,8 +1036,9 @@
             </div>
 
             <div class="seg-control">
-                <div class="seg-btn active" id="seg-coins" onclick="loadLeaderboard('coins')">💰 Top Coins</div>
-                <div class="seg-btn" id="seg-wins" onclick="loadLeaderboard('wins')">🏆 Top Wins</div>
+                <div class="seg-btn active" id="seg-rating" onclick="loadLeaderboard('rating')">📈 Rating</div>
+                <div class="seg-btn" id="seg-wins" onclick="loadLeaderboard('wins')">🏆 Wins</div>
+                <div class="seg-btn" id="seg-coins" onclick="loadLeaderboard('coins')">💰 Coins</div>
             </div>
 
             <div id="lb-loading" class="loading-spinner">Fetching Data...</div>
@@ -1177,20 +1182,28 @@
                 
                 <div class="modal-grid">
                     <div class="modal-stat">
-                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">COINS</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-coins">0</div>
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">RATING</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-rating">0</div>
                     </div>
                     <div class="modal-stat">
-                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">WINS</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-wins">0</div>
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">RANK</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-rank-val">#--</div>
                     </div>
                     <div class="modal-stat">
-                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">PLAYED</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-played">0</div>
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">COINS</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-coins">0</div>
                     </div>
                     <div class="modal-stat">
-                        <div style="font-size: 12px; color: var(--hint); margin-bottom: 4px;">WIN RATE</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #fff;" id="m-rate">0%</div>
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">WINS</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-wins">0</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">PLAYED</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-played">0</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div style="font-size: 11px; color: var(--hint); margin-bottom: 4px;">WIN RATE</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #fff;" id="m-rate">0%</div>
                     </div>
                 </div>
             </div>
@@ -1238,7 +1251,7 @@
             }
         }
 
-        let currentLbSort = 'coins';
+        let currentLbSort = 'rating';
 
         function updateDropCooldownUI(data) {
             const btn = document.getElementById('watch-btn');
@@ -1331,6 +1344,7 @@
                 document.getElementById('user-name').innerText = data.name;
                 document.getElementById('user-initial').innerText = data.name.charAt(0).toUpperCase();
                 document.getElementById('user-rank').innerText = `Global Rank: #${data.rank}`;
+                document.getElementById('stat-rating').innerText = data.rating || 0;
                 document.getElementById('stat-coins').innerText = data.coins.toLocaleString();
                 document.getElementById('stat-wins').innerText = data.wins;
 
@@ -1377,8 +1391,13 @@
         // Leaderboard Logic
         function loadLeaderboard(sort) {
             currentLbSort = sort;
-            document.getElementById('seg-coins').classList.toggle('active', sort === 'coins');
-            document.getElementById('seg-wins').classList.toggle('active', sort === 'wins');
+            const ratingBtn = document.getElementById('seg-rating');
+            const winsBtn = document.getElementById('seg-wins');
+            const coinsBtn = document.getElementById('seg-coins');
+            
+            if (ratingBtn) ratingBtn.classList.toggle('active', sort === 'rating');
+            if (winsBtn) winsBtn.classList.toggle('active', sort === 'wins');
+            if (coinsBtn) coinsBtn.classList.toggle('active', sort === 'coins');
             
             const container = document.getElementById('lb-container');
             const loader = document.getElementById('lb-loading');
@@ -1391,7 +1410,12 @@
                 .then(data => {
                     container.innerHTML = '';
                     data.forEach((p, idx) => {
-                        const val = sort === 'coins' ? `💰 ${p.coins.toLocaleString()}` : `🏆 ${p.wins.toLocaleString()} Wins`;
+                        let val = `📈 ${p.rating || 0} Rating`;
+                        if (sort === 'wins') {
+                            val = `🏆 ${p.wins.toLocaleString()} Wins`;
+                        } else if (sort === 'coins') {
+                            val = `💰 ${p.coins.toLocaleString()}`;
+                        }
                         let rankDisplay = idx + 1;
                         if (idx === 0) rankDisplay = '🥇';
                         else if (idx === 1) rankDisplay = '🥈';
@@ -1436,6 +1460,8 @@
                     document.getElementById('m-name').innerText = data.name;
                     document.getElementById('m-initial').innerText = data.name.charAt(0).toUpperCase();
                     document.getElementById('m-rank').innerText = `Global Rank: #${data.rank}`;
+                    document.getElementById('m-rating').innerText = data.rating || 0;
+                    document.getElementById('m-rank-val').innerText = `#${data.rank}`;
                     document.getElementById('m-coins').innerText = data.coins.toLocaleString();
                     document.getElementById('m-wins').innerText = data.wins;
                     document.getElementById('m-played').innerText = data.played;

@@ -84,6 +84,30 @@ function setupEventListeners() {
   // Delivery Submit
   document.getElementById('submit-delivery-btn').addEventListener('click', submitDelivery);
 
+  // Wicket batsman confirm
+  const submitWicketBatsmanBtn = document.getElementById('submit-wicket-batsman-btn');
+  if (submitWicketBatsmanBtn) {
+    submitWicketBatsmanBtn.addEventListener('click', () => {
+      const selectEl = document.getElementById('wicket-batsman-select');
+      if (selectEl && selectEl.value !== "") {
+        document.getElementById('controls-sheet').classList.add('minimized');
+        selectNextBatsman(parseInt(selectEl.value));
+      }
+    });
+  }
+
+  // Over bowler confirm
+  const submitOverBowlerBtn = document.getElementById('submit-over-bowler-btn');
+  if (submitOverBowlerBtn) {
+    submitOverBowlerBtn.addEventListener('click', () => {
+      const selectEl = document.getElementById('over-bowler-select');
+      if (selectEl && selectEl.value !== "") {
+        document.getElementById('controls-sheet').classList.add('minimized');
+        selectNextBowler(parseInt(selectEl.value));
+      }
+    });
+  }
+
   // Close app button
   document.getElementById('close-app-btn').addEventListener('click', () => {
     if (tg) {
@@ -219,8 +243,8 @@ function showIdentitySelection(match) {
   container.innerHTML = '';
 
   // Header meta inside selection
-  document.getElementById('header-host-name').innerText = match.host.username ? match.host.username.toUpperCase() : 'HOST';
-  document.getElementById('header-guest-name').innerText = match.guest && match.guest.username ? match.guest.username.toUpperCase() : 'GUEST';
+  document.getElementById('header-host-name').innerText = (match.host.teamName || match.host.username || 'HOST').toUpperCase();
+  document.getElementById('header-guest-name').innerText = (match.guest ? (match.guest.teamName || match.guest.username) : 'AI XI').toUpperCase();
   document.getElementById('header-match-uuid').innerText = `MATCH ID: ${match.id.substring(0, 6).toUpperCase()}`;
 
   // Host Option
@@ -321,8 +345,8 @@ async function fetchState() {
     }
     
     // Update Header info
-    document.getElementById('header-host-name').innerText = matchState.host.username ? matchState.host.username.toUpperCase() : 'HOST';
-    document.getElementById('header-guest-name').innerText = matchState.guest && matchState.guest.username ? matchState.guest.username.toUpperCase() : 'GUEST';
+    document.getElementById('header-host-name').innerText = (matchState.host.teamName || matchState.host.username || 'HOST').toUpperCase();
+    document.getElementById('header-guest-name').innerText = (matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI XI').toUpperCase();
     document.getElementById('header-match-uuid').innerText = `MATCH ID: ${matchState.id.substring(0, 6).toUpperCase()}`;
 
     // Route to appropriate screen
@@ -351,8 +375,8 @@ function renderSetupScreen() {
     setupSubmitBtn.disabled = false;
   }
   
-  const host = matchState.host.username;
-  const guest = matchState.guest ? matchState.guest.username : 'AI';
+  const host = matchState.host.teamName || matchState.host.username;
+  const guest = matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI';
   const pitch = matchState.pitch;
   const overs = matchState.totalOvers;
   
@@ -564,8 +588,8 @@ function renderGameplayScreen() {
   const tossBadge = document.getElementById('toss-badge-display');
   const dec = matchState.tossDecision === 'bat' ? 'ELECTED TO BAT' : 'ELECTED TO BOWL';
   const winnerName = matchState.tossWinnerId === matchState.host.telegramId 
-    ? (matchState.host.username || 'Host').toUpperCase() 
-    : (matchState.guest ? (matchState.guest.username || 'Guest').toUpperCase() : 'AI');
+    ? (matchState.host.teamName || matchState.host.username || 'Host').toUpperCase() 
+    : (matchState.guest ? (matchState.guest.teamName || matchState.guest.username || 'Guest').toUpperCase() : 'AI XI');
   tossBadge.innerText = `⚫ ${winnerName} WON & ${dec}`;
 
   // Innings 2 Target logic
@@ -886,11 +910,11 @@ function renderBowlerVariations() {
   deliveryGrid.innerHTML = '';
   deliveries.forEach(del => {
     const btn = document.createElement('button');
-    btn.className = "btn btn-action-card";
-    btn.innerHTML = `<span class="label">${del.name}</span>`;
+    btn.className = "btn-variation";
+    btn.innerText = del.name;
     btn.dataset.delivery = del.id;
     btn.addEventListener('click', (e) => {
-      const allActionBtns = deliveryGrid.querySelectorAll('.btn-action-card');
+      const allActionBtns = deliveryGrid.querySelectorAll('.btn-variation');
       allActionBtns.forEach(b => b.classList.remove('active'));
       e.currentTarget.classList.add('active');
       selectedDelivery = e.currentTarget.dataset.delivery;
@@ -968,8 +992,9 @@ async function submitDelivery() {
 
 // Selection list for incoming batsman
 function renderWicketBatsmanSelectionSheet() {
-  const sheet = document.getElementById('wicket-batsman-sheet');
-  sheet.innerHTML = '';
+  const selectEl = document.getElementById('wicket-batsman-select');
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
 
   const getBatRating = (p) => p.batting_ovr || p.batting_rating || p.rating || p.ovr || 0;
 
@@ -988,25 +1013,13 @@ function renderWicketBatsmanSelectionSheet() {
     .sort((a, b) => getBatRating(b.player) - getBatRating(a.player));
 
   if (bench.length === 0) {
-    sheet.innerHTML = '<p class="info-text" style="color:var(--text-secondary);text-align:center;">No batsmen remaining on the bench.</p>';
+    selectEl.innerHTML = '<option value="">No batsmen remaining</option>';
     return;
   }
 
   bench.forEach(item => {
-    const row = document.createElement('div');
-    row.className = "player-selection-row";
-    row.innerHTML = `
-      <div class="selection-row-details">
-        <span class="selection-row-name">${item.player.name}</span>
-        <span class="selection-row-type">${item.player.role || 'PLAYER'}</span>
-      </div>
-      <div class="selection-row-ovr">${getBatRating(item.player)}</div>
-    `;
-    row.addEventListener('click', () => {
-      document.getElementById('controls-sheet').classList.add('minimized');
-      selectNextBatsman(item.index);
-    });
-    sheet.appendChild(row);
+    const opt = new Option(`${item.player.name} (${getBatRating(item.player)} OVR) - ${item.player.role || 'PLAYER'}`, item.index);
+    selectEl.add(opt);
   });
 }
 
@@ -1032,8 +1045,9 @@ async function selectNextBatsman(index) {
 // Selection list for selecting next bowler
 // Selection list for selecting next bowler
 function renderOverBowlerSelectionSheet() {
-  const sheet = document.getElementById('over-bowler-sheet');
-  sheet.innerHTML = '';
+  const selectEl = document.getElementById('over-bowler-select');
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
 
   const getBowlRating = (p) => p.bowling_ovr || p.bowling_rating || p.rating || p.ovr || 0;
   const currentBowlIdx = matchState.bowler ? matchState.bowlingXI.findIndex(p => p.id.toString() === matchState.bowler.id.toString()) : null;
@@ -1071,33 +1085,19 @@ function renderOverBowlerSelectionSheet() {
   });
 
   bench.forEach(item => {
-    const row = document.createElement('div');
-    row.className = "player-selection-row" + (item.eligible ? "" : " disabled");
-    
-    let typeText = item.player.bowler_type || 'Bowler';
+    let text = `${item.player.name} (${getBowlRating(item.player)} OVR) - ${item.player.bowler_type || 'Bowler'}`;
     const cleanOvers = item.overs || 0;
     if (cleanOvers > 0) {
-      typeText += ` • ${cleanOvers} ov`;
+      text += ` • ${cleanOvers} ov`;
     }
-    
-    row.innerHTML = `
-      <div class="selection-row-details">
-        <span class="selection-row-name">${item.player.name} (${getBowlRating(item.player)})</span>
-        <span class="selection-row-type">
-          ${typeText} 
-          ${item.reason ? `<span class="selection-row-reason">${item.reason}</span>` : ''}
-        </span>
-      </div>
-      <div class="selection-row-ovr">${item.eligible ? '✅' : '🔒'}</div>
-    `;
-
-    if (item.eligible) {
-      row.addEventListener('click', () => {
-        document.getElementById('controls-sheet').classList.add('minimized');
-        selectNextBowler(item.index);
-      });
+    if (item.reason) {
+      text += ` [${item.reason}]`;
     }
-    sheet.appendChild(row);
+    const opt = new Option(text, item.index);
+    if (!item.eligible) {
+      opt.disabled = true;
+    }
+    selectEl.add(opt);
   });
 }
 
@@ -1241,8 +1241,11 @@ function renderScorecardPanel() {
   const firstInn = matchState.innings[0] || { runs: 0, wickets: 0, overs: 0, balls: 0, extras: 0 };
   const secondInn = matchState.innings[1] || { runs: 0, wickets: 0, overs: 0, balls: 0, extras: 0 };
 
-  const firstNameShort = (firstTeam.username || 'HOST').substring(0, 3).toUpperCase();
-  const secondNameShort = (secondTeam ? (secondTeam.username || 'GUEST') : 'AI').substring(0, 3).toUpperCase();
+  const firstDisplayName = firstTeam.teamName || firstTeam.username || 'HOST';
+  const secondDisplayName = secondTeam ? (secondTeam.teamName || secondTeam.username) : 'AI XI';
+
+  const firstNameShort = firstDisplayName.substring(0, 8).toUpperCase();
+  const secondNameShort = secondDisplayName.substring(0, 8).toUpperCase();
 
   hostLabel.innerText = `${firstNameShort} ${firstInn.runs}/${firstInn.wickets}`;
   guestLabel.innerText = `${secondNameShort} ${secondInn.runs}/${secondInn.wickets}`;
@@ -1358,8 +1361,8 @@ function renderSquadsPanel() {
   hostList.innerHTML = '';
   guestList.innerHTML = '';
 
-  document.getElementById('squad-host-title').innerText = (matchState.host.username || 'Host').toUpperCase();
-  document.getElementById('squad-guest-title').innerText = (matchState.guest ? matchState.guest.username : 'AI').toUpperCase();
+  document.getElementById('squad-host-title').innerText = (matchState.host.teamName || matchState.host.username || 'Host').toUpperCase();
+  document.getElementById('squad-guest-title').innerText = (matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI').toUpperCase();
 
   matchState.host.xi.forEach(p => {
     const row = document.createElement('div');
@@ -1386,8 +1389,9 @@ function renderResultScreen() {
   const result = matchState.result;
 
   if (result && result.winner) {
+    const winnerDisplayName = result.winner.teamName || result.winner.username || 'WINNER';
     document.getElementById('result-winner-title').innerText = 
-      `${result.winner.username.toUpperCase()} WINS!`;
+      `${winnerDisplayName.toUpperCase()} WINS!`;
   } else {
     document.getElementById('result-winner-title').innerText = "TIE MATCH!";
   }
@@ -1466,7 +1470,7 @@ function runAutoplayAction() {
   if ((matchState.status === 'innings1' || matchState.status === 'innings2') && matchState.isMyTurn) {
     if (matchState.turnState === 'bowling_delivery') {
       const deliveryGrid = document.getElementById('bowler-delivery-grid');
-      const buttons = deliveryGrid.querySelectorAll('.btn-action-card');
+      const buttons = deliveryGrid.querySelectorAll('.btn-variation');
       if (buttons.length > 0) {
         const randBtn = buttons[Math.floor(Math.random() * buttons.length)];
         randBtn.click();
@@ -1491,19 +1495,25 @@ function runAutoplayAction() {
       }
     } 
     else if (matchState.turnState === 'selecting_wicket_batsman') {
-      const sheet = document.getElementById('wicket-batsman-sheet');
-      const rows = sheet.querySelectorAll('.player-selection-row');
-      if (rows.length > 0) {
+      const selectEl = document.getElementById('wicket-batsman-select');
+      if (selectEl && selectEl.options.length > 0) {
+        selectEl.selectedIndex = 0;
         console.log("[Autoplay] Auto-selecting Replacement Batsman...");
-        setTimeout(() => rows[0].click(), 500);
+        setTimeout(() => {
+          document.getElementById('controls-sheet').classList.add('minimized');
+          selectNextBatsman(parseInt(selectEl.value));
+        }, 500);
       }
     } 
     else if (matchState.turnState === 'selecting_over_bowler') {
-      const sheet = document.getElementById('over-bowler-sheet');
-      const rows = sheet.querySelectorAll('.player-selection-row');
-      if (rows.length > 0) {
+      const selectEl = document.getElementById('over-bowler-select');
+      if (selectEl && selectEl.options.length > 0) {
+        selectEl.selectedIndex = 0;
         console.log("[Autoplay] Auto-selecting Over Bowler...");
-        setTimeout(() => rows[0].click(), 500);
+        setTimeout(() => {
+          document.getElementById('controls-sheet').classList.add('minimized');
+          selectNextBowler(parseInt(selectEl.value));
+        }, 500);
       }
     }
   }
