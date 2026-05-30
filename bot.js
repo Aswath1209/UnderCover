@@ -887,7 +887,7 @@ bot.command('image', async (ctx) => {
     }
 
     const buffer = canvas.toBuffer('image/png');
-    await ctx.replyWithPhoto({ source: buffer }, {
+    await ctx.replyWithPhoto(new InputFile(buffer, 'playing11.png'), {
       caption: `🏏 <b>PLAYING XI — ${escapeHTML(teamName)}</b>\n\n📊 <b>XI Rating:</b> <code>${teamRating} OVR</code>\n\n💡 <i>Use <code>/swap [pos1] [pos2]</code> to swap players.</i>`,
       parse_mode: 'HTML'
     });
