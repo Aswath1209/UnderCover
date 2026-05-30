@@ -15,6 +15,7 @@ const matchManager = require('./game/matchManager');
 const gameConstants = require('./constants/game');
 const ai = require('./game/ai');
 const { DEFAULT_XI } = require('./game/matchManager');
+const { generateScoreboardImage } = require('./game/scoreboardGenerator');
 const activeLobbies = {};
 
 function getUserActiveLobby(userId) {
@@ -5325,7 +5326,22 @@ async function processBallAndProgress(ctx, match) {
             [buttonObj]
           ]
         };
-        await sendTelegramMessage(match, summary, { reply_markup });
+
+        try {
+          const photoBuffer = await generateScoreboardImage(match, result, marginText);
+          if (photoBuffer) {
+            await bot.api.sendPhoto(match.chatId, new InputFile(photoBuffer, 'scoreboard.png'), {
+              caption: summary,
+              reply_markup,
+              parse_mode: 'HTML'
+            });
+          } else {
+            await sendTelegramMessage(match, summary, { reply_markup });
+          }
+        } catch (err) {
+          console.error("Failed to send scoreboard photo, falling back to text:", err);
+          await sendTelegramMessage(match, summary, { reply_markup });
+        }
       }
     } else {
       if (outcome.isWicket) {
