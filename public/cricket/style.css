@@ -668,58 +668,71 @@ body {
 
 /* Custom Selection List Box */
 .selection-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 250px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--card-border);
   border-radius: var(--border-radius-md);
-  padding: 8px;
+  padding: 6px;
   background: rgba(0, 0, 0, 0.2);
   margin-bottom: 12px;
 }
 
 .selection-item {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  padding: 10px 12px;
+  text-align: center;
+  padding: 8px 6px;
   background: rgba(22, 28, 49, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--border-radius-sm);
   color: white;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 52px;
+  box-sizing: border-box;
 }
 
 .selection-item:hover, .selection-item.selected {
   background: var(--primary-gradient);
   border-color: var(--primary);
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 
 .selection-item.disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
-  background: rgba(22, 28, 49, 0.3) !important;
+  background: rgba(22, 28, 49, 0.2) !important;
   border-color: transparent !important;
   transform: none !important;
 }
 
 .selection-item-name {
   font-weight: 700;
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .selection-item-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .selection-item.selected .selection-item-meta {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* Buttons */
