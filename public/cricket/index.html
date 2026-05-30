@@ -69,13 +69,13 @@
             <p class="section-description">Choose who walks out to open the innings.</p>
             
             <div class="form-group">
-              <label for="striker-select">Striker (Batsman 1)</label>
-              <select id="striker-select" class="custom-select"></select>
+              <label>Striker (Batsman 1)</label>
+              <div id="striker-list" class="selection-list"></div>
             </div>
             
             <div class="form-group">
-              <label for="non-striker-select">Non-Striker (Batsman 2)</label>
-              <select id="non-striker-select" class="custom-select"></select>
+              <label>Non-Striker (Batsman 2)</label>
+              <div id="non-striker-list" class="selection-list"></div>
             </div>
           </div>
         </div>
@@ -87,8 +87,8 @@
             <p class="section-description">Pick the bowler to bowl the first over of the match.</p>
             
             <div class="form-group">
-              <label for="bowler-select">Opening Bowler</label>
-              <select id="bowler-select" class="custom-select"></select>
+              <label>Opening Bowler</label>
+              <div id="bowler-list" class="selection-list"></div>
             </div>
           </div>
         </div>
@@ -177,7 +177,6 @@
         <!-- AUTOPLAY SWITCH STRIP -->
         <div class="autoplay-strip">
           <div class="autoplay-label">
-            <span class="premium-badge">PREMIUM</span>
             <span class="autoplay-text">AUTOPLAY</span>
           </div>
           <button class="autoplay-pill-btn" id="autoplay-toggle-btn">
@@ -338,14 +337,14 @@
           <!-- INCOMING BATSMAN SELECTION -->
           <div id="wicket-batsman-controls" class="controls-section hidden">
             <p class="warning-text">Striker got out! Select your next batsman:</p>
-            <select id="wicket-batsman-select" class="custom-select mb-3"></select>
+            <div id="wicket-batsman-list" class="selection-list mb-3"></div>
             <button id="submit-wicket-batsman-btn" class="btn btn-primary btn-block btn-green mt-3">Confirm Batsman</button>
           </div>
 
           <!-- INCOMING BOWLER SELECTION -->
           <div id="over-bowler-controls" class="controls-section hidden">
             <p class="info-text">Bowler for the next over:</p>
-            <select id="over-bowler-select" class="custom-select mb-3"></select>
+            <div id="over-bowler-list" class="selection-list mb-3"></div>
             <button id="submit-over-bowler-btn" class="btn btn-primary btn-block btn-green mt-3">Confirm Bowler</button>
           </div>
 

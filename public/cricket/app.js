@@ -88,10 +88,12 @@ function setupEventListeners() {
   const submitWicketBatsmanBtn = document.getElementById('submit-wicket-batsman-btn');
   if (submitWicketBatsmanBtn) {
     submitWicketBatsmanBtn.addEventListener('click', () => {
-      const selectEl = document.getElementById('wicket-batsman-select');
-      if (selectEl && selectEl.value !== "") {
+      const selectedEl = document.querySelector('#wicket-batsman-list .selection-item.selected');
+      if (selectedEl) {
         document.getElementById('controls-sheet').classList.add('minimized');
-        selectNextBatsman(parseInt(selectEl.value));
+        selectNextBatsman(parseInt(selectedEl.dataset.index));
+      } else {
+        alert("Please select a batsman first!");
       }
     });
   }
@@ -100,10 +102,12 @@ function setupEventListeners() {
   const submitOverBowlerBtn = document.getElementById('submit-over-bowler-btn');
   if (submitOverBowlerBtn) {
     submitOverBowlerBtn.addEventListener('click', () => {
-      const selectEl = document.getElementById('over-bowler-select');
-      if (selectEl && selectEl.value !== "") {
+      const selectedEl = document.querySelector('#over-bowler-list .selection-item.selected');
+      if (selectedEl) {
         document.getElementById('controls-sheet').classList.add('minimized');
-        selectNextBowler(parseInt(selectEl.value));
+        selectNextBowler(parseInt(selectedEl.dataset.index));
+      } else {
+        alert("Please select a bowler first!");
       }
     });
   }
@@ -404,72 +408,93 @@ function renderSetupScreen() {
     battingSetup.classList.remove('hidden');
     bowlingSetup.classList.add('hidden');
     
-    const strikerSelect = document.getElementById('striker-select');
-    const nonStrikerSelect = document.getElementById('non-striker-select');
-    
-    strikerSelect.innerHTML = '';
-    nonStrikerSelect.innerHTML = '';
+    const strikerContainer = document.getElementById('striker-list');
+    const nonStrikerContainer = document.getElementById('non-striker-list');
+    if (strikerContainer && nonStrikerContainer) {
+      const getBatRating = (p) => p.batting_ovr || p.batting_rating || p.rating || p.ovr || 0;
+      const sortedBatting = matchState.battingXI.map((p, idx) => ({ p, idx }))
+        .sort((a, b) => getBatRating(b.p) - getBatRating(a.p));
 
-    const getBatRating = (p) => p.batting_ovr || p.batting_rating || p.rating || p.ovr || 0;
-    const sortedBatting = matchState.battingXI.map((p, idx) => ({ p, idx }))
-      .sort((a, b) => getBatRating(b.p) - getBatRating(a.p));
+      let sSel = strikerContainer.querySelector('.selection-item.selected')?.dataset.index;
+      let nsSel = nonStrikerContainer.querySelector('.selection-item.selected')?.dataset.index;
 
-    sortedBatting.forEach(({ p, idx }) => {
-      const ratingVal = getBatRating(p);
-      const opt1 = new Option(`${p.name} (${ratingVal})`, idx);
-      const opt2 = new Option(`${p.name} (${ratingVal})`, idx);
-      strikerSelect.add(opt1);
-      nonStrikerSelect.add(opt2);
-    });
-    
-    if (sortedBatting.length >= 2) {
-      strikerSelect.value = sortedBatting[0].idx;
-      nonStrikerSelect.value = sortedBatting[1].idx;
-    } else {
-      strikerSelect.value = 0;
-      nonStrikerSelect.value = 0;
+      if (sSel === undefined && nsSel === undefined && sortedBatting.length >= 2) {
+        sSel = sortedBatting[0].idx.toString();
+        nsSel = sortedBatting[1].idx.toString();
+      }
+
+      const buildList = (container, currentSel, otherSel, onSelect) => {
+        container.innerHTML = '';
+        sortedBatting.forEach(({ p, idx }) => {
+          const div = document.createElement('div');
+          div.className = 'selection-item';
+          div.dataset.index = idx;
+          
+          const isSelected = currentSel === idx.toString();
+          const isDisabled = otherSel === idx.toString();
+          
+          if (isSelected) div.classList.add('selected');
+          if (isDisabled) div.classList.add('disabled');
+          
+          div.innerHTML = `
+            <span class="selection-item-name">${p.name}</span>
+            <span class="selection-item-meta">${getBatRating(p)} OVR - ${p.role || 'Batsman'}</span>
+          `;
+          
+          if (!isDisabled) {
+            div.onclick = () => {
+              onSelect(idx.toString());
+            };
+          }
+          container.appendChild(div);
+        });
+      };
+
+      const updateLists = (newStriker, newNonStriker) => {
+        buildList(strikerContainer, newStriker, newNonStriker, (idx) => updateLists(idx, newNonStriker));
+        buildList(nonStrikerContainer, newNonStriker, newStriker, (idx) => updateLists(newStriker, idx));
+      };
+
+      updateLists(sSel, nsSel);
     }
-
-    // Dropdown synchronization to prevent choosing the same player
-    const syncDropdowns = () => {
-      const sVal = strikerSelect.value;
-      const nsVal = nonStrikerSelect.value;
-
-      // Disable selected striker in non-striker dropdown
-      Array.from(nonStrikerSelect.options).forEach(opt => {
-        opt.disabled = (opt.value === sVal);
-      });
-
-      // Disable selected non-striker in striker dropdown
-      Array.from(strikerSelect.options).forEach(opt => {
-        opt.disabled = (opt.value === nsVal);
-      });
-    };
-
-    strikerSelect.addEventListener('change', syncDropdowns);
-    nonStrikerSelect.addEventListener('change', syncDropdowns);
-    
-    // Run once initially
-    syncDropdowns();
   } else if (matchState.myRole === 'bowling' && !myConfirmed) {
     bowlingSetup.classList.remove('hidden');
     battingSetup.classList.add('hidden');
     
-    const bowlerSelect = document.getElementById('bowler-select');
-    bowlerSelect.innerHTML = '';
+    const container = document.getElementById('bowler-list');
+    if (container) {
+      const getBowlRating = (p) => p.bowling_ovr || p.bowling_rating || p.rating || p.ovr || 0;
+      const sortedBowling = matchState.bowlingXI.map((p, idx) => ({ p, idx }))
+        .sort((a, b) => getBowlRating(b.p) - getBowlRating(a.p));
 
-    const getBowlRating = (p) => p.bowling_ovr || p.bowling_rating || p.rating || p.ovr || 0;
-    const sortedBowling = matchState.bowlingXI.map((p, idx) => ({ p, idx }))
-      .sort((a, b) => getBowlRating(b.p) - getBowlRating(a.p));
+      let currentSel = container.querySelector('.selection-item.selected')?.dataset.index;
+      if (currentSel === undefined && sortedBowling.length > 0) {
+        currentSel = sortedBowling[0].idx.toString();
+      }
 
-    sortedBowling.forEach(({ p, idx }) => {
-      const ratingVal = getBowlRating(p);
-      const opt = new Option(`${p.name} (${ratingVal})`, idx);
-      bowlerSelect.add(opt);
-    });
-    
-    if (sortedBowling.length > 0) {
-      bowlerSelect.value = sortedBowling[0].idx;
+      const build = (selectedIdx) => {
+        container.innerHTML = '';
+        sortedBowling.forEach(({ p, idx }) => {
+          const div = document.createElement('div');
+          div.className = 'selection-item';
+          div.dataset.index = idx;
+          
+          const isSelected = selectedIdx === idx.toString();
+          if (isSelected) div.classList.add('selected');
+          
+          div.innerHTML = `
+            <span class="selection-item-name">${p.name}</span>
+            <span class="selection-item-meta">${getBowlRating(p)} OVR - ${p.bowler_type || 'Bowler'}</span>
+          `;
+          
+          div.onclick = () => {
+            build(idx.toString());
+          };
+          container.appendChild(div);
+        });
+      };
+
+      build(currentSel);
     }
   } else {
     // Spectator or already confirmed
@@ -534,8 +559,14 @@ async function submitSetup() {
   const body = { userId };
   
   if (isBatting) {
-    const sIdx = parseInt(document.getElementById('striker-select').value);
-    const nsIdx = parseInt(document.getElementById('non-striker-select').value);
+    const strikerEl = document.querySelector('#striker-list .selection-item.selected');
+    const nonStrikerEl = document.querySelector('#non-striker-list .selection-item.selected');
+    if (!strikerEl || !nonStrikerEl) {
+      alert("Please select both Striker and Non-Striker!");
+      return;
+    }
+    const sIdx = parseInt(strikerEl.dataset.index);
+    const nsIdx = parseInt(nonStrikerEl.dataset.index);
     if (sIdx === nsIdx) {
       alert("Striker and Non-Striker cannot be the same player!");
       return;
@@ -543,7 +574,12 @@ async function submitSetup() {
     body.strikerIdx = sIdx;
     body.nonStrikerIdx = nsIdx;
   } else {
-    body.bowlerIdx = parseInt(document.getElementById('bowler-select').value);
+    const bowlerEl = document.querySelector('#bowler-list .selection-item.selected');
+    if (!bowlerEl) {
+      alert("Please select opening bowler!");
+      return;
+    }
+    body.bowlerIdx = parseInt(bowlerEl.dataset.index);
   }
 
   document.getElementById('submit-setup-btn').disabled = true;
@@ -992,9 +1028,8 @@ async function submitDelivery() {
 
 // Selection list for incoming batsman
 function renderWicketBatsmanSelectionSheet() {
-  const selectEl = document.getElementById('wicket-batsman-select');
-  if (!selectEl) return;
-  selectEl.innerHTML = '';
+  const container = document.getElementById('wicket-batsman-list');
+  if (!container) return;
 
   const getBatRating = (p) => p.batting_ovr || p.batting_rating || p.rating || p.ovr || 0;
 
@@ -1013,14 +1048,38 @@ function renderWicketBatsmanSelectionSheet() {
     .sort((a, b) => getBatRating(b.player) - getBatRating(a.player));
 
   if (bench.length === 0) {
-    selectEl.innerHTML = '<option value="">No batsmen remaining</option>';
+    container.innerHTML = '<div class="no-options">No batsmen remaining</div>';
     return;
   }
 
-  bench.forEach(item => {
-    const opt = new Option(`${item.player.name} (${getBatRating(item.player)} OVR) - ${item.player.role || 'PLAYER'}`, item.index);
-    selectEl.add(opt);
-  });
+  let currentSel = container.querySelector('.selection-item.selected')?.dataset.index;
+  if (currentSel === undefined && bench.length > 0) {
+    currentSel = bench[0].index.toString();
+  }
+
+  const build = (selectedIdx) => {
+    container.innerHTML = '';
+    bench.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'selection-item';
+      div.dataset.index = item.index;
+      
+      const isSelected = selectedIdx === item.index.toString();
+      if (isSelected) div.classList.add('selected');
+      
+      div.innerHTML = `
+        <span class="selection-item-name">${item.player.name}</span>
+        <span class="selection-item-meta">${getBatRating(item.player)} OVR - ${item.player.role || 'Batsman'}</span>
+      `;
+      
+      div.onclick = () => {
+        build(item.index.toString());
+      };
+      container.appendChild(div);
+    });
+  };
+
+  build(currentSel);
 }
 
 async function selectNextBatsman(index) {
@@ -1045,9 +1104,8 @@ async function selectNextBatsman(index) {
 // Selection list for selecting next bowler
 // Selection list for selecting next bowler
 function renderOverBowlerSelectionSheet() {
-  const selectEl = document.getElementById('over-bowler-select');
-  if (!selectEl) return;
-  selectEl.innerHTML = '';
+  const container = document.getElementById('over-bowler-list');
+  if (!container) return;
 
   const getBowlRating = (p) => p.bowling_ovr || p.bowling_rating || p.rating || p.ovr || 0;
   const currentBowlIdx = matchState.bowler ? matchState.bowlingXI.findIndex(p => p.id.toString() === matchState.bowler.id.toString()) : null;
@@ -1084,21 +1142,47 @@ function renderOverBowlerSelectionSheet() {
     return getBowlRating(b.player) - getBowlRating(a.player);
   });
 
-  bench.forEach(item => {
-    let text = `${item.player.name} (${getBowlRating(item.player)} OVR) - ${item.player.bowler_type || 'Bowler'}`;
-    const cleanOvers = item.overs || 0;
-    if (cleanOvers > 0) {
-      text += ` • ${cleanOvers} ov`;
-    }
-    if (item.reason) {
-      text += ` [${item.reason}]`;
-    }
-    const opt = new Option(text, item.index);
-    if (!item.eligible) {
-      opt.disabled = true;
-    }
-    selectEl.add(opt);
-  });
+  let currentSel = container.querySelector('.selection-item.selected')?.dataset.index;
+  const firstEligible = bench.find(item => item.eligible);
+  if (currentSel === undefined && firstEligible) {
+    currentSel = firstEligible.index.toString();
+  }
+
+  const build = (selectedIdx) => {
+    container.innerHTML = '';
+    bench.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'selection-item';
+      div.dataset.index = item.index;
+      
+      const isSelected = selectedIdx === item.index.toString();
+      if (isSelected) div.classList.add('selected');
+      if (!item.eligible) div.classList.add('disabled');
+      
+      let metaText = `${getBowlRating(item.player)} OVR - ${item.player.bowler_type || 'Bowler'}`;
+      const cleanOvers = item.overs || 0;
+      if (cleanOvers > 0) {
+        metaText += ` • ${cleanOvers} ov`;
+      }
+      if (item.reason) {
+        metaText += ` [${item.reason}]`;
+      }
+      
+      div.innerHTML = `
+        <span class="selection-item-name">${item.player.name}</span>
+        <span class="selection-item-meta">${metaText}</span>
+      `;
+      
+      if (item.eligible) {
+        div.onclick = () => {
+          build(item.index.toString());
+        };
+      }
+      container.appendChild(div);
+    });
+  };
+
+  build(currentSel);
 }
 
 async function selectNextBowler(index) {
@@ -1446,19 +1530,15 @@ function runAutoplayAction() {
 
     const myConfirmed = isHost ? confirmedHost : confirmedGuest;
     if (!myConfirmed) {
-      const strikerSelect = document.getElementById('striker-select');
-      const nonStrikerSelect = document.getElementById('non-striker-select');
-      const bowlerSelect = document.getElementById('bowler-select');
+      // Batsman setup auto-click
+      const sItem = document.querySelector('#striker-list .selection-item:not(.disabled)');
+      if (sItem) sItem.click();
+      const nsItem = document.querySelector('#non-striker-list .selection-item:not(.disabled)');
+      if (nsItem) nsItem.click();
 
-      if (strikerSelect && strikerSelect.options.length > 0) {
-        strikerSelect.selectedIndex = 0;
-      }
-      if (nonStrikerSelect && nonStrikerSelect.options.length > 1) {
-        nonStrikerSelect.selectedIndex = 1;
-      }
-      if (bowlerSelect && bowlerSelect.options.length > 0) {
-        bowlerSelect.selectedIndex = bowlerSelect.options.length - 1;
-      }
+      // Bowler setup auto-click
+      const bItem = document.querySelector('#bowler-list .selection-item:not(.disabled)');
+      if (bItem) bItem.click();
 
       console.log("[Autoplay] Auto-submitting Setup Selection...");
       submitSetup();
@@ -1495,24 +1575,26 @@ function runAutoplayAction() {
       }
     } 
     else if (matchState.turnState === 'selecting_wicket_batsman') {
-      const selectEl = document.getElementById('wicket-batsman-select');
-      if (selectEl && selectEl.options.length > 0) {
-        selectEl.selectedIndex = 0;
+      const item = document.querySelector('#wicket-batsman-list .selection-item:not(.disabled)');
+      if (item) {
+        item.click();
+        const index = parseInt(item.dataset.index);
         console.log("[Autoplay] Auto-selecting Replacement Batsman...");
         setTimeout(() => {
           document.getElementById('controls-sheet').classList.add('minimized');
-          selectNextBatsman(parseInt(selectEl.value));
+          selectNextBatsman(index);
         }, 500);
       }
     } 
     else if (matchState.turnState === 'selecting_over_bowler') {
-      const selectEl = document.getElementById('over-bowler-select');
-      if (selectEl && selectEl.options.length > 0) {
-        selectEl.selectedIndex = 0;
+      const item = document.querySelector('#over-bowler-list .selection-item:not(.disabled)');
+      if (item) {
+        item.click();
+        const index = parseInt(item.dataset.index);
         console.log("[Autoplay] Auto-selecting Over Bowler...");
         setTimeout(() => {
           document.getElementById('controls-sheet').classList.add('minimized');
-          selectNextBowler(parseInt(selectEl.value));
+          selectNextBowler(index);
         }, 500);
       }
     }
