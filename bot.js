@@ -799,24 +799,35 @@ bot.command('claim', async (ctx) => {
     const result = await sb.claimStarterPack(userId);
     
     if (result.success) {
-      const starPlayer = result.players.find(p => p.ovr === 84);
-      const lowPlayers = result.players.filter(p => p.ovr !== 84);
-      
-      let msg = `🎁 <b>Starter Pack Claimed!</b> 🎁\n`;
-      msg += `══════════════════════════\n`;
-      msg += `Congratulations <a href="tg://user?id=${userId}">${escapeHTML(firstName)}</a>! You have successfully claimed your Cricket Starter Pack.\n\n`;
-      
-      msg += `🌟 <b>STAR PLAYER (1):</b>\n`;
-      if (starPlayer) {
-        msg += `• 🏆 <b>${escapeHTML(starPlayer.name)}</b> (${starPlayer.ovr} OVR) - <i>${escapeHTML(starPlayer.role || 'All-Rounder')}</i>\n\n`;
+      let msg = '';
+      if (result.isBackfill) {
+        msg += `🔧 <b>Starter Pack Backfilled!</b> 🔧\n`;
+        msg += `══════════════════════════\n`;
+        msg += `We detected your squad was incomplete. We have awarded you the missing players to complete your Playing XI!\n\n`;
+        msg += `🏏 <b>ADDED PLAYERS (${result.players.length}):</b>\n`;
+        result.players.forEach(p => {
+          msg += `• 👤 <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR) - <i>${escapeHTML(p.role || 'Player')}</i>\n`;
+        });
       } else {
-        msg += `• None (Error fetching star player)\n\n`;
+        const starPlayer = result.players.find(p => p.ovr === 84);
+        const lowPlayers = result.players.filter(p => p.ovr !== 84);
+        
+        msg += `🎁 <b>Starter Pack Claimed!</b> 🎁\n`;
+        msg += `══════════════════════════\n`;
+        msg += `Congratulations <a href="tg://user?id=${userId}">${escapeHTML(firstName)}</a>! You have successfully claimed your Cricket Starter Pack.\n\n`;
+        
+        msg += `🌟 <b>STAR PLAYER (1):</b>\n`;
+        if (starPlayer) {
+          msg += `• 🏆 <b>${escapeHTML(starPlayer.name)}</b> (${starPlayer.ovr} OVR) - <i>${escapeHTML(starPlayer.role || 'All-Rounder')}</i>\n\n`;
+        } else {
+          msg += `• None (Error fetching star player)\n\n`;
+        }
+        
+        msg += `🏏 <b>LOW OVR PLAYERS (10):</b>\n`;
+        lowPlayers.forEach(p => {
+          msg += `• 👤 <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR) - <i>${escapeHTML(p.role || 'Player')}</i>\n`;
+        });
       }
-      
-      msg += `🏏 <b>LOW OVR PLAYERS (10):</b>\n`;
-      lowPlayers.forEach(p => {
-        msg += `• 👤 <b>${escapeHTML(p.name)}</b> (${p.ovr} OVR) - <i>${escapeHTML(p.role || 'Player')}</i>\n`;
-      });
       
       msg += `\n🎯 Build your Playing XI and start challenging players using <code>/cric</code>!`;
       
