@@ -40,7 +40,13 @@ function calculateBallOutcome(
   };
 
   // 1. Get Base Compatibility (0.0 to 1.0)
-  const baseCompatibility = SHOT_BALL_COMPATIBILITY[delivery]?.[shot] ?? 0.5;
+  const compoundKey = `${speed}_${delivery}`;
+  let baseCompatibility = 0.5;
+  if (SHOT_BALL_COMPATIBILITY[compoundKey]) {
+    baseCompatibility = SHOT_BALL_COMPATIBILITY[compoundKey][shot] ?? 0.5;
+  } else {
+    baseCompatibility = SHOT_BALL_COMPATIBILITY[delivery]?.[shot] ?? 0.5;
+  }
 
   // 2. Rating Factor
   const ratingDiff = (batsman.batting_rating || 50) - (bowler.bowling_rating || 50);
@@ -50,7 +56,7 @@ function calculateBallOutcome(
   const pitchEffect = PITCH_FACTORS[pitch] || PITCH_FACTORS.balanced;
   let pitchMultiplier = 1;
   
-  if (delivery && delivery.includes('spin')) {
+  if (delivery && (delivery.includes('spin') || delivery.includes('break') || delivery.includes('doosra') || delivery.includes('googly') || delivery.includes('flipper') || delivery.includes('slider') || delivery.includes('carrom'))) {
     pitchMultiplier = pitchEffect.spin;
   } else {
     pitchMultiplier = pitchEffect.pace;
@@ -60,7 +66,7 @@ function calculateBallOutcome(
 
   // 4. Combined Success Probability
   let successValue = baseCompatibility * ratingMultiplier * battingPitchMultiplier / pitchMultiplier;
-  if (delivery === 'mystery_ball') successValue *= 0.85;
+  if (delivery === 'mystery_ball' || context?.isMysteryBall) successValue *= 0.85;
   if (context?.movement) successValue *= 0.95;
 
   // Archetypes & Tiers
@@ -116,7 +122,7 @@ function calculateBallOutcome(
   if (bowlArch === 'Strike') wicketChance *= 1.2;
   if (bowlArch === 'Wicket-taker') wicketChance *= 1.15;
 
-  if (delivery === 'mystery_ball') wicketChance *= 1.35;
+  if (delivery === 'mystery_ball' || context?.isMysteryBall) wicketChance *= 1.35;
   if (context?.movement) wicketChance *= 1.15;
   if (isDeath) wicketChance *= 1.4; 
   if (isPowerplay && powerShots.has(shot)) wicketChance *= 1.2;

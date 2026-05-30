@@ -1024,6 +1024,76 @@ body {
   border-color: var(--primary-accent);
 }
 
+/* Mystery Ball Toggle Styling */
+.mystery-selection-area {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mystery-toggle-container {
+  display: block;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+
+.mystery-toggle-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.mystery-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1c1836;
+  border: 1px solid #3c3275;
+  border-radius: var(--border-radius-md);
+  color: #cbbfff;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(50, 40, 110, 0.15);
+}
+
+.mystery-toggle-container input:checked ~ .mystery-toggle-btn {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border-color: #a78bfa;
+  color: white;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+}
+
+.mystery-toggle-container input:disabled ~ .mystery-toggle-btn {
+  background: #141221;
+  border-color: #25223c;
+  color: #55526e;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.mystery-icon {
+  font-size: 16px;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
+}
+
+.mystery-limit-hint {
+  font-size: 11px;
+  color: #7b74aa;
+  font-weight: 500;
+  text-align: center;
+}
+
+.mystery-limit-hint.used {
+  color: #ef4444;
+}
+
 /* Player lists */
 .player-selection-sheet {
   display: flex;

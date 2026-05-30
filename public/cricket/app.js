@@ -846,9 +846,14 @@ function renderControlsSection() {
     
     const incomingCard = document.getElementById('incoming-delivery-container');
     if (matchState.currentDelivery) {
-      const delName = matchState.currentDelivery.replace(/_/g, ' ').toUpperCase();
-      const speedName = matchState.currentSpeed ? matchState.currentSpeed.toUpperCase() : 'NORMAL';
-      const displayText = `${speedName} ${delName}`;
+      let displayText = '';
+      if (matchState.currentDelivery === 'mystery_ball') {
+        displayText = '🔮 MYSTERY BALL';
+      } else {
+        const delName = matchState.currentDelivery.replace(/_/g, ' ').toUpperCase();
+        const speedName = matchState.currentSpeed ? matchState.currentSpeed.toUpperCase() : 'NORMAL';
+        displayText = `${speedName} ${delName}`;
+      }
 
       promptSubtitle.innerHTML = `<span class="glow-text" style="color:var(--warning-accent); font-weight:800; font-size:12px; letter-spacing:0.5px;">INCOMING: ${displayText}</span>`;
       incomingCard.classList.remove('hidden');
@@ -959,6 +964,22 @@ function renderBowlerVariations() {
   });
 
   selectedDelivery = null;
+
+  // Update Mystery Ball toggle UI state based on whether it has already been used in this over
+  const mysteryCheckbox = document.getElementById('mystery-ball-checkbox');
+  const mysteryHint = document.getElementById('mystery-ball-hint');
+  if (mysteryCheckbox && mysteryHint) {
+    if (matchState.mysteryBallBowledThisOver) {
+      mysteryCheckbox.disabled = true;
+      mysteryCheckbox.checked = false;
+      mysteryHint.innerText = "Used this over";
+      mysteryHint.classList.add('used');
+    } else {
+      mysteryCheckbox.disabled = false;
+      mysteryHint.innerText = "1 available this over";
+      mysteryHint.classList.remove('used');
+    }
+  }
 }
 
 // Render batting shot event listeners
@@ -1005,6 +1026,9 @@ async function submitDelivery() {
   // Minimize sheet immediately
   document.getElementById('controls-sheet').classList.add('minimized');
 
+  const mysteryCheckbox = document.getElementById('mystery-ball-checkbox');
+  const isMysteryBall = mysteryCheckbox ? mysteryCheckbox.checked : false;
+
   try {
     const res = await fetch('/api/match/action', {
       method: 'POST',
@@ -1014,10 +1038,16 @@ async function submitDelivery() {
         type: 'delivery',
         action: {
           delivery: selectedDelivery,
-          speed: selectedSpeed
+          speed: selectedSpeed,
+          isMysteryBall
         }
       })
     });
+    
+    if (mysteryCheckbox) {
+      mysteryCheckbox.checked = false;
+    }
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to submit delivery");
     fetchState();

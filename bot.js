@@ -606,6 +606,298 @@ bot.command('xi', async (ctx) => {
   }
 });
 
+bot.command('image', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+  const user = ctx.message.reply_to_message?.from || ctx.from;
+  await sb.ensureUser(user.id, user.first_name).catch(() => {});
+
+  // Send a typing/processing action so user knows it's working
+  await ctx.replyWithChatAction('upload_photo').catch(() => {});
+
+  try {
+    const squad = await sb.getUserCricketTeam(user.id);
+    if (!squad || squad.length === 0) {
+      return ctx.reply("🏏 You don't have any cricket players yet! Use /claim to get your starter pack.", { parse_mode: 'HTML' });
+    }
+    if (squad.length < 11) {
+      return ctx.reply(`🏏 You only have <b>${squad.length}</b> player(s). You need at least 11 to form a Playing XI.\n\nUse /claim or /shop to get more players.`, { parse_mode: 'HTML' });
+    }
+
+    const xi = squad.slice(0, 11);
+    const profile = await sb.getProfile(user.id);
+    const teamName = profile && profile.team_name ? profile.team_name : `${user.first_name}'s XI`;
+
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
+
+    const width = 1200;
+    const height = 820;
+    const canvas = createCanvas(width, height);
+    const ctxCanvas = canvas.getContext('2d');
+
+    // 1. Draw Background Gradient
+    const bgGrad = ctxCanvas.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, '#0f1225');
+    bgGrad.addColorStop(0.5, '#131131');
+    bgGrad.addColorStop(1, '#060713');
+    ctxCanvas.fillStyle = bgGrad;
+    ctxCanvas.fillRect(0, 0, width, height);
+
+    // 2. Draw Decorative Grid Pattern
+    ctxCanvas.strokeStyle = 'rgba(124, 58, 237, 0.05)';
+    ctxCanvas.lineWidth = 1;
+    const gridSize = 60;
+    for (let x = 0; x < width; x += gridSize) {
+      ctxCanvas.beginPath();
+      ctxCanvas.moveTo(x, 0);
+      ctxCanvas.lineTo(x, height);
+      ctxCanvas.stroke();
+    }
+    for (let y = 0; y < height; y += gridSize) {
+      ctxCanvas.beginPath();
+      ctxCanvas.moveTo(0, y);
+      ctxCanvas.lineTo(width, y);
+      ctxCanvas.stroke();
+    }
+
+    // Draw glowing stadium arch effect
+    ctxCanvas.fillStyle = 'rgba(79, 70, 229, 0.08)';
+    ctxCanvas.beginPath();
+    ctxCanvas.arc(width / 2, height + 100, 500, Math.PI, 0);
+    ctxCanvas.fill();
+
+    // 3. Draw Header
+    ctxCanvas.fillStyle = '#ffffff';
+    ctxCanvas.font = 'bold 36px sans-serif';
+    ctxCanvas.textAlign = 'center';
+    ctxCanvas.fillText('PLAYING XI', width / 2, 65);
+
+    ctxCanvas.fillStyle = '#a78bfa';
+    ctxCanvas.font = 'italic 22px sans-serif';
+    ctxCanvas.fillText(`"${teamName}"`, width / 2, 100);
+
+    const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
+    
+    // Draw OVR badge on the right
+    ctxCanvas.fillStyle = 'rgba(167, 139, 250, 0.15)';
+    ctxCanvas.beginPath();
+    ctxCanvas.arc(1080, 75, 45, 0, Math.PI * 2);
+    ctxCanvas.fill();
+    ctxCanvas.strokeStyle = '#a78bfa';
+    ctxCanvas.lineWidth = 2;
+    ctxCanvas.stroke();
+
+    ctxCanvas.fillStyle = '#ffffff';
+    ctxCanvas.font = 'bold 28px sans-serif';
+    ctxCanvas.fillText(String(teamRating), 1080, 73);
+    ctxCanvas.fillStyle = '#a78bfa';
+    ctxCanvas.font = 'bold 12px sans-serif';
+    ctxCanvas.fillText('TEAM OVR', 1080, 95);
+
+    // Helper functions for colors and roles
+    const getOvrColor = (ovr) => {
+      if (ovr >= 90) return '#ff007f'; // Legendary pink
+      if (ovr >= 80) return '#ffd700'; // Gold
+      if (ovr >= 70) return '#82b1ff'; // Silver
+      return '#cd7f32'; // Bronze
+    };
+
+    const roleIcon = (role) => {
+      if (role === 'batsman') return '🏏';
+      if (role === 'wicket_keeper') return '🧤';
+      if (role === 'all_rounder') return '⚡';
+      if (role === 'bowler') return '🥎';
+      return '👤';
+    };
+
+    const countryFlags = {
+      'India': '🇮🇳',
+      'Australia': '🇦🇺',
+      'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+      'South Africa': '🇿🇦',
+      'Pakistan': '🇵🇰',
+      'New Zealand': '🇳🇿',
+      'West Indies': '🌴',
+      'Sri Lanka': '🇱🇰',
+      'Bangladesh': '🇧🇩',
+      'Afghanistan': '🇦🇫',
+      'Ireland': '🇮🇪',
+      'Zimbabwe': '🇿🇼',
+      'Netherlands': '🇳🇱',
+      'Nepal': '🇳🇵',
+      'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+      'USA': '🇺🇸',
+      'Canada': '🇨🇦',
+      'Oman': '🇴🇲',
+      'UAE': '🇦🇪',
+      'Namibia': '🇳🇦'
+    };
+
+    // Pre-load all player images in parallel
+    const loadedImages = await Promise.all(
+      xi.map(async (p) => {
+        if (!p.image_url) return null;
+        try {
+          return await loadImage(p.image_url);
+        } catch (err) {
+          console.error(`Failed to load avatar for ${p.name}:`, err);
+          return null;
+        }
+      })
+    );
+
+    // 4. Render Grid of 11 Player Cards
+    const cardWidth = 240;
+    const cardHeight = 180;
+
+    const positions = [];
+
+    // Row 1 (y = 150)
+    let marginRow1 = (width - (4 * cardWidth)) / 5;
+    for (let i = 0; i < 4; i++) {
+      positions.push({ x: marginRow1 + i * (cardWidth + marginRow1), y: 150 });
+    }
+
+    // Row 2 (y = 370)
+    let marginRow2 = (width - (4 * cardWidth)) / 5;
+    for (let i = 0; i < 4; i++) {
+      positions.push({ x: marginRow2 + i * (cardWidth + marginRow2), y: 370 });
+    }
+
+    // Row 3 (y = 590) - centered 3 players
+    let marginRow3 = (width - (3 * cardWidth)) / 4;
+    for (let i = 0; i < 3; i++) {
+      positions.push({ x: marginRow3 + i * (cardWidth + marginRow3), y: 590 });
+    }
+
+    for (let i = 0; i < 11; i++) {
+      const p = xi[i];
+      const pos = positions[i];
+      const ovrColor = getOvrColor(p.ovr);
+      const img = loadedImages[i];
+
+      // Draw glass card body
+      ctxCanvas.save();
+      ctxCanvas.beginPath();
+      ctxCanvas.roundRect(pos.x, pos.y, cardWidth, cardHeight, 16);
+      ctxCanvas.clip();
+
+      const cardGrad = ctxCanvas.createLinearGradient(pos.x, pos.y, pos.x, pos.y + cardHeight);
+      cardGrad.addColorStop(0, '#171c2f');
+      cardGrad.addColorStop(1, '#0e111d');
+      ctxCanvas.fillStyle = cardGrad;
+      ctxCanvas.fill();
+
+      ctxCanvas.strokeStyle = p.tier === 'Legendary' ? '#ff007f' : p.tier === 'Gold' ? '#ffd700' : 'rgba(255, 255, 255, 0.15)';
+      ctxCanvas.lineWidth = p.tier === 'Legendary' || p.tier === 'Gold' ? 2 : 1;
+      ctxCanvas.stroke();
+
+      const shadowGrad = ctxCanvas.createRadialGradient(
+        pos.x + cardWidth/2, pos.y + cardHeight/2, 10,
+        pos.x + cardWidth/2, pos.y + cardHeight/2, cardWidth/2
+      );
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.4)');
+      ctxCanvas.fillStyle = shadowGrad;
+      ctxCanvas.fill();
+
+      ctxCanvas.restore();
+
+      // Draw OVR rating badge
+      ctxCanvas.fillStyle = ovrColor;
+      ctxCanvas.beginPath();
+      ctxCanvas.roundRect(pos.x + 12, pos.y + 12, 64, 24, 6);
+      ctxCanvas.fill();
+
+      ctxCanvas.fillStyle = '#000000';
+      ctxCanvas.font = 'bold 12px sans-serif';
+      ctxCanvas.textAlign = 'center';
+      ctxCanvas.fillText(`${p.ovr} OVR`, pos.x + 44, pos.y + 28);
+
+      // Draw Pos Number
+      ctxCanvas.fillStyle = 'rgba(255,255,255,0.1)';
+      ctxCanvas.beginPath();
+      ctxCanvas.arc(pos.x + 90, pos.y + 24, 12, 0, Math.PI * 2);
+      ctxCanvas.fill();
+      ctxCanvas.fillStyle = '#ffffff';
+      ctxCanvas.font = '10px sans-serif';
+      ctxCanvas.fillText(String(i + 1), pos.x + 90, pos.y + 27);
+
+      // Draw Role icon
+      ctxCanvas.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctxCanvas.beginPath();
+      ctxCanvas.arc(pos.x + cardWidth - 24, pos.y + 24, 16, 0, Math.PI * 2);
+      ctxCanvas.fill();
+      ctxCanvas.font = '14px sans-serif';
+      ctxCanvas.fillText(roleIcon(p.role), pos.x + cardWidth - 24, pos.y + 29);
+
+      const avX = pos.x + cardWidth / 2;
+      const avY = pos.y + 85;
+      const avRadius = 34;
+
+      if (img) {
+        ctxCanvas.save();
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
+        ctxCanvas.clip();
+        ctxCanvas.drawImage(img, avX - avRadius, avY - avRadius, avRadius * 2, avRadius * 2);
+        ctxCanvas.restore();
+
+        ctxCanvas.strokeStyle = ovrColor;
+        ctxCanvas.lineWidth = 2;
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
+        ctxCanvas.stroke();
+      } else {
+        ctxCanvas.save();
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
+        ctxCanvas.clip();
+
+        ctxCanvas.fillStyle = '#111422';
+        ctxCanvas.fill();
+
+        ctxCanvas.fillStyle = ovrColor;
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY - 3, avRadius * 0.4, 0, Math.PI * 2);
+        ctxCanvas.fill();
+
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY + avRadius * 1.05, avRadius * 0.82, Math.PI, 0, false);
+        ctxCanvas.fill();
+
+        ctxCanvas.restore();
+
+        ctxCanvas.strokeStyle = ovrColor;
+        ctxCanvas.lineWidth = 1.5;
+        ctxCanvas.beginPath();
+        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
+        ctxCanvas.stroke();
+      }
+
+      // Draw Player Name
+      ctxCanvas.fillStyle = '#ffffff';
+      ctxCanvas.font = 'bold 14px sans-serif';
+      ctxCanvas.textAlign = 'center';
+      ctxCanvas.fillText(p.name, pos.x + cardWidth/2, pos.y + 142);
+
+      const flag = countryFlags[p.country] || '🏳️';
+      ctxCanvas.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctxCanvas.font = '10px sans-serif';
+      ctxCanvas.fillText(`${(p.role || '').toUpperCase().replace('_', ' ')}  ${flag} ${p.country || 'N/A'}`, pos.x + cardWidth/2, pos.y + 162);
+    }
+
+    const buffer = canvas.toBuffer('image/png');
+    await ctx.replyWithPhoto({ source: buffer }, {
+      caption: `🏏 <b>PLAYING XI — ${escapeHTML(teamName)}</b>\n\n📊 <b>XI Rating:</b> <code>${teamRating} OVR</code>\n\n💡 <i>Use <code>/swap [pos1] [pos2]</code> to swap players.</i>`,
+      parse_mode: 'HTML'
+    });
+
+  } catch (e) {
+    console.error("Error in /image command:", e);
+    await ctx.reply("❌ Failed to generate the Playing XI image. Please try again.");
+  }
+});
+
 bot.command('swap', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
 
@@ -4778,6 +5070,16 @@ app.post('/api/match/action', async (req, res) => {
     if (isBatting) return res.status(400).json({ error: 'You are batting, cannot bowl!' });
     if (match.turnState !== 'bowling_delivery') return res.status(400).json({ error: 'Not in bowling delivery phase.' });
 
+    if (action.isMysteryBall) {
+      if (match.mysteryBallBowledThisOver) {
+        return res.status(400).json({ error: 'You can only bowl one mystery ball per over.' });
+      }
+      match.isMysteryBall = true;
+      match.mysteryBallBowledThisOver = true;
+    } else {
+      match.isMysteryBall = false;
+    }
+
     match.currentDelivery = action.delivery;
     match.currentSpeed = action.speed || 'normal';
     match.lastDeliveryKmph = generateDeliveryKmph(match.currentBowler.bowler_type || 'fast', match.currentSpeed);
@@ -4786,7 +5088,9 @@ app.post('/api/match/action', async (req, res) => {
     matchManager.saveToDb(match);
 
     if (match.type === 'pve' && match.battingTeam.telegramId === 'ai') {
-      match.currentShot = ai.getAIShot(match.striker, match.currentDelivery, match.currentSpeed);
+      const aiDelivery = match.isMysteryBall ? 'mystery_ball' : match.currentDelivery;
+      const aiSpeed = match.isMysteryBall ? 'normal' : match.currentSpeed;
+      match.currentShot = ai.getAIShot(match.striker, aiDelivery, aiSpeed);
       await processBallAndProgress(null, match);
     } else {
       await runGameLoopStep(null, match, false);
@@ -5044,8 +5348,9 @@ function serializeMatchState(match, userId) {
     bowlingXI: match.bowlingTeam ? match.bowlingTeam.xi : [],
     stats: match.stats,
     commentary: match.commentary,
-    currentDelivery: match.currentDelivery,
-    currentSpeed: match.currentSpeed,
+    currentDelivery: (match.isMysteryBall && isBatting) ? 'mystery_ball' : match.currentDelivery,
+    currentSpeed: (match.isMysteryBall && isBatting) ? 'normal' : match.currentSpeed,
+    mysteryBallBowledThisOver: match.mysteryBallBowledThisOver || false,
     lastBall: match.lastBallOutcome ? {
       runs: match.lastBallOutcome.runs,
       isWicket: match.lastBallOutcome.isWicket,
@@ -5156,6 +5461,14 @@ async function runGameLoopStep(ctx, match, forceNewMessage = false) {
           match.currentDelivery = aiBowl.delivery;
           match.currentSpeed = aiBowl.speed;
           match.lastDeliveryKmph = generateDeliveryKmph(match.currentBowler.bowler_type || 'fast', aiBowl.speed);
+          
+          if (!match.mysteryBallBowledThisOver && Math.random() < 0.25) {
+            match.isMysteryBall = true;
+            match.mysteryBallBowledThisOver = true;
+          } else {
+            match.isMysteryBall = false;
+          }
+          
           match.turnState = 'batting_shot';
         }
       }

@@ -1753,8 +1753,12 @@
                     `<div class="player-img-container ${p.tier.toLowerCase()}">
                         <img class="player-img" src="${p.image_url}" alt="${p.name}">
                      </div>` : 
-                    `<div class="player-placeholder-avatar" style="background: ${ovrColor}20; border-color: ${ovrColor}; margin-top: 8px; margin-bottom: 6px;">
-                        <span style="color: ${ovrColor};">${p.name.charAt(0)}</span>
+                    `<div class="player-img-container ${p.tier.toLowerCase()}">
+                        <div class="player-img" style="border-color: ${ovrColor}; display: flex; align-items: center; justify-content: center; background: rgba(23, 28, 47, 0.6); box-shadow: 0 0 10px ${ovrColor}20;">
+                            <svg viewBox="0 0 100 100" style="width: 42px; height: 42px; fill: ${ovrColor}; opacity: 0.7;">
+                                <path d="M50,20 C58.28,20 65,26.72 65,35 C65,43.28 58.28,50 50,50 C41.72,50 35,43.28 35,35 C35,26.72 41.72,20 50,20 Z M50,58 C68.33,58 85,68 85,76 L85,80 L15,80 L15,76 C15,68 31.67,58 50,58 Z"/>
+                            </svg>
+                        </div>
                      </div>`;
 
                 const card = document.createElement('div');

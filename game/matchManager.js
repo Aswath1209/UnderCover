@@ -84,6 +84,8 @@ class Match {
     this.currentDelivery = null;
     this.currentSpeed = null;
     this.currentShot = null;
+    this.isMysteryBall = false;
+    this.mysteryBallBowledThisOver = false;
 
     this.commentary = [];
     this.lastBallOutcome = null;
@@ -300,7 +302,8 @@ class Match {
         overNumber: Math.floor(this.currentInnings.balls / 6),
         totalOvers: this.totalOvers,
         batsmanStats: this.stats[this.striker.id],
-        bowlerStats: this.stats[this.currentBowler.id]
+        bowlerStats: this.stats[this.currentBowler.id],
+        isMysteryBall: this.isMysteryBall
       }
     );
 
@@ -336,7 +339,7 @@ class Match {
       
       if (outcome.runs === 4) batStats.fours += 1;
       if (outcome.runs === 6) batStats.sixes += 1;
-
+ 
       if (outcome.runs === 1 || outcome.runs === 3) {
         const temp = this.strikerIdx;
         this.strikerIdx = this.nonStrikerIdx;
@@ -362,9 +365,14 @@ class Match {
       }
     }
 
+    if (overCompleted) {
+      this.mysteryBallBowledThisOver = false;
+    }
+
     this.currentDelivery = null;
     this.currentSpeed = null;
     this.currentShot = null;
+    this.isMysteryBall = false;
 
     this.lastBallOutcome = outcome;
     if (outcome.isWicket) {
@@ -514,6 +522,8 @@ class Match {
       currentDelivery: this.currentDelivery,
       currentSpeed: this.currentSpeed,
       currentShot: this.currentShot,
+      isMysteryBall: this.isMysteryBall,
+      mysteryBallBowledThisOver: this.mysteryBallBowledThisOver,
       commentary: this.commentary,
       lastBallOutcome: this.lastBallOutcome,
       partnership: this.partnership,
@@ -550,6 +560,8 @@ function deserializeMatch(data) {
   match.currentDelivery = data.currentDelivery;
   match.currentSpeed = data.currentSpeed;
   match.currentShot = data.currentShot;
+  match.isMysteryBall = data.isMysteryBall || false;
+  match.mysteryBallBowledThisOver = data.mysteryBallBowledThisOver || false;
   match.commentary = data.commentary;
   match.lastBallOutcome = data.lastBallOutcome;
   match.partnership = data.partnership;
