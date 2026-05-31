@@ -5146,17 +5146,32 @@ app.post('/api/match/action', async (req, res) => {
     if (match.turnState !== 'bowling_delivery') return res.status(400).json({ error: 'Not in bowling delivery phase.' });
 
     if (action.isMysteryBall) {
+      const bowlerType = (match.currentBowler?.bowler_type || '').toLowerCase();
+      const isSpin = bowlerType.includes('spin');
+      if (!isSpin) {
+        return res.status(400).json({ error: 'Mystery ball is only available for spin bowlers.' });
+      }
       if (match.mysteryBallBowledThisOver) {
         return res.status(400).json({ error: 'You can only bowl one mystery ball per over.' });
       }
       match.isMysteryBall = true;
       match.mysteryBallBowledThisOver = true;
+      
+      const isOffSpin = bowlerType.includes('off') || bowlerType.includes('offspin') || bowlerType.includes('off-spin');
+      let spinDeliveries = [];
+      if (isOffSpin) {
+        spinDeliveries = ['off_break', 'carrom_ball', 'arm_ball', 'doosra', 'top_spinner_off'];
+      } else {
+        spinDeliveries = ['leg_break', 'googly', 'flipper', 'top_spinner_leg', 'slider'];
+      }
+      const randomIdx = Math.floor(Math.random() * spinDeliveries.length);
+      match.currentDelivery = spinDeliveries[randomIdx];
+      match.currentSpeed = 'normal';
     } else {
       match.isMysteryBall = false;
+      match.currentDelivery = action.delivery;
+      match.currentSpeed = action.speed || 'normal';
     }
-
-    match.currentDelivery = action.delivery;
-    match.currentSpeed = action.speed || 'normal';
     match.lastDeliveryKmph = generateDeliveryKmph(match.currentBowler.bowler_type || 'fast', match.currentSpeed);
     match.turnState = 'batting_shot';
 

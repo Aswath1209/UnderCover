@@ -1989,6 +1989,14 @@ body {
   color: white;
 }
 
+.btn-variation:disabled {
+  background: #10121d;
+  border-color: #1c2135;
+  color: #4b526d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Margin and Padding utilities */
 .mt-3 {
   margin-top: 16px !important;

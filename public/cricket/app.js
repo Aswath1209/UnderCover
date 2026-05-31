@@ -900,7 +900,8 @@ function renderBowlerVariations() {
       { id: 'carrom_ball', name: 'Carrom Ball' },
       { id: 'arm_ball', name: 'Arm Ball' },
       { id: 'doosra', name: 'Doosra' },
-      { id: 'top_spinner_off', name: 'Top Spinner' }
+      { id: 'top_spinner_off', name: 'Top Spinner' },
+      { id: 'mystery_ball', name: 'Mystery Ball' }
     ];
     document.getElementById('bowling-speed-section').classList.add('hidden');
     selectedSpeed = 'normal';
@@ -910,7 +911,8 @@ function renderBowlerVariations() {
       { id: 'googly', name: 'Googly' },
       { id: 'flipper', name: 'Flipper' },
       { id: 'top_spinner_leg', name: 'Top Spinner' },
-      { id: 'slider', name: 'Slider' }
+      { id: 'slider', name: 'Slider' },
+      { id: 'mystery_ball', name: 'Mystery Ball' }
     ];
     document.getElementById('bowling-speed-section').classList.add('hidden');
     selectedSpeed = 'normal';
@@ -952,6 +954,9 @@ function renderBowlerVariations() {
     btn.className = "btn-variation";
     btn.innerText = del.name;
     btn.dataset.delivery = del.id;
+    if (del.id === 'mystery_ball' && matchState.mysteryBallBowledThisOver) {
+      btn.disabled = true;
+    }
     btn.addEventListener('click', (e) => {
       const allActionBtns = deliveryGrid.querySelectorAll('.btn-variation');
       allActionBtns.forEach(b => b.classList.remove('active'));
@@ -962,58 +967,6 @@ function renderBowlerVariations() {
   });
 
   selectedDelivery = null;
-
-  // Setup Mystery Ball Button
-  const mysterySection = document.getElementById('bowling-mystery-section');
-  const mysteryBtn = document.getElementById('mystery-ball-btn');
-  const mysteryHint = document.getElementById('mystery-ball-hint');
-  
-  if (mysterySection) {
-    if (isSpin) {
-      mysterySection.classList.remove('hidden');
-      if (mysteryBtn && mysteryHint) {
-        // Clone to clean any prior event listeners
-        const newMysteryBtn = mysteryBtn.cloneNode(true);
-        mysteryBtn.parentNode.replaceChild(newMysteryBtn, mysteryBtn);
-        
-        if (matchState.mysteryBallBowledThisOver) {
-          newMysteryBtn.disabled = true;
-          mysteryHint.innerText = "Used this over";
-          mysteryHint.classList.add('used');
-        } else {
-          newMysteryBtn.disabled = false;
-          mysteryHint.innerText = "1 available this over";
-          mysteryHint.classList.remove('used');
-          
-          newMysteryBtn.addEventListener('click', async () => {
-            document.getElementById('controls-sheet').classList.add('minimized');
-            try {
-              const res = await fetch('/api/match/action', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId,
-                  type: 'delivery',
-                  action: {
-                    delivery: 'mystery_ball',
-                    speed: 'normal',
-                    isMysteryBall: true
-                  }
-                })
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || "Failed to bowl mystery ball");
-              fetchState();
-            } catch (err) {
-              alert(err.message);
-            }
-          });
-        }
-      }
-    } else {
-      mysterySection.classList.add('hidden');
-    }
-  }
 }
 
 // Render batting shot event listeners
@@ -1060,8 +1013,7 @@ async function submitDelivery() {
   // Minimize sheet immediately
   document.getElementById('controls-sheet').classList.add('minimized');
 
-  const mysteryCheckbox = document.getElementById('mystery-ball-checkbox');
-  const isMysteryBall = mysteryCheckbox ? mysteryCheckbox.checked : false;
+  const isMysteryBall = selectedDelivery === 'mystery_ball';
 
   try {
     const res = await fetch('/api/match/action', {
@@ -1078,10 +1030,6 @@ async function submitDelivery() {
       })
     });
     
-    if (mysteryCheckbox) {
-      mysteryCheckbox.checked = false;
-    }
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to submit delivery");
     fetchState();
