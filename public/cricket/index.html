@@ -331,14 +331,11 @@
               </div>
             </div>
 
-            <!-- MYSTERY BALL TOGGLE -->
+            <!-- MYSTERY BALL BUTTON -->
             <div class="mystery-selection-area" id="bowling-mystery-section">
-              <label class="mystery-toggle-container">
-                <input type="checkbox" id="mystery-ball-checkbox">
-                <span class="mystery-toggle-btn">
-                  <span class="mystery-icon">🎲</span> Mystery Ball
-                </span>
-              </label>
+              <button id="mystery-ball-btn" class="btn-mystery-ball">
+                <span class="mystery-icon">🎲</span> Bowl Mystery Ball
+              </button>
               <div class="mystery-limit-hint" id="mystery-ball-hint">1 available this over</div>
             </div>
 
@@ -348,14 +345,26 @@
           <!-- INCOMING BATSMAN SELECTION -->
           <div id="wicket-batsman-controls" class="controls-section hidden">
             <p class="warning-text">Striker got out! Select your next batsman:</p>
-            <div id="wicket-batsman-list" class="selection-list mb-3"></div>
+            <div class="custom-dropdown" id="batsman-dropdown">
+              <div class="dropdown-trigger" id="batsman-dropdown-trigger">
+                <span class="selected-value">Select Batsman</span>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+              <div class="dropdown-menu" id="wicket-batsman-list"></div>
+            </div>
             <button id="submit-wicket-batsman-btn" class="btn btn-primary btn-block btn-green mt-3">Confirm Batsman</button>
           </div>
 
           <!-- INCOMING BOWLER SELECTION -->
           <div id="over-bowler-controls" class="controls-section hidden">
             <p class="info-text">Bowler for the next over:</p>
-            <div id="over-bowler-list" class="selection-list mb-3"></div>
+            <div class="custom-dropdown" id="bowler-dropdown">
+              <div class="dropdown-trigger" id="bowler-dropdown-trigger">
+                <span class="selected-value">Select Bowler</span>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+              <div class="dropdown-menu" id="over-bowler-list"></div>
+            </div>
             <button id="submit-over-bowler-btn" class="btn btn-primary btn-block btn-green mt-3">Confirm Bowler</button>
           </div>
 
