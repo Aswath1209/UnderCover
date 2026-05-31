@@ -73,22 +73,23 @@ async function recordWin(userId, firstName, chatId) {
   const release = await acquireLock(userId);
   try {
     let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    const finalName = (firstName && firstName !== 'cricket') ? firstName : (profile?.first_name || 'User');
     if (profile) {
       const newCoins = (profile.coins || 0) + 200;
       await supabase.from('profiles').update({ 
           wins: profile.wins + 1, 
           matches_played: profile.matches_played + 1, 
-          first_name: firstName, 
+          first_name: finalName, 
           coins: newCoins 
       }).eq('user_id', userId);
     } else {
-      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 1, matches_played: 1, coins: 2200 });
+      await supabase.from('profiles').insert({ user_id: userId, first_name: finalName, wins: 1, matches_played: 1, coins: 2200 });
     }
+    // No lock needed for group stats (no coins)
+    await updateGroupStat(userId, chatId, finalName, true);
   } finally {
     releaseLock(release);
   }
-  // No lock needed for group stats (no coins)
-  await updateGroupStat(userId, chatId, firstName, true);
 }
 
 async function recordLoss(userId, firstName, chatId) {
@@ -96,27 +97,29 @@ async function recordLoss(userId, firstName, chatId) {
   const release = await acquireLock(userId);
   try {
     let { data: profile } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+    const finalName = (firstName && firstName !== 'cricket') ? firstName : (profile?.first_name || 'User');
     if (profile) {
-      await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: firstName }).eq('user_id', userId);
+      await supabase.from('profiles').update({ matches_played: profile.matches_played + 1, first_name: finalName }).eq('user_id', userId);
     } else {
-      await supabase.from('profiles').insert({ user_id: userId, first_name: firstName, wins: 0, matches_played: 1, coins: 2000 });
+      await supabase.from('profiles').insert({ user_id: userId, first_name: finalName, wins: 0, matches_played: 1, coins: 2000 });
     }
+    await updateGroupStat(userId, chatId, finalName, false);
   } finally {
     releaseLock(release);
   }
-  await updateGroupStat(userId, chatId, firstName, false);
 }
 
 async function updateGroupStat(userId, chatId, firstName, isWin) {
   let { data: gstat } = await supabase.from('group_stats').select('*').eq('user_id', userId).eq('chat_id', chatId).single();
+  const finalName = (firstName && firstName !== 'cricket') ? firstName : (gstat?.first_name || 'User');
   if (gstat) {
     await supabase.from('group_stats').update({ 
         wins: gstat.wins + (isWin ? 1 : 0), 
         matches_played: gstat.matches_played + 1, 
-        first_name: firstName 
+        first_name: finalName 
     }).eq('user_id', userId).eq('chat_id', chatId);
   } else {
-    await supabase.from('group_stats').insert({ user_id: userId, chat_id: chatId, first_name: firstName, wins: isWin ? 1 : 0, matches_played: 1 });
+    await supabase.from('group_stats').insert({ user_id: userId, chat_id: chatId, first_name: finalName, wins: isWin ? 1 : 0, matches_played: 1 });
   }
 }
 

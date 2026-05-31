@@ -5882,8 +5882,8 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
       // Award coins to active player
       await sb.addCoins(activeId, compensation);
       // Record win/loss
-      await sb.recordLoss(inactiveId, 'cricket');
-      await sb.recordWin(activeId, 'cricket');
+      await sb.recordLoss(inactiveId, inactiveName, match.chatId);
+      await sb.recordWin(activeId, activeName, match.chatId);
     } catch (dbErr) {
       console.error("Failed to update database for match termination:", dbErr);
     }

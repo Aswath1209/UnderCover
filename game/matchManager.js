@@ -444,14 +444,16 @@ class Match {
       motmStats = this.stats[bestPlayerId];
     }
 
-    // Award rewards directly in the database
+     // Award rewards directly in the database
     if (winner && winner.telegramId !== 'ai') {
+      const winnerName = winner.username || 'User';
       await sb.addCoins(winner.telegramId, winnerReward).catch(e => console.error("Failed to add coins to winner:", e));
-      await sb.recordWin(winner.telegramId, 'cricket').catch(e => console.error("Failed to record win:", e));
+      await sb.recordWin(winner.telegramId, winnerName, this.chatId).catch(e => console.error("Failed to record win:", e));
     }
     if (loser && loser.telegramId !== 'ai') {
+      const loserName = loser.username || 'User';
       await sb.addCoins(loser.telegramId, loserReward).catch(e => console.error("Failed to add coins to loser:", e));
-      await sb.recordLoss(loser.telegramId, 'cricket').catch(e => console.error("Failed to record loss:", e));
+      await sb.recordLoss(loser.telegramId, loserName, this.chatId).catch(e => console.error("Failed to record loss:", e));
     }
 
     // Sync to Supabase
