@@ -1471,8 +1471,8 @@ bot.command('cric', async (ctx) => {
   const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
   const overs = args[0] ? parseInt(args[0]) : 1;
   
-  if (isNaN(overs) || overs < 1 || overs > 5) {
-    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-5)&gt;</code> to start a match lobby.", { parse_mode: 'HTML' });
+  if (isNaN(overs) || overs < 1 || overs > 20) {
+    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt;</code> to start a match lobby.", { parse_mode: 'HTML' });
   }
 
   const telegramId = ctx.from.id;
