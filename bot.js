@@ -781,9 +781,17 @@ bot.command('image', async (ctx) => {
           } else if (p.image_url.startsWith('http')) {
             // It's a remote Wikipedia URL
             try {
-              return await loadImage(p.image_url);
+              const axios = require('axios');
+              const response = await axios.get(p.image_url, {
+                responseType: 'arraybuffer',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                timeout: 6000
+              });
+              return await loadImage(Buffer.from(response.data));
             } catch (err) {
-              console.error(`Failed to load remote avatar for ${p.name} from ${p.image_url}:`, err);
+              console.error(`Failed to load remote avatar for ${p.name} from ${p.image_url}:`, err.message);
             }
           }
         }
