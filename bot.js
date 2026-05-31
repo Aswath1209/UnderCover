@@ -606,6 +606,27 @@ bot.command('xi', async (ctx) => {
   }
 });
 
+// Helper to draw a rounded rectangle on a canvas context (compatible with older @napi-rs/canvas)
+function drawRoundRect(ctx, x, y, width, height, radius) {
+  if (typeof radius === 'number') {
+    radius = { tl: radius, tr: radius, br: radius, bl: radius };
+  } else {
+    const defaultRadius = { tl: 0, tr: 0, br: 0, bl: 0 };
+    radius = { ...defaultRadius, ...radius };
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + radius.tl, y);
+  ctx.lineTo(x + width - radius.tr, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
+  ctx.lineTo(x + width, y + height - radius.br);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
+  ctx.lineTo(x + radius.bl, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
+  ctx.lineTo(x, y + radius.tl);
+  ctx.quadraticCurveTo(x, y, x + radius.tl, y);
+  ctx.closePath();
+}
+
 bot.command('image', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
   const user = ctx.message.reply_to_message?.from || ctx.from;
@@ -732,16 +753,41 @@ bot.command('image', async (ctx) => {
       'Namibia': '🇳🇦'
     };
 
-    // Pre-load all player images in parallel
+    // Pre-load all player images in parallel (trying local cache first, then database/remote url)
     const loadedImages = await Promise.all(
       xi.map(async (p) => {
-        if (!p.image_url) return null;
-        try {
-          return await loadImage(p.image_url);
-        } catch (err) {
-          console.error(`Failed to load avatar for ${p.name}:`, err);
-          return null;
+        const localPath = getCricketPlayerLocalImagePath(p.name);
+        if (localPath) {
+          try {
+            return await loadImage(localPath);
+          } catch (err) {
+            console.error(`Failed to load local avatar for ${p.name} from ${localPath}:`, err);
+          }
         }
+        
+        if (p.image_url) {
+          // If it's a relative path starting with /assets/players/, map to local file
+          if (p.image_url.startsWith('/assets/players/')) {
+            const relativeFilename = p.image_url.replace('/assets/players/', '').toLowerCase();
+            const actualFilename = cricketImageCache.get(relativeFilename);
+            if (actualFilename) {
+              const fullLocalPath = path.join(crickidexPlayersDir, actualFilename);
+              try {
+                return await loadImage(fullLocalPath);
+              } catch (err) {
+                console.error(`Failed to load avatar from mapped image_url path for ${p.name}:`, err);
+              }
+            }
+          } else if (p.image_url.startsWith('http')) {
+            // It's a remote Wikipedia URL
+            try {
+              return await loadImage(p.image_url);
+            } catch (err) {
+              console.error(`Failed to load remote avatar for ${p.name} from ${p.image_url}:`, err);
+            }
+          }
+        }
+        return null;
       })
     );
 
@@ -777,8 +823,7 @@ bot.command('image', async (ctx) => {
 
       // Draw glass card body
       ctxCanvas.save();
-      ctxCanvas.beginPath();
-      ctxCanvas.roundRect(pos.x, pos.y, cardWidth, cardHeight, 16);
+      drawRoundRect(ctxCanvas, pos.x, pos.y, cardWidth, cardHeight, 16);
       ctxCanvas.clip();
 
       const cardGrad = ctxCanvas.createLinearGradient(pos.x, pos.y, pos.x, pos.y + cardHeight);
@@ -804,8 +849,7 @@ bot.command('image', async (ctx) => {
 
       // Draw OVR rating badge
       ctxCanvas.fillStyle = ovrColor;
-      ctxCanvas.beginPath();
-      ctxCanvas.roundRect(pos.x + 12, pos.y + 12, 64, 24, 6);
+      drawRoundRect(ctxCanvas, pos.x + 12, pos.y + 12, 64, 24, 6);
       ctxCanvas.fill();
 
       ctxCanvas.fillStyle = '#000000';
@@ -4564,6 +4608,37 @@ try {
     }
 } catch (error) {
     console.error('[Shop] Error building image cache:', error);
+}
+
+// Helper to resolve player name to local filesystem path
+function getCricketPlayerLocalImagePath(name) {
+    if (!name) return null;
+    
+    // 1. Try formatted First_Last.jpg
+    const formattedName = name.trim().replace(/\s+/g, '_').toLowerCase();
+    const filenameJpg = `${formattedName}.jpg`;
+    if (cricketImageCache.has(filenameJpg)) {
+        return path.join(crickidexPlayersDir, cricketImageCache.get(filenameJpg));
+    }
+    
+    // 2. Try removing special characters
+    const cleanName = name.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_').toLowerCase();
+    const cleanFilenameJpg = `${cleanName}.jpg`;
+    if (cricketImageCache.has(cleanFilenameJpg)) {
+        return path.join(crickidexPlayersDir, cricketImageCache.get(cleanFilenameJpg));
+    }
+
+    // 3. Try matches in filename list where the filename contains all parts of the name
+    const nameParts = formattedName.split('_');
+    if (nameParts.length > 0) {
+        for (const [key, value] of cricketImageCache.entries()) {
+            if (nameParts.every(part => key.includes(part))) {
+                return path.join(crickidexPlayersDir, value);
+            }
+        }
+    }
+    
+    return null;
 }
 
 // Helper to resolve player name to static image URL
