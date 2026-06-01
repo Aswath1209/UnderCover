@@ -23,21 +23,23 @@ function extractInningsPerformers(match, inningsIdx) {
   const inn = match.innings[inningsIdx];
   if (!inn) return { batsmen: [], bowlers: [] };
 
-  const battingId = inn.battingId;
-  const bowlingId = inn.bowlingId;
+  const battingId = inn.battingId ? inn.battingId.toString() : '';
+  const bowlingId = inn.bowlingId ? inn.bowlingId.toString() : '';
+  const hostId = match.host?.telegramId ? match.host.telegramId.toString() : '';
+  const guestId = match.guest?.telegramId ? match.guest.telegramId.toString() : '';
 
   let battingXI = [];
   let bowlingXI = [];
 
-  if (match.host.telegramId.toString() === battingId.toString()) {
+  if (hostId && hostId === battingId) {
     battingXI = match.host.xi || [];
-  } else if (match.guest && match.guest.telegramId.toString() === battingId.toString()) {
+  } else if (guestId && guestId === battingId) {
     battingXI = match.guest.xi || [];
   }
 
-  if (match.host.telegramId.toString() === bowlingId.toString()) {
+  if (hostId && hostId === bowlingId) {
     bowlingXI = match.host.xi || [];
-  } else if (match.guest && match.guest.telegramId.toString() === bowlingId.toString()) {
+  } else if (guestId && guestId === bowlingId) {
     bowlingXI = match.guest.xi || [];
   }
 
@@ -118,14 +120,16 @@ async function generateScoreboardImage(match, result, marginText) {
     ctx.stroke();
 
     // Resolve team names
-    const hostId = match.host.telegramId.toString();
-    const hostName = match.host.teamName || match.host.username || 'Host';
-    const guestName = match.guest ? (match.guest.teamName || match.guest.username) : 'AI Bot';
+    const hostId = match.host?.telegramId ? match.host.telegramId.toString() : '';
+    const hostName = match.host?.teamName || match.host?.username || 'Host';
+    const guestName = (match.guest && (match.guest.teamName || match.guest.username)) || (match.guest ? 'Guest' : 'AI Bot');
 
     const inn1 = match.innings[0];
     const inn2 = match.innings[1];
-    const team1Name = inn1.battingId.toString() === hostId ? hostName : guestName;
-    const team2Name = inn2.battingId.toString() === hostId ? hostName : guestName;
+    const inn1BattingId = inn1?.battingId ? inn1.battingId.toString() : '';
+    const inn2BattingId = inn2?.battingId ? inn2.battingId.toString() : '';
+    const team1Name = ((hostId && inn1BattingId === hostId) ? hostName : guestName) || 'Unknown';
+    const team2Name = ((hostId && inn2BattingId === hostId) ? hostName : guestName) || 'Unknown';
 
     // 3. Top Horizontal Metallic Bar (MATCH SUMMARY)
     const metalGrad = ctx.createLinearGradient(130, 55, 130, 97);

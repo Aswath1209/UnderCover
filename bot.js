@@ -1520,8 +1520,8 @@ bot.command('cric', async (ctx) => {
     };
 
     const keyboard = new InlineKeyboard()
-      .text('🤝 Join Match', 'cric_join')
-      .text('❌ Cancel Lobby', 'cric_cancel_lobby');
+      .text('🤝 Join', 'cric_join')
+      .text('❌ Cancel', 'cric_cancel_lobby');
     
     await ctx.reply(
       `🏏 <b>CRICKET MATCH LOBBY CREATED!</b> 🏏\n` +
@@ -5617,14 +5617,24 @@ async function processBallAndProgress(ctx, match) {
 
   const outcome = match.bowlBall();
 
-  match.commentary.unshift({
-    over: `${Math.floor((match.currentInnings.balls - 1) / 6)}.${(match.currentInnings.balls - 1) % 6 + 1}`,
-    text: outcome.commentary,
-    runs: outcome.runs,
-    isWicket: outcome.isWicket
-  });
+  if (outcome.isExtra) {
+    match.commentary.unshift({
+      over: `${Math.floor(match.currentInnings.balls / 6)}.${match.currentInnings.balls % 6} (Extra)`,
+      text: outcome.commentary,
+      runs: outcome.runs,
+      isWicket: false,
+      isExtra: true
+    });
+  } else {
+    match.commentary.unshift({
+      over: `${Math.floor((match.currentInnings.balls - 1) / 6)}.${(match.currentInnings.balls - 1) % 6 + 1}`,
+      text: outcome.commentary,
+      runs: outcome.runs,
+      isWicket: outcome.isWicket
+    });
+  }
 
-  if (match.currentInnings.balls % 6 === 0) {
+  if (!outcome.isExtra && match.currentInnings.balls % 6 === 0) {
     const overNum = Math.floor(match.currentInnings.balls / 6);
     const lastEndRuns = match.lastOverEndRuns || 0;
     const runsThisOver = match.currentInnings.runs - lastEndRuns;
@@ -5686,72 +5696,83 @@ async function processBallAndProgress(ctx, match) {
         match.startSecondInnings();
         await runGameLoopStep(null, match, true);
       } else {
-        const result = await match.finalizeMatch();
-        
-        match.commentary.unshift({
-          type: 'end_of_innings',
-          inningsIdx: 1,
-          runs: result.inn2Runs,
-          wickets: result.inn2Wickets,
-          overs: result.inn2Overs,
-          winner: result.winner ? result.winner.username : 'Tie Match',
-          motm: result.motm
-        });
-
-        let marginText = '';
-        if (result.winner) {
-          const inn1 = match.innings[0];
-          const inn2 = match.innings[1];
-          const isWinnerInn2 = result.winner.telegramId.toString() === inn2.battingId.toString();
-          
-          if (isWinnerInn2) {
-            const wicketsWonBy = 10 - inn2.wickets;
-            marginText = `won by ${wicketsWonBy} wicket${wicketsWonBy > 1 ? 's' : ''}`;
-          } else {
-            const runsWonBy = inn1.runs - inn2.runs;
-            marginText = `won by ${runsWonBy} run${runsWonBy > 1 ? 's' : ''}`;
-          }
-        }
-
-        let summary;
-        if (result.winner) {
-          summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🎉 <b>${escapeHTML(result.winner.username)}</b> ${marginText}!`;
-        } else {
-          summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🤝 <b>Match Tied!</b>`;
-        }
-
-        const botUsername = botInfo?.username || 'Imposter0_bot';
-        const playUrl = getMatchPlayUrl(match);
-        const isPrivate = match.chatId > 0;
-        
-        let buttonObj;
-        if (isPrivate) {
-          buttonObj = { text: "↗️ View Match Details", web_app: { url: playUrl } };
-        } else {
-          const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${match.id}_${match.chatId}`;
-          buttonObj = { text: "↗️ View Match Details", url: directLink };
-        }
-
-        const reply_markup = {
-          inline_keyboard: [
-            [buttonObj]
-          ]
-        };
-
         try {
-          const photoBuffer = await generateScoreboardImage(match, result, marginText);
-          if (photoBuffer) {
-            await bot.api.sendPhoto(match.chatId, new InputFile(photoBuffer, 'scoreboard.png'), {
-              caption: summary,
-              reply_markup,
-              parse_mode: 'HTML'
-            });
+          const result = await match.finalizeMatch();
+          
+          match.commentary.unshift({
+            type: 'end_of_innings',
+            inningsIdx: 1,
+            runs: result?.inn2Runs || 0,
+            wickets: result?.inn2Wickets || 0,
+            overs: result?.inn2Overs || '0.0',
+            winner: result?.winner ? result.winner.username : 'Tie Match',
+            motm: result?.motm || null
+          });
+
+          let marginText = '';
+          if (result && result.winner) {
+            const inn1 = match.innings[0];
+            const inn2 = match.innings[1];
+            const winnerId = result.winner.telegramId ? result.winner.telegramId.toString() : '';
+            const inn2BattingId = inn2?.battingId ? inn2.battingId.toString() : '';
+            const isWinnerInn2 = winnerId && winnerId === inn2BattingId;
+            
+            if (isWinnerInn2) {
+              const wicketsWonBy = 10 - (inn2?.wickets || 0);
+              marginText = `won by ${wicketsWonBy} wicket${wicketsWonBy > 1 ? 's' : ''}`;
+            } else {
+              const runsWonBy = (inn1?.runs || 0) - (inn2?.runs || 0);
+              marginText = `won by ${runsWonBy} run${runsWonBy > 1 ? 's' : ''}`;
+            }
+          }
+
+          let summary;
+          if (result && result.winner) {
+            summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🎉 <b>${escapeHTML(result.winner.username)}</b> ${marginText}!`;
           } else {
+            summary = `🏆 <b>MATCH COMPLETED!</b>\n\n🤝 <b>Match Tied!</b>`;
+          }
+
+          const botUsername = botInfo?.username || 'Imposter0_bot';
+          const playUrl = getMatchPlayUrl(match);
+          const isPrivate = match.chatId > 0;
+          
+          let buttonObj;
+          if (isPrivate) {
+            buttonObj = { text: "↗️ View Match Details", web_app: { url: playUrl } };
+          } else {
+            const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${match.id}_${match.chatId}`;
+            buttonObj = { text: "↗️ View Match Details", url: directLink };
+          }
+
+          const reply_markup = {
+            inline_keyboard: [
+              [buttonObj]
+            ]
+          };
+
+          try {
+            const photoBuffer = await generateScoreboardImage(match, result, marginText);
+            if (photoBuffer) {
+              await bot.api.sendPhoto(match.chatId, new InputFile(photoBuffer, 'scoreboard.png'), {
+                caption: summary,
+                reply_markup,
+                parse_mode: 'HTML'
+              });
+            } else {
+              await sendTelegramMessage(match, summary, { reply_markup });
+            }
+          } catch (err) {
+            console.error("Failed to send scoreboard photo, falling back to text:", err);
             await sendTelegramMessage(match, summary, { reply_markup });
           }
-        } catch (err) {
-          console.error("Failed to send scoreboard photo, falling back to text:", err);
-          await sendTelegramMessage(match, summary, { reply_markup });
+        } catch (finalizeErr) {
+          console.error("Error during match completion/finalization:", finalizeErr);
+          try {
+            await sendTelegramMessage(match, "🏆 <b>MATCH COMPLETED!</b>\n\nAn error occurred while rendering the final scoreboard, but the match has ended.");
+          } catch (msgErr) {
+            console.error("Failed to send fallback completion message:", msgErr);
+          }
         }
       }
     } else {
@@ -5764,7 +5785,7 @@ async function processBallAndProgress(ctx, match) {
         }
       }
       
-      const overCompleted = match.currentInnings.balls % 6 === 0;
+      const overCompleted = !outcome.isExtra && (match.currentInnings.balls % 6 === 0);
       if (overCompleted && match.currentInnings.balls > 0) {
         if (match.bowlingTeam.telegramId === 'ai') {
           match.selectBestBowler();
@@ -5778,7 +5799,7 @@ async function processBallAndProgress(ctx, match) {
         }
       }
 
-      if (!match.turnState || match.turnState === 'batting_shot') {
+      if (!match.turnState || match.turnState === 'batting_shot' || outcome.isExtra) {
         match.turnState = 'bowling_delivery';
       }
 
@@ -5790,8 +5811,8 @@ async function processBallAndProgress(ctx, match) {
 async function handleMatchTermination(match, quittingUserId = null, reason = "quit") {
   try {
     const ballsBowled = (match.innings[0]?.balls || 0) + (match.innings[1]?.balls || 0);
-    const hostId = match.host.telegramId.toString();
-    const guestId = match.guest.telegramId.toString();
+    const hostId = match.host?.telegramId ? match.host.telegramId.toString() : '';
+    const guestId = match.guest?.telegramId ? match.guest.telegramId.toString() : '';
 
     let inactiveId = null;
     let activeId = null;
@@ -5802,7 +5823,7 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
     } else {
       // Inactivity timeout: determine whose turn it was
       if (match.status === 'xi_selection') {
-        const isHostBatting = match.innings[0].battingId && match.host.telegramId && (match.innings[0].battingId.toString() === match.host.telegramId.toString());
+        const isHostBatting = match.innings[0]?.battingId && match.host?.telegramId && (match.innings[0].battingId.toString() === match.host.telegramId.toString());
         const battingConfirmed = match.strikerIdx !== null && match.nonStrikerIdx !== null;
         const bowlingConfirmed = match.currentBowlerIdx !== null;
         const hostConfirmed = isHostBatting ? battingConfirmed : bowlingConfirmed;
