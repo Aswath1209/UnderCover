@@ -166,33 +166,22 @@ async function getGlobalLeaderboard(sortBy = 'wins') {
   }
 
   let result = [];
+  let query = supabase.from('profiles').select('*');
   if (sortBy === 'rating') {
-    const { data: profiles } = await supabase.from('profiles').select('*');
-    if (!profiles) return [];
-    const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket');
-    const cricket = await getCricketPlayers();
-    const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
-    
-    const userPlayers = new Map();
-    (owned || []).forEach(o => {
-      if (!userPlayers.has(o.user_id)) userPlayers.set(o.user_id, []);
-      userPlayers.get(o.user_id).push(ovrMap.get(o.player_id) || 0);
-    });
-    
-    profiles.forEach(p => {
-      const playerOvrs = userPlayers.get(p.user_id) || [];
-      playerOvrs.sort((a, b) => b - a);
-      const top11 = playerOvrs.slice(0, 11);
-      const teamRating = Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
-      p.rating = teamRating;
-    });
-    
-    profiles.sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.coins - a.coins);
-    result = profiles.slice(0, 10);
+    query = query.order('rating', { ascending: false })
+                 .order('wins', { ascending: false })
+                 .order('coins', { ascending: false });
+  } else if (sortBy === 'wins') {
+    query = query.order('wins', { ascending: false })
+                 .order('rating', { ascending: false })
+                 .order('coins', { ascending: false });
   } else {
-    const { data } = await supabase.from('profiles').select('*').order(sortBy, { ascending: false }).limit(10);
-    result = data || [];
+    query = query.order(sortBy, { ascending: false })
+                 .order('wins', { ascending: false })
+                 .order('rating', { ascending: false });
   }
+  const { data } = await query.limit(10);
+  result = data || [];
 
   leaderboardCache.set(sortBy, { timestamp: now, data: result });
   return result;
@@ -203,131 +192,93 @@ async function getGroupLeaderboard(chatId, sortBy = 'wins') {
   if (sortBy === 'wins') {
     const { data } = await supabase.from('group_stats').select('*').eq('chat_id', chatId).order('wins', { ascending: false }).limit(10);
     return data;
-  } else if (sortBy === 'coins') {
-    // For group coins: fetch all user IDs in this group, then get their global coin rankings
+  } else if (sortBy === 'coins' || sortBy === 'rating') {
     const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
     if (!participants || participants.length === 0) return [];
-    
     const userIds = participants.map(p => p.user_id);
-    const { data: profiles } = await supabase.from('profiles')
-      .select('user_id, first_name, coins')
-      .in('user_id', userIds)
-      .order('coins', { ascending: false })
-      .limit(10);
-      
+    
+    let query = supabase.from('profiles').select('*').in('user_id', userIds);
+    if (sortBy === 'coins') {
+      query = query.order('coins', { ascending: false })
+                   .order('wins', { ascending: false })
+                   .order('rating', { ascending: false });
+    } else {
+      query = query.order('rating', { ascending: false })
+                   .order('wins', { ascending: false })
+                   .order('coins', { ascending: false });
+    }
+    const { data: profiles } = await query.limit(10);
     return profiles || [];
-  } else if (sortBy === 'rating') {
-    const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
-    if (!participants || participants.length === 0) return [];
-    const userIds = participants.map(p => p.user_id);
-    
-    const { data: profiles } = await supabase.from('profiles')
-      .select('*')
-      .in('user_id', userIds);
-    if (!profiles || profiles.length === 0) return [];
-    
-    const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket').in('user_id', userIds);
-    const cricket = await getCricketPlayers();
-    const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
-    
-    const userPlayers = new Map();
-    (owned || []).forEach(o => {
-      if (!userPlayers.has(o.user_id)) userPlayers.set(o.user_id, []);
-      userPlayers.get(o.user_id).push(ovrMap.get(o.player_id) || 0);
-    });
-    
-    profiles.forEach(p => {
-      const playerOvrs = userPlayers.get(p.user_id) || [];
-      playerOvrs.sort((a, b) => b - a);
-      const top11 = playerOvrs.slice(0, 11);
-      const teamRating = Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
-      p.rating = teamRating;
-    });
-    
-    profiles.sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.coins - a.coins);
-    return profiles.slice(0, 10);
   }
+  return [];
 }
 
 async function getUserGlobalRank(userId, sortBy = 'wins') {
   if (!supabase) return null;
-  if (sortBy === 'rating') {
-    const { data: allProfiles } = await supabase.from('profiles').select('user_id, wins, coins');
-    if (!allProfiles) return null;
-    const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket');
-    const cricket = await getCricketPlayers();
-    const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
-    
-    const userPlayers = new Map();
-    (owned || []).forEach(o => {
-      if (!userPlayers.has(o.user_id)) userPlayers.set(o.user_id, []);
-      userPlayers.get(o.user_id).push(ovrMap.get(o.player_id) || 0);
-    });
-    
-    const ratings = allProfiles.map(p => {
-      const playerOvrs = userPlayers.get(p.user_id) || [];
-      playerOvrs.sort((a, b) => b - a);
-      const top11 = playerOvrs.slice(0, 11);
-      const teamRating = Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
-      return { user_id: p.user_id, rating: teamRating, wins: p.wins || 0, coins: p.coins || 0 };
-    });
-    
-    ratings.sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.coins - a.coins);
-    const targetIndex = ratings.findIndex(r => r.user_id === userId);
-    return targetIndex !== -1 ? targetIndex + 1 : null;
-  }
   const profile = await getProfile(userId);
   if (!profile) return null;
+  
   const val = profile[sortBy] || 0;
+  
+  if (sortBy === 'rating') {
+    const { count: higherRating } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt('rating', val);
+    const { count: sameRatingMoreWins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('rating', val).gt('wins', profile.wins || 0);
+    const { count: sameRatingSameWinsMoreCoins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('rating', val).eq('wins', profile.wins || 0).gt('coins', profile.coins || 0);
+    
+    return (higherRating || 0) + (sameRatingMoreWins || 0) + (sameRatingSameWinsMoreCoins || 0) + 1;
+  }
+  
+  if (sortBy === 'wins') {
+    const { count: higherWins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt('wins', val);
+    const { count: sameWinsMoreRating } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('wins', val).gt('rating', profile.rating || 0);
+    const { count: sameWinsSameRatingMoreCoins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('wins', val).eq('rating', profile.rating || 0).gt('coins', profile.coins || 0);
+    
+    return (higherWins || 0) + (sameWinsMoreRating || 0) + (sameWinsSameRatingMoreCoins || 0) + 1;
+  }
+  
+  if (sortBy === 'coins') {
+    const { count: higherCoins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt('coins', val);
+    const { count: sameCoinsMoreWins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('coins', val).gt('wins', profile.wins || 0);
+    const { count: sameCoinsSameWinsMoreRating } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('coins', val).eq('wins', profile.wins || 0).gt('rating', profile.rating || 0);
+    
+    return (higherCoins || 0) + (sameCoinsMoreWins || 0) + (sameCoinsSameWinsMoreRating || 0) + 1;
+  }
+
   const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).gt(sortBy, val);
   return (count !== null ? count : 0) + 1;
 }
 
 async function getUserGroupRank(chatId, userId, sortBy = 'wins') {
   if (!supabase) return null;
+  
   if (sortBy === 'wins') {
     const { data: gstat } = await supabase.from('group_stats').select('wins').eq('user_id', userId).eq('chat_id', chatId).single();
     if (!gstat) return null;
     const { count } = await supabase.from('group_stats').select('user_id', { count: 'exact', head: true }).eq('chat_id', chatId).gt('wins', gstat.wins);
     return (count !== null ? count : 0) + 1;
-  } else if (sortBy === 'coins') {
-    const profile = await getProfile(userId);
-    if (!profile) return null;
-    const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
-    if (!participants || participants.length === 0) return null;
-    const userIds = participants.map(p => p.user_id);
-    const { count } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).gt('coins', profile.coins);
-    return (count !== null ? count : 0) + 1;
-  } else if (sortBy === 'rating') {
-    const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
-    if (!participants || participants.length === 0) return null;
-    const userIds = participants.map(p => p.user_id);
-    
-    const { data: profiles } = await supabase.from('profiles').select('user_id, wins, coins').in('user_id', userIds);
-    if (!profiles || profiles.length === 0) return null;
-    
-    const { data: owned } = await supabase.from('user_owned_players').select('user_id, player_id').eq('sport', 'cricket').in('user_id', userIds);
-    const cricket = await getCricketPlayers();
-    const ovrMap = new Map((cricket || []).map(p => [p.id, p.ovr || 0]));
-    
-    const userPlayers = new Map();
-    (owned || []).forEach(o => {
-      if (!userPlayers.has(o.user_id)) userPlayers.set(o.user_id, []);
-      userPlayers.get(o.user_id).push(ovrMap.get(o.player_id) || 0);
-    });
-    
-    const ratings = profiles.map(p => {
-      const playerOvrs = userPlayers.get(p.user_id) || [];
-      playerOvrs.sort((a, b) => b - a);
-      const top11 = playerOvrs.slice(0, 11);
-      const teamRating = Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
-      return { user_id: p.user_id, rating: teamRating, wins: p.wins || 0, coins: p.coins || 0 };
-    });
-    
-    ratings.sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.coins - a.coins);
-    const targetIndex = ratings.findIndex(r => r.user_id === userId);
-    return targetIndex !== -1 ? targetIndex + 1 : null;
   }
+  
+  const profile = await getProfile(userId);
+  if (!profile) return null;
+  const { data: participants } = await supabase.from('group_stats').select('user_id').eq('chat_id', chatId);
+  if (!participants || participants.length === 0) return null;
+  const userIds = participants.map(p => p.user_id);
+  
+  if (sortBy === 'coins') {
+    const { count: higherCoins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).gt('coins', profile.coins || 0);
+    const { count: sameCoinsMoreWins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).eq('coins', profile.coins || 0).gt('wins', profile.wins || 0);
+    const { count: sameCoinsSameWinsMoreRating } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).eq('coins', profile.coins || 0).eq('wins', profile.wins || 0).gt('rating', profile.rating || 0);
+    return (higherCoins || 0) + (sameCoinsMoreWins || 0) + (sameCoinsSameWinsMoreRating || 0) + 1;
+  }
+  
+  if (sortBy === 'rating') {
+    const { count: higherRating } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).gt('rating', profile.rating || 0);
+    const { count: sameRatingMoreWins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).eq('rating', profile.rating || 0).gt('wins', profile.wins || 0);
+    const { count: sameRatingSameWinsMoreCoins } = await supabase.from('profiles').select('user_id', { count: 'exact', head: true }).in('user_id', userIds).eq('rating', profile.rating || 0).eq('wins', profile.wins || 0).gt('coins', profile.coins || 0);
+    return (higherRating || 0) + (sameRatingMoreWins || 0) + (sameRatingSameWinsMoreCoins || 0) + 1;
+  }
+  
+  return null;
 }
 
 async function getGlobalStats() {
@@ -758,6 +709,8 @@ async function buyPlayer(userId, playerId, sport, price) {
     const newCoins = currentCoins - price;
     await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
 
+    await updateUserRating(userId);
+
     return { success: true, newBalance: newCoins };
   } catch (e) {
     console.error("Purchase player transaction failed:", e);
@@ -801,6 +754,8 @@ async function sellPlayer(userId, playerId, sport, sellPrice) {
 
     const newCoins = (profile.coins || 0) + sellPrice;
     await supabase.from('profiles').update({ coins: newCoins }).eq('user_id', userId);
+
+    await updateUserRating(userId);
 
     return { success: true, newBalance: newCoins };
   } catch (e) {
@@ -849,6 +804,8 @@ async function awardPlayer(userId, playerId, sport) {
       console.error("Award player error:", insertError);
       return { success: false, error: 'Failed to record award.' };
     }
+
+    await updateUserRating(userId);
 
     return { success: true, alreadyOwned: false };
   } catch (e) {
@@ -979,6 +936,8 @@ async function swapSquadOrder(userId, pos1, pos2) {
         .eq('id', item.id);
     });
     await Promise.all(updates);
+
+    await updateUserRating(userId);
 
     return { success: true };
   } catch (e) {
@@ -1133,6 +1092,8 @@ async function removePlayerFromSquad(userId, playerId, sport) {
       return { success: false, error: 'Failed to delete player from database.' };
     }
 
+    await updateUserRating(userId);
+
     return { success: true };
   } catch (e) {
     console.error("[DB] Remove player exception:", e);
@@ -1279,6 +1240,8 @@ async function claimStarterPack(userId) {
       return { success: false, error: 'Failed to update starter pack claim status.' };
     }
     
+    await updateUserRating(userId);
+    
     return { success: true, players: allSelected, isBackfill: false };
   } catch (e) {
     console.error("claimStarterPack exception:", e);
@@ -1302,9 +1265,27 @@ async function getUserTeamRating(userId) {
   return Math.round(top11.reduce((sum, ovr) => sum + ovr, 0) / 11);
 }
 
+async function updateUserRating(userId) {
+  if (!supabase) return 0;
+  try {
+    const rating = await getUserTeamRating(userId);
+    const { error } = await supabase.from('profiles').update({ rating }).eq('user_id', userId);
+    if (error) {
+      console.error(`[DB] Error updating profile rating for user ${userId}:`, error);
+    }
+    // Clear/invalidate cache
+    leaderboardCache.clear();
+    return rating;
+  } catch (e) {
+    console.error(`[DB] updateUserRating exception for user ${userId}:`, e);
+    return 0;
+  }
+}
+
 module.exports = {
   supabase,
   getUserTeamRating,
+  updateUserRating,
   getUserCricketTeam,
   recordWin,
   recordLoss,

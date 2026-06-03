@@ -4774,7 +4774,7 @@ app.get('/api/user-stats', async (req, res) => {
             spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
         }
 
-        const jackpotPlayerId = 'd592f282-82ae-4493-9b17-bd1eff00ee36';
+        const jackpotPlayerId = '9f29976c-ce6d-4e9e-9f25-7eec9a053848';
         const jackpotClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
 
         res.json({
@@ -4828,7 +4828,7 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const jackpotPlayerId = 'd592f282-82ae-4493-9b17-bd1eff00ee36';
+            const jackpotPlayerId = '9f29976c-ce6d-4e9e-9f25-7eec9a053848';
             const hasClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
             if (hasClaimed) {
                 alreadyOwned = true;
@@ -4860,7 +4860,7 @@ app.get('/api/spin', async (req, res) => {
                     (async () => {
                         try {
                             const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
-                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Shreyas Iyer</b> (86 OVR Batsman) in the Lucky Spin! 🎡\n\n` +
+                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Varun Chakravarthy</b> (85 OVR Bowler) in the Lucky Spin! 🎡\n\n` +
                                             `Congratulations! 🥳`;
                             try {
                                 await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
