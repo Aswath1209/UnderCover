@@ -1195,25 +1195,8 @@ async function claimStarterPack(userId) {
       return { success: false, error: 'Database error fetching profile.' };
     }
     
-    let isBackfill = false;
-    let ownedPlayers = [];
     if (profile && profile.claimed_starter) {
-      const { data: ownedRows, error: ownedError } = await supabase
-        .from('user_owned_players')
-        .select('player_id')
-        .eq('user_id', userId)
-        .eq('sport', 'cricket');
-        
-      if (ownedError) {
-        console.error("Error fetching owned players for backfill check:", ownedError);
-        return { success: false, error: 'Database error checking owned players.' };
-      }
-      
-      if (ownedRows && ownedRows.length >= 11) {
-        return { success: false, error: 'ALREADY_CLAIMED' };
-      }
-      isBackfill = true;
-      ownedPlayers = ownedRows || [];
+      return { success: false, error: 'ALREADY_CLAIMED' };
     }
     
     // 2. Fetch all cricket players
@@ -1222,135 +1205,54 @@ async function claimStarterPack(userId) {
       return { success: false, error: 'No players available in database.' };
     }
     
-    const ovrMap = new Map((players || []).map(p => [p.id, p]));
-    let allSelected = [];
-    let startSquadOrder = 1;
+    // 3. Filter players
+    // Low OVR players: OVR <= 75
+    // Star players: OVR == 84
+    const lowKeepers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'wicket_keeper');
+    const lowBatsmen = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'batsman');
+    const lowAllRounders = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'all_rounder');
+    const lowBowlers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'bowler');
+    const starPlayers = players.filter(p => p.ovr === 84);
     
-    if (isBackfill) {
-      // 1. Group currently owned players by role
-      const ownedKeepers = [];
-      const ownedBatsmen = [];
-      const ownedAllRounders = [];
-      const ownedBowlers = [];
-
-      ownedPlayers.forEach(o => {
-        const p = ovrMap.get(o.player_id);
-        if (p) {
-          if (p.role === 'wicket_keeper') ownedKeepers.push(p);
-          else if (p.role === 'batsman') ownedBatsmen.push(p);
-          else if (p.role === 'all_rounder') ownedAllRounders.push(p);
-          else if (p.role === 'bowler') ownedBowlers.push(p);
-        }
-      });
-
-      // Target counts: Keeper: 1, Batsman: 4, All-Rounder: 2, Bowler: 4
-      const neededKeepers = Math.max(0, 1 - ownedKeepers.length);
-      const neededBatsmen = Math.max(0, 4 - ownedBatsmen.length);
-      const neededAllRounders = Math.max(0, 2 - ownedAllRounders.length);
-      const neededBowlers = Math.max(0, 4 - ownedBowlers.length);
-
-      const roleQueue = [];
-      for (let i = 0; i < neededKeepers; i++) roleQueue.push('wicket_keeper');
-      for (let i = 0; i < neededBatsmen; i++) roleQueue.push('batsman');
-      for (let i = 0; i < neededAllRounders; i++) roleQueue.push('all_rounder');
-      for (let i = 0; i < neededBowlers; i++) roleQueue.push('bowler');
-
-      const targetAddCount = 11 - ownedPlayers.length;
-      let finalRolesToAdd = [];
-      if (roleQueue.length >= targetAddCount) {
-        finalRolesToAdd = roleQueue.slice(0, targetAddCount);
-      } else {
-        finalRolesToAdd = [...roleQueue];
-        const wildcards = ['batsman', 'bowler', 'all_rounder', 'wicket_keeper'];
-        while (finalRolesToAdd.length < targetAddCount) {
-          finalRolesToAdd.push(wildcards[finalRolesToAdd.length % wildcards.length]);
-        }
-      }
-
-      const ownedIds = new Set(ownedPlayers.map(o => o.player_id));
-      const lowKeepers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'wicket_keeper' && !ownedIds.has(p.id));
-      const lowBatsmen = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'batsman' && !ownedIds.has(p.id));
-      const lowAllRounders = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'all_rounder' && !ownedIds.has(p.id));
-      const lowBowlers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'bowler' && !ownedIds.has(p.id));
-
-      const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
-      const shuffledKeepers = shuffle(lowKeepers);
-      const shuffledBatsmen = shuffle(lowBatsmen);
-      const shuffledAllRounders = shuffle(lowAllRounders);
-      const shuffledBowlers = shuffle(lowBowlers);
-
-      finalRolesToAdd.forEach(role => {
-        let picked = null;
-        if (role === 'wicket_keeper' && shuffledKeepers.length > 0) picked = shuffledKeepers.pop();
-        else if (role === 'batsman' && shuffledBatsmen.length > 0) picked = shuffledBatsmen.pop();
-        else if (role === 'all_rounder' && shuffledAllRounders.length > 0) picked = shuffledAllRounders.pop();
-        else if (role === 'bowler' && shuffledBowlers.length > 0) picked = shuffledBowlers.pop();
-
-        if (picked) {
-          allSelected.push(picked);
-        }
-      });
-
-      const { data: maxRow } = await supabase
-        .from('user_owned_players')
-        .select('squad_order')
-        .eq('user_id', userId)
-        .eq('sport', 'cricket')
-        .order('squad_order', { ascending: false })
-        .limit(1);
-      
-      startSquadOrder = (maxRow && maxRow.length > 0 ? maxRow[0].squad_order : 0) + 1;
-      
-    } else {
-      // 3. Filter players
-      // Low OVR players: OVR <= 75
-      // Star players: OVR == 84
-      const lowKeepers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'wicket_keeper');
-      const lowBatsmen = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'batsman');
-      const lowAllRounders = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'all_rounder');
-      const lowBowlers = players.filter(p => p.ovr && p.ovr <= 75 && p.role === 'bowler');
-      const starPlayers = players.filter(p => p.ovr === 84);
-      
-      if (lowKeepers.length < 1 || lowBatsmen.length < 4 || lowAllRounders.length < 2 || lowBowlers.length < 4) {
-        return { success: false, error: 'Insufficient low OVR players in database.' };
-      }
-      if (starPlayers.length < 1) {
-        return { success: false, error: 'No 84 OVR star players found in database.' };
-      }
-      
-      // 4. Pick 1 star player
-      const selectedStar = starPlayers[Math.floor(Math.random() * starPlayers.length)];
-      const starRole = selectedStar.role;
-      
-      // Target counts for the final Playing XI:
-      // Wicket Keepers: 1, Batsmen: 4, All-Rounders: 2, Bowlers: 4
-      let neededKeepers = 1;
-      let neededBatsmen = 4;
-      let neededAllRounders = 2;
-      let neededBowlers = 4;
-      
-      if (starRole === 'wicket_keeper') neededKeepers--;
-      else if (starRole === 'batsman') neededBatsmen--;
-      else if (starRole === 'all_rounder') neededAllRounders--;
-      else if (starRole === 'bowler') neededBowlers--;
-      
-      // Shuffle helper
-      const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
-      
-      const selectedKeepers = shuffle(lowKeepers).slice(0, neededKeepers);
-      const selectedBatsmen = shuffle(lowBatsmen).slice(0, neededBatsmen);
-      const selectedAllRounders = shuffle(lowAllRounders).slice(0, neededAllRounders);
-      const selectedBowlers = shuffle(lowBowlers).slice(0, neededBowlers);
-      
-      allSelected = [
-        selectedStar,
-        ...selectedKeepers,
-        ...selectedBatsmen,
-        ...selectedAllRounders,
-        ...selectedBowlers
-      ];
-      startSquadOrder = 1;
+    if (lowKeepers.length < 1 || lowBatsmen.length < 4 || lowAllRounders.length < 2 || lowBowlers.length < 4) {
+      return { success: false, error: 'Insufficient low OVR players in database.' };
     }
+    if (starPlayers.length < 1) {
+      return { success: false, error: 'No 84 OVR star players found in database.' };
+    }
+    
+    // 4. Pick 1 star player
+    const selectedStar = starPlayers[Math.floor(Math.random() * starPlayers.length)];
+    const starRole = selectedStar.role;
+    
+    // Target counts for the final Playing XI:
+    // Wicket Keepers: 1, Batsmen: 4, All-Rounders: 2, Bowlers: 4
+    let neededKeepers = 1;
+    let neededBatsmen = 4;
+    let neededAllRounders = 2;
+    let neededBowlers = 4;
+    
+    if (starRole === 'wicket_keeper') neededKeepers--;
+    else if (starRole === 'batsman') neededBatsmen--;
+    else if (starRole === 'all_rounder') neededAllRounders--;
+    else if (starRole === 'bowler') neededBowlers--;
+    
+    // Shuffle helper
+    const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
+    
+    const selectedKeepers = shuffle(lowKeepers).slice(0, neededKeepers);
+    const selectedBatsmen = shuffle(lowBatsmen).slice(0, neededBatsmen);
+    const selectedAllRounders = shuffle(lowAllRounders).slice(0, neededAllRounders);
+    const selectedBowlers = shuffle(lowBowlers).slice(0, neededBowlers);
+    
+    const allSelected = [
+      selectedStar,
+      ...selectedKeepers,
+      ...selectedBatsmen,
+      ...selectedAllRounders,
+      ...selectedBowlers
+    ];
+    const startSquadOrder = 1;
     
     // 5. Insert players into user_owned_players
     const inserts = allSelected.map((p, idx) => ({
@@ -1377,7 +1279,7 @@ async function claimStarterPack(userId) {
       return { success: false, error: 'Failed to update starter pack claim status.' };
     }
     
-    return { success: true, players: allSelected, isBackfill };
+    return { success: true, players: allSelected, isBackfill: false };
   } catch (e) {
     console.error("claimStarterPack exception:", e);
     return { success: false, error: 'An unexpected database error occurred.' };
