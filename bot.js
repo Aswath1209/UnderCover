@@ -1127,7 +1127,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Shreyas Iyer</b> (86 OVR Batsman)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Varun Chakravarthy</b> (85 OVR Bowler)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -5984,7 +5984,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Shreyas Iyer" },
+    { command: "spin", description: "🎡 Spin the wheel to win Varun Chakravarthy" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },
