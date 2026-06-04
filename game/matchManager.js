@@ -86,6 +86,7 @@ class Match {
     this.currentShot = null;
     this.isMysteryBall = false;
     this.mysteryBallBowledThisOver = false;
+    this.isFreeHit = false;
 
     this.commentary = [];
     this.lastBallOutcome = null;
@@ -298,6 +299,8 @@ class Match {
     if (!bowlStats.deliveryHistory) bowlStats.deliveryHistory = [];
     if (!bowlStats.speedHistory) bowlStats.speedHistory = [];
 
+    const wasFreeHit = this.isFreeHit || false;
+
     const outcome = calculateBallOutcome(
       this.striker,
       this.currentBowler,
@@ -315,7 +318,13 @@ class Match {
         recentOutcomes: this.recentOutcomes || [],
         shotHistory: batStats.shotHistory,
         deliveryHistory: bowlStats.deliveryHistory,
-        speedHistory: bowlStats.speedHistory
+        speedHistory: bowlStats.speedHistory,
+        isFreeHit: wasFreeHit,
+        isSecondInnings: this.currentInningsIdx === 1,
+        target: this.currentInnings.target,
+        runsScored: this.currentInnings.runs,
+        ballsRemaining: (this.totalOvers * 6) - this.currentInnings.balls,
+        wicketsDown: this.currentInnings.wickets
       }
     );
 
@@ -350,6 +359,15 @@ class Match {
       this.currentShot = null;
       this.isMysteryBall = false;
       this.lastBallOutcome = outcome;
+
+      // Transition free hit state on extras
+      if (outcome.extraType === 'no-ball') {
+        this.isFreeHit = true;
+      } else if (wasFreeHit) {
+        this.isFreeHit = true; // still free hit on wide/etc.
+      } else {
+        this.isFreeHit = false;
+      }
 
       return outcome;
     }
@@ -426,6 +444,7 @@ class Match {
     this.currentSpeed = null;
     this.currentShot = null;
     this.isMysteryBall = false;
+    this.isFreeHit = false;
 
     this.lastBallOutcome = outcome;
     if (outcome.isWicket) {
@@ -579,6 +598,7 @@ class Match {
       currentShot: this.currentShot,
       isMysteryBall: this.isMysteryBall,
       mysteryBallBowledThisOver: this.mysteryBallBowledThisOver,
+      isFreeHit: this.isFreeHit,
       commentary: this.commentary,
       lastBallOutcome: this.lastBallOutcome,
       partnership: this.partnership,
@@ -618,6 +638,7 @@ function deserializeMatch(data) {
   match.currentShot = data.currentShot;
   match.isMysteryBall = data.isMysteryBall || false;
   match.mysteryBallBowledThisOver = data.mysteryBallBowledThisOver || false;
+  match.isFreeHit = data.isFreeHit || false;
   match.commentary = data.commentary;
   match.lastBallOutcome = data.lastBallOutcome;
   match.partnership = data.partnership;

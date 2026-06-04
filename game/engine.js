@@ -119,7 +119,73 @@ function calculateBallOutcome(
 
   // --- 4. Rating Factor ---
   const ratingDiff = (batsman.batting_rating || 50) - (bowler.bowling_rating || 50);
-  const ratingMultiplier = 1 + (ratingDiff / 300);
+  const ratingMultiplier = 1 + (ratingDiff / 120); // More than doubled the weight of rating diff
+
+  // --- Platoon Matchup (Left/Right) ---
+  let matchupMultiplier = 1.0;
+  const batHand = batsman.batting_hand || 'right';
+  const bowlType = bowler.bowler_type || 'fast';
+
+  if (bowlType === 'off_spin') {
+    if (batHand === 'left') {
+      matchupMultiplier = 0.90; // Off-spin turns away from lefties (bowler advantage)
+    } else {
+      matchupMultiplier = 1.06; // Turns into righties (easier to hit)
+    }
+  } else if (bowlType === 'leg_spin' || bowlType === 'left_arm_orthodox') {
+    if (batHand === 'right') {
+      matchupMultiplier = 0.90; // Leg-spin / Orthodox turns away from righties (bowler advantage)
+    } else {
+      matchupMultiplier = 1.06; // Turns into lefties (easier to hit)
+    }
+  }
+
+  // --- Batsman Set-ness (Confidence Boost) ---
+  const ballsFaced = context?.batsmanStats?.balls || 0;
+  const confidenceMultiplier = 1 + Math.min(0.20, ballsFaced * 0.02); // Up to +20% success rate
+
+  // --- Bowler Fatigue / Match Rhythm (Economy-based) ---
+  let bowlerRhythmMultiplier = 1.0;
+  const bowlerOvers = context?.bowlerStats?.overs || 0;
+  const bowlerRuns = context?.bowlerStats?.runsConceded || 0;
+  if (bowlerOvers > 0) {
+    const wholeOvers = Math.floor(bowlerOvers);
+    const extraBalls = Math.round((bowlerOvers % 1) * 10);
+    const totalBowlerBalls = (wholeOvers * 6) + extraBalls;
+    if (totalBowlerBalls >= 6) {
+      const economy = (bowlerRuns / totalBowlerBalls) * 6;
+      if (economy > 12.0) {
+        bowlerRhythmMultiplier = 1.08; // Leaking runs, batsman finds it easier
+      } else if (economy < 6.0) {
+        bowlerRhythmMultiplier = 0.92; // Tight economy, batsman struggles
+      }
+    }
+  }
+
+  // --- Bowler Spam (Batsman getting used to the ball) ---
+  let bowlerSpamScoringMultiplier = 1.0;
+  let bowlerSpamWicketMultiplier = 1.0;
+
+  if (deliveryHistory.length >= 2) {
+    const lastDel = deliveryHistory[deliveryHistory.length - 1];
+    const secondLastDel = deliveryHistory[deliveryHistory.length - 2];
+    if (delivery === lastDel && delivery === secondLastDel) {
+      bowlerSpamScoringMultiplier += 0.20; // +20% scoring boost if bowled 3 times in a row
+      bowlerSpamWicketMultiplier -= 0.35;  // -35% wicket chance
+    } else if (delivery === lastDel) {
+      bowlerSpamScoringMultiplier += 0.08; // +8% scoring boost if bowled 2 times in a row
+      bowlerSpamWicketMultiplier -= 0.15;  // -15% wicket chance
+    }
+  }
+  if (speedHistory.length >= 2) {
+    const lastSpeed = speedHistory[speedHistory.length - 1];
+    const secondLastSpeed = speedHistory[speedHistory.length - 2];
+    if (speed === lastSpeed && speed === secondLastSpeed) {
+      bowlerSpamScoringMultiplier += 0.12; // +12% scoring boost on speed spam 3 times
+    } else if (speed === lastSpeed) {
+      bowlerSpamScoringMultiplier += 0.05; // +5% scoring boost on speed spam 2 times
+    }
+  }
 
   // --- 5. Pitch & Bowler Realism ---
   const pitchEffect = PITCH_FACTORS[pitch] || PITCH_FACTORS.balanced;
@@ -135,7 +201,7 @@ function calculateBallOutcome(
   const battingPitchMultiplier = pitchEffect.batting;
 
   // Combine multipliers into successValue
-  let successValue = baseCompatibility * ratingMultiplier * battingPitchMultiplier / pitchMultiplier;
+  let successValue = baseCompatibility * ratingMultiplier * matchupMultiplier * confidenceMultiplier * bowlerRhythmMultiplier * bowlerSpamScoringMultiplier * battingPitchMultiplier / pitchMultiplier;
 
   // Match bowler style with pitch style
   let pitchWicketMult = 1.0;
@@ -179,11 +245,11 @@ function calculateBallOutcome(
     const lastShot = shotHistory[shotHistory.length - 1];
     const secondLastShot = shotHistory[shotHistory.length - 2];
     if (shot === lastShot && shot === secondLastShot) {
-      shotSpamWicketMult = 2.2;
-      shotSpamRunMult = 0.5;
+      shotSpamWicketMult = 1.7; // Toned down from 2.2
+      shotSpamRunMult = 0.7;    // Boosted from 0.5
     } else if (shot === lastShot) {
-      shotSpamWicketMult = 1.5;
-      shotSpamRunMult = 0.75;
+      shotSpamWicketMult = 1.35; // Toned down from 1.5
+      shotSpamRunMult = 0.85;   // Boosted from 0.75
     }
   }
 
@@ -220,6 +286,12 @@ function calculateBallOutcome(
   successValue = successValue * shotSpamRunMult * momentumRunMult;
   successValue = Math.max(0.15, Math.min(successValue, 0.95)); // Clip to prevent OP/underpowered cases
 
+  // --- Free Hit Success Boost ---
+  if (context?.isFreeHit) {
+    successValue *= 1.25;
+    successValue = Math.max(0.15, Math.min(successValue, 1.2)); // Allow slightly higher success cap on free hits
+  }
+
   // --- 8. Phase adjustments & Wicket Logic ---
   const powerShots = new Set(['loft', 'slog', 'upper_cut', 'hook', 'pull', 'slog_sweep', 'reverse_sweep', 'drive_on_the_up']);
   const defensiveShots = new Set(['defend', 'leave']);
@@ -250,9 +322,40 @@ function calculateBallOutcome(
   if (powerShots.has(shot)) boundaryBias *= 1.2;
   if (batArch === 'Brute') boundaryBias *= 1.15;
 
+  // --- Match Pressure (Chasing Context) ---
+  let matchPressureWicketMultiplier = 1.0;
+  let matchPressureBoundaryMultiplier = 1.0;
+
+  if (context?.isSecondInnings && context?.target) {
+    const runsNeeded = context.target - (context.runsScored || 0);
+    const ballsRemaining = context.ballsRemaining !== undefined ? context.ballsRemaining : 0;
+    if (ballsRemaining > 0) {
+      const requiredRunRate = (runsNeeded / ballsRemaining) * 6;
+      if (requiredRunRate > 10.0) {
+        if (powerShots.has(shot)) {
+          matchPressureBoundaryMultiplier = 1.15; // 15% boost to boundaries
+          matchPressureWicketMultiplier = 1.25;    // 25% increase in wicket risk
+        }
+      }
+    }
+  }
+
+  boundaryBias *= matchPressureBoundaryMultiplier;
+
+  // --- Free Hit Boundary Bias ---
+  if (context?.isFreeHit) {
+    boundaryBias *= 1.35;
+  }
+
+  // --- Wicket Rating Multiplier ---
+  const wicketRatingMultiplier = Math.max(0.5, Math.min(1.8, 1 - (ratingDiff / 150)));
+
+  // --- Batsman Set-ness (Confidence Wicket Reduction) ---
+  const setnessWicketReduction = Math.max(0.60, 1 - (ballsFaced * 0.04));
+
   // Wicket Chance
   const baseWicketProb = 0.035;
-  let wicketChance = baseWicketProb * (1 + (0.6 - successValue)) * speedWicketMult * pitchWicketMult * shotSpamWicketMult * momentumWicketMult;
+  let wicketChance = baseWicketProb * (1 + (0.6 - successValue)) * speedWicketMult * pitchWicketMult * shotSpamWicketMult * momentumWicketMult * wicketRatingMultiplier * setnessWicketReduction * (bowlerSpamWicketMultiplier || 1.0) * matchPressureWicketMultiplier;
 
   if (batArch === 'Anchor') wicketChance *= 0.75;
   if (batArch === 'Brute') wicketChance *= 1.25;
@@ -271,7 +374,11 @@ function calculateBallOutcome(
   if (shot === 'defend') wicketChance *= 0.15;
   if (shot === 'leave') wicketChance *= 0.05;
 
-  wicketChance = Math.max(0.005, Math.min(wicketChance, 0.45));
+  if (context?.isFreeHit) {
+    wicketChance = 0; // Immune to wickets on Free Hit
+  } else {
+    wicketChance = Math.max(0.005, Math.min(wicketChance, 0.45));
+  }
 
   if (rand < wicketChance) {
     outcome.isWicket = true;
@@ -368,6 +475,8 @@ function generateCommentary(type, value, batsman, bowler, context) {
   // Random picker helper
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+  let resultCommentary = '';
+
   if (type === 'wicket') {
     const cleanDetail = detail || `out b ${bowlName}`;
     const bowledTemplates = [
@@ -386,60 +495,60 @@ function generateCommentary(type, value, batsman, bowler, context) {
       `What a spectacular catch! ${batName} hits a hard ${shotFormatted}, but it flies straight to a diving fielder off the bowling of ${bowlName}!`
     ];
 
-    if (wicketType === 'bowled') return pick(bowledTemplates);
-    if (wicketType === 'lbw') return pick(lbwTemplates);
-    return pick(caughtTemplates);
-  }
-
-  if (value === 6) {
+    if (wicketType === 'bowled') resultCommentary = pick(bowledTemplates);
+    else if (wicketType === 'lbw') resultCommentary = pick(lbwTemplates);
+    else resultCommentary = pick(caughtTemplates);
+  } else if (value === 6) {
     const sixTemplates = [
       `🚀 That is massive! ${batName} stands tall and lofts the ${deliveryFormatted} from ${bowlName} straight over the bowler's head for a monstrous SIX!`,
       `💥 CRACK! A beautiful ${shotFormatted} by ${batName} sends the ball sailing deep into the stands off ${bowlName}! High, handsome, and maximum!`,
       `Smacked! ${batName} picks up the ${speedStr} ${deliveryFormatted} early, plays a clean ${shotFormatted}, and clears the boundary rope with ease! Six runs!`
     ];
-    return pick(sixTemplates);
-  }
-
-  if (value === 4) {
+    resultCommentary = pick(sixTemplates);
+  } else if (value === 4) {
     const fourTemplates = [
       `⚡ Shot! ${batName} transfers weight quickly, plays a textbook ${shotFormatted} off ${bowlName}'s ${deliveryFormatted}, and it races away to the boundary for FOUR!`,
       `Beautiful timing! ${batName} pierces the gap between cover and point off ${bowlName}'s ${deliveryFormatted} for a boundary!`,
       `Flicked away! ${batName} plays a crisp ${shotFormatted} off the pads, sending the ${deliveryFormatted} away to the fence for four runs.`
     ];
-    return pick(fourTemplates);
-  }
-
-  if (value === 0) {
+    resultCommentary = pick(fourTemplates);
+  } else if (value === 0) {
     if (shot === 'leave') {
-      return pick([
+      resultCommentary = pick([
         `${batName} leaves the ${deliveryFormatted} alone as it sails through to the wicketkeeper.`,
         `No shot offered. ${batName} lets the ${deliveryFormatted} from ${bowlName} go through cleanly.`
       ]);
-    }
-    if (shot === 'defend') {
-      return pick([
+    } else if (shot === 'defend') {
+      resultCommentary = pick([
         `Solid defensive block from ${batName} to a ${deliveryFormatted} bowled by ${bowlName}.`,
         `${batName} defends the ${deliveryFormatted} carefully back to the bowler.`,
         `No run. ${batName} plays a defensive shot but can't find the gap.`
       ]);
+    } else {
+      // They played an active/aggressive shot but got a dot ball
+      resultCommentary = pick([
+        `No run. ${batName} attempts a ${shotFormatted} off the ${deliveryFormatted} but hits it straight to a fielder.`,
+        `Beaten! ${batName} tries to play a ${shotFormatted} off ${bowlName}'s ${deliveryFormatted} but misses completely.`,
+        `A swing and a miss! ${batName} goes for a big ${shotFormatted} against the ${deliveryFormatted} from ${bowlName} but fails to connect.`,
+        `${batName} connects with a ${shotFormatted} but cannot pierce the infield. Dot ball.`
+      ]);
     }
-    // They played an active/aggressive shot but got a dot ball
-    return pick([
-      `No run. ${batName} attempts a ${shotFormatted} off the ${deliveryFormatted} but hits it straight to a fielder.`,
-      `Beaten! ${batName} tries to play a ${shotFormatted} off ${bowlName}'s ${deliveryFormatted} but misses completely.`,
-      `A swing and a miss! ${batName} goes for a big ${shotFormatted} against the ${deliveryFormatted} from ${bowlName} but fails to connect.`,
-      `${batName} connects with a ${shotFormatted} but cannot pierce the infield. Dot ball.`
-    ]);
+  } else {
+    const runsText = value === 1 ? '1 run' : `${value} runs`;
+    const runTemplates = [
+      `${batName} plays a nice ${shotFormatted} off ${bowlName}'s ${deliveryFormatted} to collect ${runsText}.`,
+      `Tucked away! ${batName} uses the ${shotFormatted} to work the ${deliveryFormatted} into the gap for ${runsText}.`,
+      `Good running! ${batName} pushes this ${deliveryFormatted} into the gap with a ${shotFormatted} and picks up ${runsText}.`,
+      `${batName} taps the ${deliveryFormatted} from ${bowlName} to the off-side with a ${shotFormatted} and rotates the strike.`
+    ];
+    resultCommentary = pick(runTemplates);
   }
 
-  const runsText = value === 1 ? '1 run' : `${value} runs`;
-  const runTemplates = [
-    `${batName} plays a nice ${shotFormatted} off ${bowlName}'s ${deliveryFormatted} to collect ${runsText}.`,
-    `Tucked away! ${batName} uses the ${shotFormatted} to work the ${deliveryFormatted} into the gap for ${runsText}.`,
-    `Good running! ${batName} pushes this ${deliveryFormatted} into the gap with a ${shotFormatted} and picks up ${runsText}.`,
-    `${batName} taps the ${deliveryFormatted} from ${bowlName} to the off-side with a ${shotFormatted} and rotates the strike.`
-  ];
-  return pick(runTemplates);
+  if (context?.isFreeHit) {
+    resultCommentary = `🚀 <b>[FREE HIT]</b> ` + resultCommentary;
+  }
+
+  return resultCommentary;
 }
 
 module.exports = {
