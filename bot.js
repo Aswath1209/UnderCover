@@ -12,6 +12,23 @@ const sb = require('./db/supabase');
 const path = require('path');
 const footballPlayers = require('./data/footballPlayers.json');
 const matchManager = require('./game/matchManager');
+
+// Support for legacy pricing to prevent players selling corrected cheap cards for new high prices
+const legacyPrices = require('./db/legacyPrices.json');
+const MIGRATION_CUTOFF = new Date('2026-06-05T09:00:00Z');
+
+function resolvePlayerPrice(player, acquiredAt) {
+  if (player.sport === 'cricket' && acquiredAt) {
+    const acqDate = new Date(acquiredAt);
+    if (acqDate < MIGRATION_CUTOFF) {
+      const legacyPrice = legacyPrices[player.id];
+      if (legacyPrice !== undefined) {
+        return legacyPrice;
+      }
+    }
+  }
+  return player.buy_price;
+}
 const gameConstants = require('./constants/game');
 const ai = require('./game/ai');
 const { DEFAULT_XI } = require('./game/matchManager');
@@ -1027,12 +1044,14 @@ bot.command('sell', async (ctx) => {
       p.name.toLowerCase().includes(query.toLowerCase())
     );
     matchedCricket.forEach(p => {
+      const ownedRecord = owned.find(o => o.player_id === p.id && o.sport === 'cricket');
       matches.push({
         id: p.id,
         name: p.name,
         ovr: p.ovr,
         buy_price: p.buy_price,
-        sport: 'cricket'
+        sport: 'cricket',
+        acquired_at: ownedRecord ? ownedRecord.acquired_at : null
       });
     });
 
@@ -1075,13 +1094,14 @@ bot.command('sell', async (ctx) => {
 
     // Exactly one player match
     const player = matches[0];
-    const sellPrice = Math.round(player.buy_price * 0.55);
+    const actualBuyPrice = resolvePlayerPrice(player, player.acquired_at);
+    const sellPrice = Math.round(actualBuyPrice * 0.55);
 
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
                  `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
                  `• OVR: <b>${player.ovr}</b>\n` +
                  `• Sport: <b>${player.sport === 'cricket' ? '🏏 Cricket' : '⚽ Football'}</b>\n` +
-                 `• Original Price: 💰 <b>${player.buy_price.toLocaleString()}</b>\n\n` +
+                 `• Original Price: 💰 <b>${actualBuyPrice.toLocaleString()}</b>\n\n` +
                  `💰 You will receive: <b>${sellPrice.toLocaleString()} coins</b>.\n\n` +
                  `<i>Do you want to proceed?</i>`;
 
@@ -3650,7 +3670,12 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
 
-      const sellPrice = Math.round(player.buy_price * 0.55);
+      const owned = await sb.getUserOwnedPlayers(userId);
+      const ownedRecord = owned.find(o => o.player_id === playerId && o.sport === sport);
+      const acquiredAt = ownedRecord ? ownedRecord.acquired_at : null;
+
+      const actualBuyPrice = resolvePlayerPrice(player, acquiredAt);
+      const sellPrice = Math.round(actualBuyPrice * 0.55);
       const result = await sb.sellPlayer(userId, player.id, sport, sellPrice);
       
       if (result.success) {

@@ -598,7 +598,7 @@ async function getUserOwnedPlayers(userId) {
   if (!supabase) return [];
   try {
     const { data, error } = await supabase.from('user_owned_players')
-      .select('player_id, sport')
+      .select('player_id, sport, acquired_at')
       .eq('user_id', userId)
       .neq('sport', 'jackpot');
     if (error) {
