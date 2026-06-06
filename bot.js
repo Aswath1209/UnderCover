@@ -1322,9 +1322,17 @@ bot.command('remove', async (ctx) => {
     }
   }
 
+  const cricLobby = getUserActiveLobby(targetUserId);
+  if (cricLobby) {
+    const chatId = cricLobby.chatId;
+    delete activeLobbies[chatId];
+    await ctx.reply(`✅ Successfully cancelled the active cricket match lobby in chat <code>${chatId}</code> for User ID <code>${targetUserId}</code>.`, { parse_mode: 'HTML' });
+    return;
+  }
+
   const match = matchManager.getActiveMatch(targetUserId);
   if (!match) {
-    return ctx.reply(`❌ No active cricket match found for User ID <code>${targetUserId}</code>.`, { parse_mode: 'HTML' });
+    return ctx.reply(`❌ No active cricket match or lobby found for User ID <code>${targetUserId}</code>.`, { parse_mode: 'HTML' });
   }
 
   match.status = 'completed';
@@ -1536,7 +1544,8 @@ bot.command('cric', async (ctx) => {
       },
       guest: null,
       status: 'waiting_join',
-      overs
+      overs,
+      createdAt: Date.now()
     };
 
     const keyboard = new InlineKeyboard()
@@ -2324,6 +2333,29 @@ async function handleBJStand(ctx, state) {
 
 bot.command('quit', async (ctx) => {
   const userId = ctx.from.id;
+
+  // Check for Cricket match lobby
+  const cricLobby = getUserActiveLobby(userId);
+  if (cricLobby) {
+      const chatId = cricLobby.chatId;
+      delete activeLobbies[chatId];
+      try {
+          await bot.api.sendMessage(chatId, `🛑 <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a> has quit the cricket lobby. The lobby has been cancelled.`, { parse_mode: 'HTML' });
+      } catch (e) {}
+      return ctx.reply("✅ You quit the cricket match lobby. The lobby has been cancelled.");
+  }
+
+  // Check for Guess the Word game
+  for (const [cid, gGame] of guessManager.getAllGames().entries()) {
+      if (gGame.host && gGame.host.id === userId) {
+          guessManager.endGame(cid);
+          try {
+              await bot.api.sendMessage(cid, `🛑 <a href="tg://user?id=${userId}">${escapeHTML(ctx.from.first_name)}</a> has quit. The Guess the Word game has been ended.`, { parse_mode: 'HTML' });
+          } catch(e) {}
+          return ctx.reply("✅ You quit the Guess the Word game.");
+      }
+  }
+
   const regularLobby = gameManager.getLobbyByUserId(userId);
   const mafiaLobby = mafiaManager.getLobbyByUserId(userId);
   
@@ -6052,6 +6084,14 @@ if (require.main === module) {
   setInterval(async () => {
     const ONE_HOUR = 1 * 60 * 60 * 1000;
     const now = Date.now();
+
+    // Cleanup Cricket Lobbies
+    for (const [chatId, lobby] of Object.entries(activeLobbies)) {
+      if (lobby.createdAt && (now - lobby.createdAt) > ONE_HOUR) {
+        try { await bot.api.sendMessage(chatId, "🛑 <b>Lobby Closed:</b> This cricket match lobby has been inactive for more than 1 hour and has been automatically closed.", { parse_mode: 'HTML' }); } catch(e) {}
+        delete activeLobbies[chatId];
+      }
+    }
 
     // Cleanup Undercover
     const ucLobbies = gameManager.getLobbies();
