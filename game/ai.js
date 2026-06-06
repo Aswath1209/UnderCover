@@ -152,7 +152,7 @@ function selectValidPlayingXI(squad) {
   if (!squad || squad.length < 11) {
     return {
       success: false,
-      error: `You do not have enough players in your squad to play. You own ${squad ? squad.length : 0} player(s), but you need at least 11.\n\nUse /claim to get your starter pack or buy players from the /shop.`
+      error: `You do not have enough players in your squad to play. You own <b>${squad ? squad.length : 0}</b> player(s), but you need at least 11.\n\nUse <code>/claim</code> to get your starter pack or buy players from the <code>/shop</code>.`
     };
   }
 
@@ -206,7 +206,7 @@ function selectValidPlayingXI(squad) {
              `• 1 to 2 Wicket Keepers\n` +
              `• 1 to 3 All-Rounders\n` +
              `• 3 to 5 Bowlers\n\n` +
-             `Use /swap <pos1> <pos2> to rearrange your squad.`
+             `Use <code>/swap pos1 pos2</code> to rearrange your squad.`
     };
   }
 

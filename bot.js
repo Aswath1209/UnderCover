@@ -3241,8 +3241,8 @@ bot.on('callback_query:data', async (ctx) => {
       }
       const xiResult = ai.selectValidPlayingXI(squad);
       if (!xiResult.success) {
-        const cleanError = xiResult.error.replace(/<[^>]*>/g, '').replace(/\n\n/g, '\n');
-        return ctx.answerCallbackQuery({ text: `❌ Join Failed:\n${cleanError}`, show_alert: true });
+        await ctx.reply(`❌ <b>Join Failed for <a href="tg://user?id=${guestId}">${escapeHTML(guestUsername)}</a>:</b>\n\n${xiResult.error}`, { parse_mode: 'HTML' });
+        return ctx.answerCallbackQuery({ text: "❌ Join Failed: Check chat for details.", show_alert: true });
       }
       const xi = xiResult.xi;
 
