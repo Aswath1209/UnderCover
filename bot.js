@@ -1147,7 +1147,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Varun Chakravarthy</b> (85 OVR Bowler)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Ishan Kishan</b> (85 OVR Wicketkeeper)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -4831,7 +4831,7 @@ app.get('/api/user-stats', async (req, res) => {
             spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
         }
 
-        const jackpotPlayerId = '9f29976c-ce6d-4e9e-9f25-7eec9a053848';
+        const jackpotPlayerId = 'd9496691-0e49-42d1-aeaf-dddcf65eed03';
         const jackpotClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
 
         res.json({
@@ -4885,7 +4885,7 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const jackpotPlayerId = '9f29976c-ce6d-4e9e-9f25-7eec9a053848';
+            const jackpotPlayerId = 'd9496691-0e49-42d1-aeaf-dddcf65eed03';
             const hasClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
             if (hasClaimed) {
                 alreadyOwned = true;
@@ -4917,7 +4917,7 @@ app.get('/api/spin', async (req, res) => {
                     (async () => {
                         try {
                             const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
-                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Varun Chakravarthy</b> (85 OVR Bowler) in the Lucky Spin! 🎡\n\n` +
+                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Ishan Kishan</b> (85 OVR Wicketkeeper) in the Lucky Spin! 🎡\n\n` +
                                             `Congratulations! 🥳`;
                             try {
                                 await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
@@ -6041,7 +6041,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Varun Chakravarthy" },
+    { command: "spin", description: "🎡 Spin the wheel to win Ishan Kishan" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },

@@ -1077,7 +1077,7 @@
                     <div class="slice-text" data-i="7">500</div>
                     <div class="slice-text" data-i="8">100</div>
                     <div class="slice-text" data-i="9">
-                        <img class="slice-img" src="/assets/players/varun_chakravarthy.jpg" alt="Varun">
+                        <img class="slice-img" src="/assets/players/ishan_kishan.jpg" alt="Ishan">
                     </div>
                 </div>
                 <div class="wheel-center">⭐</div>
@@ -1086,7 +1086,7 @@
             <!-- Premium Grand Prize Showcase Tag -->
             <div class="grand-prize-tag">
                 <span class="prize-crown">👑</span>
-                <span class="prize-tag-text">Grand Prize: <b>Varun Chakravarthy</b> (85 OVR Bowler)</span>
+                <span class="prize-tag-text">Grand Prize: <b>Ishan Kishan</b> (85 OVR Wicketkeeper)</span>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
@@ -1289,18 +1289,18 @@
                 if (grandPrizeTag) {
                     grandPrizeTag.innerHTML = `
                         <span class="prize-crown">👑</span>
-                        <span class="prize-tag-text">Grand Prize: <b>10,000 Coins</b> (Varun Chakravarthy Claimed)</span>
+                        <span class="prize-tag-text">Grand Prize: <b>10,000 Coins</b> (Ishan Kishan Claimed)</span>
                     `;
                 }
             } else {
                 if (slice9) {
-                    slice9.innerHTML = '<img class="slice-img" src="/assets/players/varun_chakravarthy.jpg" alt="Varun">';
+                    slice9.innerHTML = '<img class="slice-img" src="/assets/players/ishan_kishan.jpg" alt="Ishan">';
                     slice9.style.paddingRight = '16px';
                 }
                 if (grandPrizeTag) {
                     grandPrizeTag.innerHTML = `
                         <span class="prize-crown">👑</span>
-                        <span class="prize-tag-text">Grand Prize: <b>Varun Chakravarthy</b> (85 OVR Bowler)</span>
+                        <span class="prize-tag-text">Grand Prize: <b>Ishan Kishan</b> (85 OVR Wicketkeeper)</span>
                     `;
                 }
             }
@@ -1910,9 +1910,9 @@
                             if (data.wonPlayer) {
                                 try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
                                 if (data.alreadyOwned) {
-                                    status.innerHTML = `<span style="color:#FFD700; font-size:16px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 10px rgba(255,215,0,0.5);">🎉 JACKPOT! Won Varun Chakravarthy! <br><span style="font-size:13px; color:#aaa;">(Already owned, got 10,000 Coins)</span> 🎉</span>`;
+                                    status.innerHTML = `<span style="color:#FFD700; font-size:16px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 10px rgba(255,215,0,0.5);">🎉 JACKPOT! Won Ishan Kishan! <br><span style="font-size:13px; color:#aaa;">(Already owned, got 10,000 Coins)</span> 🎉</span>`;
                                 } else {
-                                    status.innerHTML = `<span style="color:#FFD700; font-size:18px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 15px #ffd700;">🎉 JACKPOT! Won Varun Chakravarthy! 🎉</span>`;
+                                    status.innerHTML = `<span style="color:#FFD700; font-size:18px; font-weight:bold; animation: pulse 1.5s infinite; text-shadow: 0 0 15px #ffd700;">🎉 JACKPOT! Won Ishan Kishan! 🎉</span>`;
                                 }
                             } else if (data.isJackpot) {
                                 try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
