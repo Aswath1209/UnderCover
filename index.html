@@ -908,6 +908,121 @@
             animation: float 2.5s ease-in-out infinite;
         }
 
+        /* ── Card Reveal Animation ───────────────────────────── */
+        @keyframes cardEntrance {
+            0%   { opacity: 0; transform: scale(0.3) rotateY(90deg); }
+            60%  { transform: scale(1.08) rotateY(-8deg); }
+            80%  { transform: scale(0.96) rotateY(4deg); }
+            100% { opacity: 1; transform: scale(1) rotateY(0deg); }
+        }
+        @keyframes shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position:  200% center; }
+        }
+        @keyframes particleBurst {
+            0%   { opacity:1; transform: translate(0,0) scale(1); }
+            100% { opacity:0; transform: translate(var(--tx), var(--ty)) scale(0); }
+        }
+        @keyframes glowPulse {
+            0%,100% { box-shadow: 0 0 20px var(--rarity-color, #4facfe), 0 0 60px rgba(79,172,254,0.2); }
+            50%     { box-shadow: 0 0 40px var(--rarity-color, #4facfe), 0 0 100px rgba(79,172,254,0.4); }
+        }
+        @keyframes ovrCount {
+            from { opacity:0; transform: scale(0.5); }
+            to   { opacity:1; transform: scale(1); }
+        }
+        .reveal-card {
+            position: relative;
+            width: 220px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            animation: cardEntrance 0.7s cubic-bezier(.34,1.56,.64,1) forwards,
+                       glowPulse 2s ease-in-out 0.7s infinite;
+            --rarity-color: #4facfe;
+        }
+        .reveal-card.rarity-BRONZE { --rarity-color: #cd7f32; }
+        .reveal-card.rarity-SILVER { --rarity-color: #94A3B8; }
+        .reveal-card.rarity-GOLD   { --rarity-color: #FFD700; }
+        .reveal-card.rarity-ELITE  { --rarity-color: #ff007f; }
+        .reveal-card-inner {
+            background: linear-gradient(160deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+            border: 2px solid var(--rarity-color, #4facfe);
+            border-radius: 20px;
+            padding: 20px 16px 16px;
+            text-align: center;
+        }
+        .reveal-shimmer {
+            position: absolute; inset: 0; border-radius: 20px;
+            background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.25) 50%, transparent 60%);
+            background-size: 200% 100%;
+            animation: shimmer 1.8s linear 0.7s 3;
+            pointer-events: none;
+        }
+        .reveal-rarity-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            background: var(--rarity-color, #4facfe);
+            color: #000;
+        }
+        .reveal-player-img {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--rarity-color, #4facfe);
+            margin: 0 auto 10px;
+            display: block;
+        }
+        .reveal-player-avatar {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            border: 3px solid var(--rarity-color, #4facfe);
+            margin: 0 auto 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 40px; font-weight: 800;
+            background: rgba(255,255,255,0.1);
+        }
+        .reveal-ovr {
+            font-size: 42px;
+            font-weight: 900;
+            color: var(--rarity-color, #4facfe);
+            line-height: 1;
+            margin-bottom: 2px;
+            animation: ovrCount 0.4s ease 0.9s both;
+        }
+        .reveal-ovr-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--hint);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .reveal-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+        .reveal-sub {
+            font-size: 11px;
+            color: var(--hint);
+        }
+        .particle {
+            position: absolute;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleBurst 0.8s ease-out forwards;
+        }
+        #drop-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
         /* Responsive Tab Bar for 5 items */
         @media (max-width: 400px) {
             .tab-bar {
@@ -1103,43 +1218,52 @@
 
         <!-- Drop View -->
         <div id="view-drop" class="view">
-            <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
-                <h1 style="margin: 0 0 8px 0; font-size: 28px;">Mystery Drop</h1>
-                <p style="color: var(--hint); margin: 0; font-size: 15px;">Claim a mystery crate filled with random coins!</p>
+            <div style="text-align: center; margin-bottom: 16px; margin-top: 10px;">
+                <h1 style="margin: 0 0 4px 0; font-size: 26px;">🃏 Mystery Player Drop</h1>
+                <p style="color: var(--hint); margin: 0; font-size: 14px;">Watch an ad to unlock a random cricket player card!</p>
             </div>
 
-            <div class="drop-container glass-panel" style="text-align: center; padding: 32px 24px; margin-top: 20px; border-radius: 20px;">
-                <!-- Crate Area -->
+            <!-- Rarity odds legend -->
+            <div class="glass-panel" style="padding:10px 14px; border-radius:14px; margin-bottom:14px; font-size:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <span style="color:#cd7f32;">🥉 BRONZE <span style="color:var(--hint)">common</span></span>
+                <span style="color:#94A3B8;">🥈 SILVER <span style="color:var(--hint)">uncommon</span></span>
+                <span style="color:#FFD700;">⭐ GOLD <span style="color:var(--hint)">rare</span></span>
+                <span style="color:#ff007f;">💎 ELITE <span style="color:var(--hint)">ultra-rare</span></span>
+            </div>
+
+            <div class="drop-container glass-panel" style="text-align: center; padding: 28px 20px; border-radius: 20px; position:relative; overflow:hidden;">
+                <div id="drop-particles"></div>
+
+                <!-- Step 1: Watch Ad -->
                 <div id="ad-container">
-                    <div class="float-animation" style="font-size: 80px; margin-bottom: 16px; display: inline-block;">🎁</div>
-                    <h3 style="margin: 0 0 8px 0; font-size: 20px; color: #fff;">Mystery Coin Crate</h3>
-                    <p style="color: var(--hint); font-size: 14px; line-height: 1.5; margin-bottom: 24px; max-width: 320px; margin-left: auto; margin-right: auto;">
-                        Watch a short video ad to claim a random reward between <b style="color: #00f2fe;">300 to 5,000 coins</b>! Luck is on your side today.
+                    <div class="float-animation" style="font-size: 80px; margin-bottom: 14px; display: inline-block;">🎴</div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 20px; color: #fff;">Mystery Player Drop</h3>
+                    <p style="color: var(--hint); font-size: 13px; line-height: 1.6; margin-bottom: 20px; max-width: 300px; margin-left: auto; margin-right: auto;">
+                        Watch a short ad to receive a <b style="color: #4facfe;">random cricket player</b> card. Higher OVR = rarer drop! Max: <b style="color:#ff007f;">86 OVR</b>.
                     </p>
-                    
                     <button class="btn pulse" id="watch-btn" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
-                        <span>📺 Watch & Claim Drop</span>
+                        <span>📺 Watch &amp; Get Player</span>
                     </button>
-                    
-                    <div id="status" style="margin-top: 16px; font-size: 13px; color: var(--hint); font-weight: 600;">Ready to unlock!</div>
+                    <div id="status" style="margin-top: 14px; font-size: 13px; color: var(--hint); font-weight: 600;">Ready to unlock!</div>
                 </div>
 
-                <!-- Success Box -->
+                <!-- Step 2: Claim button (after ad) -->
                 <div id="success-box" class="hidden">
                     <div id="success-prompt">
-                        <div class="float-animation" style="font-size: 80px; margin-bottom: 16px; display: inline-block;">🎁</div>
-                        <h2 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 28px;">Crate Unlocked!</h2>
-                        <p style="color: var(--hint); margin-bottom: 24px; font-size: 15px;">Your random coin reward is ready to be claimed.</p>
-                        <button class="btn" id="claim-btn" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
-                            <span>💰 Claim Coins</span>
+                        <div class="float-animation" style="font-size: 80px; margin-bottom: 14px; display: inline-block;">🎴</div>
+                        <h2 style="color: #00f2fe; margin: 0 0 8px 0; font-size: 26px;">Card Unlocked!</h2>
+                        <p style="color: var(--hint); margin-bottom: 20px; font-size: 14px;">Tap below to reveal your mystery player!</p>
+                        <button class="btn" id="claim-btn" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px;">
+                            <span>🃏 Reveal My Player</span>
                         </button>
                     </div>
-                    <div id="claim-result" class="hidden">
-                        <div style="font-size: 72px; margin-bottom: 16px;">💎</div>
-                        <h2 style="color: #34c759; margin: 0 0 10px 0; font-size: 28px;">Reward Claimed!</h2>
-                        <p style="color: var(--hint); margin-bottom: 24px; font-size: 16px;">You received <b style="color: #fff; font-size: 22px;" id="reward-amount-display">0</b> coins!</p>
-                        <button class="btn" onclick="resetDropUI()" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 12px; transition: all 0.2s;">
-                            <span>Back to Dashboard</span>
+
+                    <!-- Step 3: Reveal animation -->
+                    <div id="claim-result" class="hidden" style="min-height:320px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+                        <div id="reveal-card-wrap" style="position:relative;"></div>
+                        <div id="reveal-caption" style="font-size:13px; color:var(--hint); font-weight:600;"></div>
+                        <button class="btn" onclick="resetDropUI()" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px; margin-top:4px;">
+                            <span>🏠 Back to Dashboard</span>
                         </button>
                     </div>
                 </div>
@@ -1322,19 +1446,92 @@
             document.getElementById('ad-container').classList.remove('hidden');
             document.getElementById('claim-result').classList.add('hidden');
             document.getElementById('success-prompt').classList.remove('hidden');
-            
+            document.getElementById('reveal-card-wrap').innerHTML = '';
+            document.getElementById('reveal-caption').innerHTML = '';
+            document.getElementById('drop-particles').innerHTML = '';
+
             const claimBtn = document.getElementById('claim-btn');
             if (claimBtn) {
                 claimBtn.disabled = false;
                 const btnSpan = claimBtn.querySelector('span');
-                if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
-                else claimBtn.innerText = '💰 Claim Coins';
+                if (btnSpan) btnSpan.innerText = '🃏 Reveal My Player';
+                else claimBtn.innerText = '🃏 Reveal My Player';
             }
-            
+
             checkDropCooldown();
-            
+
             const homeTab = document.querySelector('.tab-item[data-target="home"]');
             if (homeTab) switchTab('home', homeTab);
+        }
+
+        // Role display helpers
+        function getRoleEmoji(role) {
+            const map = { batsman: '🏏', bowler: '🎳', all_rounder: '⚡', wicket_keeper: '🧤' };
+            return map[role] || '👤';
+        }
+        function getRoleLabel(role) {
+            const map = { batsman: 'Batsman', bowler: 'Bowler', all_rounder: 'All-Rounder', wicket_keeper: 'Wicket Keeper' };
+            return map[role] || role;
+        }
+
+        // Spawn confetti/particle burst around the card
+        function spawnParticles(rarityColor) {
+            const container = document.getElementById('drop-particles');
+            container.innerHTML = '';
+            const colors = [rarityColor, '#ffffff', '#FFD700', '#4facfe'];
+            for (let i = 0; i < 28; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const angle = (i / 28) * 360;
+                const dist = 80 + Math.random() * 80;
+                const tx = Math.cos(angle * Math.PI / 180) * dist + 'px';
+                const ty = Math.sin(angle * Math.PI / 180) * dist + 'px';
+                p.style.cssText = `left:50%;top:50%;background:${colors[i % colors.length]};--tx:${tx};--ty:${ty};animation-delay:${Math.random()*0.3}s;animation-duration:${0.6+Math.random()*0.5}s;`;
+                container.appendChild(p);
+            }
+        }
+
+        // Build and show the animated reveal card
+        function showRevealCard(player, rarity, alreadyOwned) {
+            const wrap = document.getElementById('reveal-card-wrap');
+            const caption = document.getElementById('reveal-caption');
+
+            const roleEmoji = getRoleEmoji(player.role);
+            const roleLabel = getRoleLabel(player.role);
+            const rarityColor = rarity.color || '#4facfe';
+
+            // Build avatar HTML
+            let avatarHtml;
+            if (player.image_url) {
+                avatarHtml = `<img class="reveal-player-img" src="${player.image_url}" alt="${player.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                              <div class="reveal-player-avatar" style="display:none;">${player.name.charAt(0)}</div>`;
+            } else {
+                avatarHtml = `<div class="reveal-player-avatar">${player.name.charAt(0)}</div>`;
+            }
+
+            wrap.innerHTML = `
+                <div class="reveal-card rarity-${rarity.label}" style="--rarity-color:${rarityColor};">
+                    <div class="reveal-shimmer"></div>
+                    <div class="reveal-card-inner">
+                        <div class="reveal-rarity-badge">${rarity.emoji} ${rarity.label}</div>
+                        ${avatarHtml}
+                        <div class="reveal-ovr">${player.ovr}</div>
+                        <div class="reveal-ovr-label">OVR</div>
+                        <div class="reveal-name">${player.name}</div>
+                        <div class="reveal-sub">${roleEmoji} ${roleLabel} · ${player.country || ''}</div>
+                    </div>
+                </div>
+            `;
+
+            if (alreadyOwned) {
+                caption.innerHTML = `<span style="color:#FFD700;">⚠️ Already owned! Check your squad.</span>`;
+            } else {
+                caption.innerHTML = `<span style="color:#34c759;">✅ Added to your cricket squad!</span>`;
+            }
+
+            // Particles after a short delay (let card appear first)
+            setTimeout(() => spawnParticles(rarityColor), 300);
+            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
         }
 
         // Initial Data Fetch
@@ -1506,43 +1703,55 @@
             };
         }
 
-        // Prevents multiple claims via rapid clicks
+        // Claim button — calls /api/drop-player and shows the reveal animation
         const claimBtn = document.getElementById('claim-btn');
         if (claimBtn) {
             claimBtn.onclick = (e) => {
                 const btn = claimBtn;
                 if (btn.disabled) return;
-                
+
                 btn.disabled = true;
                 const btnSpan = btn.querySelector('span');
-                if (btnSpan) btnSpan.innerText = 'Claiming... ⏳';
-                else btn.innerText = 'Claiming... ⏳';
-                
+                if (btnSpan) btnSpan.innerText = '⏳ Revealing...';
+                else btn.innerText = '⏳ Revealing...';
+
                 try { tg.HapticFeedback.impactOccurred('medium'); } catch(e) {}
-                
+
                 const chatId = chatIdUrl || userId;
 
-                fetch(`/api/reward?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
+                fetch(`/api/drop-player?user_id=${userId}&msg_id=${msgId}&chat_id=${chatId}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            document.getElementById('reward-amount-display').innerText = data.amount.toLocaleString();
                             document.getElementById('success-prompt').classList.add('hidden');
-                            document.getElementById('claim-result').classList.remove('hidden');
-                            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                            const resultEl = document.getElementById('claim-result');
+                            resultEl.style.display = 'flex';
+                            resultEl.classList.remove('hidden');
+
+                            if (data.type === 'player') {
+                                showRevealCard(data.player, data.rarity, data.alreadyOwned);
+                            } else {
+                                // Coin fallback
+                                document.getElementById('reveal-card-wrap').innerHTML = `
+                                    <div style="font-size:64px; margin-bottom:8px;">💰</div>
+                                    <h2 style="color:#34c759; margin:0 0 6px 0; font-size:26px;">Coins Instead!</h2>
+                                    <p style="color:var(--hint); font-size:14px; margin:0;">${data.reason === 'squad_full' ? 'Your squad is full (25/25).' : 'All players owned!'} You got <b style="color:#fff; font-size:20px;">${(data.coinAmount||0).toLocaleString()}</b> coins.</p>
+                                `;
+                                try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+                            }
                         } else {
                             btn.disabled = false;
-                            if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
-                            else btn.innerText = '💰 Claim Coins';
-                            tg.showAlert(`Failed to claim: ${data.error || 'unknown error'}`);
+                            if (btnSpan) btnSpan.innerText = '🃏 Reveal My Player';
+                            else btn.innerText = '🃏 Reveal My Player';
+                            tg.showAlert(`Failed: ${data.error || 'unknown error'}`);
                         }
                     })
                     .catch((err) => {
-                        console.error("Claim error:", err);
+                        console.error('Claim error:', err);
                         btn.disabled = false;
-                        if (btnSpan) btnSpan.innerText = '💰 Claim Coins';
-                        else btn.innerText = '💰 Claim Coins';
-                        tg.showAlert('Failed to connect to the server. Please try again.');
+                        if (btnSpan) btnSpan.innerText = '🃏 Reveal My Player';
+                        else btn.innerText = '🃏 Reveal My Player';
+                        tg.showAlert('Connection error. Please try again.');
                     });
             };
         }

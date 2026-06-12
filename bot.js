@@ -45,7 +45,7 @@ function getUserActiveLobby(userId) {
 
 
 function getWebAppUrl(chatId, tab = '') {
-  let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
   if (host === 'undefined' || !host) {
     host = 'undercover-bot.onrender.com';
   }
@@ -54,7 +54,7 @@ function getWebAppUrl(chatId, tab = '') {
 }
 
 function getMatchPlayUrl(match) {
-  let host = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
   if (host === 'undefined' || !host) {
     host = 'undercover-bot.onrender.com';
   }
@@ -115,6 +115,61 @@ function getRandomReward() {
   if (rand < 90) return Math.floor(Math.random() * (1500 - 601 + 1)) + 601; // 601 - 1500 (20%)
   if (rand < 98) return Math.floor(Math.random() * (3000 - 1501 + 1)) + 1501; // 1501 - 3000 (8%)
   return Math.floor(Math.random() * (5000 - 3001 + 1)) + 3001; // 3001 - 5000 (2%)
+}
+
+/**
+ * Pick a random cricket player for the Mystery Drop.
+ * OVR range: ~50 to 86 (capped by DB data).
+ *
+ * Weight formula: w(ovr) = e^(-k * (ovr - 50))   where k = 0.09
+ *
+ * This gives an exponential decay so that every +1 OVR is ~9% harder to get:
+ *   OVR 50 → weight 1.000 (baseline)
+ *   OVR 60 → weight 0.407  (~40% chance relative to base)
+ *   OVR 70 → weight 0.165  (~16% chance relative to base)
+ *   OVR 80 → weight 0.067  (~7% chance relative to base)
+ *   OVR 86 → weight 0.041  (~4% chance relative to base)
+ *
+ * In practice with a real player list the final per-player probability also
+ * depends on how many players share each OVR, so high-OVR players are doubly
+ * rare (low weight AND fewer of them in the pool).
+ *
+ * @param {Array} players - Full cricketplayers array from DB
+ * @param {Array} ownedIds - Player IDs the user already owns (excluded)
+ * @returns {Object|null} player object, or null if pool empty
+ */
+function getRandomPlayerDrop(players, ownedIds = []) {
+  const MAX_OVR = 86;
+  const K = 0.09; // decay constant
+
+  // Filter to only unowned cricket players at or below the cap
+  const ownedSet = new Set(ownedIds);
+  const pool = players.filter(p => p.ovr <= MAX_OVR && !ownedSet.has(p.id));
+
+  if (pool.length === 0) return null;
+
+  // Assign a weight to each player
+  const weights = pool.map(p => Math.exp(-K * (p.ovr - 50)));
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+  // Weighted random pick
+  let rand = Math.random() * totalWeight;
+  for (let i = 0; i < pool.length; i++) {
+    rand -= weights[i];
+    if (rand <= 0) return pool[i];
+  }
+  // Fallback (floating-point safety)
+  return pool[pool.length - 1];
+}
+
+/**
+ * Human-readable rarity label based on OVR tier.
+ */
+function getPlayerDropRarity(ovr) {
+  if (ovr >= 83) return { label: 'ELITE', color: '#ff007f', emoji: '💎' };
+  if (ovr >= 78) return { label: 'GOLD',  color: '#FFD700', emoji: '⭐' };
+  if (ovr >= 70) return { label: 'SILVER', color: '#94A3B8', emoji: '🥈' };
+  return             { label: 'BRONZE', color: '#cd7f32', emoji: '🥉' };
 }
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -1132,8 +1187,8 @@ async function handleDropCommand(ctx) {
   
   const kb = new InlineKeyboard().url("📺 Watch & Claim Mystery Drop", directLink);
 
-  await ctx.api.editMessageText(ctx.chat.id, msg.message_id, 
-    "🚀 <b>Mystery Drop is here!</b>\n\nWatch a short video ad to claim a random reward between <b>300 to 5,000 coins</b>! Luck is on your side today.",
+  await ctx.api.editMessageText(ctx.chat.id, msg.message_id,
+    "🃏 <b>Mystery Player Drop!</b>\n\nWatch a short video ad to receive a <b>random cricket player card</b>! Higher OVR = rarer drop. Max OVR: <b>86</b>. 🎴",
     { parse_mode: 'HTML', reply_markup: kb }
   );
 }
@@ -2021,7 +2076,7 @@ bot.command('history', async (ctx) => {
 
     const inlineKeyboard = new InlineKeyboard();
 
-    let hostStr = process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+    let hostStr = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
     const cleanHost = hostStr.replace(/^https?:\/\//, '');
 
     userMatches.forEach((row, idx) => {
@@ -4737,11 +4792,12 @@ function getCricketPlayerImageUrl(name) {
     return null;
 }
 
-// Serve player images case-insensitively
+// Serve player images case-insensitively with aggressive caching (30 days)
 app.get('/assets/players/:filename', (req, res) => {
     const requested = req.params.filename.toLowerCase();
     const actualFile = cricketImageCache.get(requested);
     if (actualFile) {
+        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 days
         res.sendFile(path.join(crickidexPlayersDir, actualFile));
     } else {
         res.status(404).send('Not found');
@@ -4750,13 +4806,25 @@ app.get('/assets/players/:filename', (req, res) => {
 
 app.get('/', (req, res) => res.send('Bot is safely running!'));
 
-app.use('/cricket', express.static(path.join(__dirname, 'public', 'cricket')));
+// Serve cricket static files with caching (7 days for JS/CSS assets)
+app.use('/cricket', express.static(path.join(__dirname, 'public', 'cricket'), {
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    setHeaders: (res, filepath) => {
+        if (filepath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour for HTML
+        } else {
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable'); // 7 days for JS/CSS
+        }
+    }
+}));
 app.get('/cricket', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     res.sendFile(path.join(__dirname, 'public', 'cricket', 'index.html'));
 });
 
-// Serve Mini App (Adsgram)
+// Serve Mini App (Adsgram) with short cache (1 hour)
 app.get('/bonus-app', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -4804,6 +4872,106 @@ app.get('/api/reward', async (req, res) => {
     } catch (error) {
         console.error('Reward error:', error);
         res.status(500).send('error');
+    }
+});
+
+// Mystery Player Drop Endpoint (Watch Ad → Get a random cricket player)
+app.get('/api/drop-player', async (req, res) => {
+    const { user_id, msg_id, chat_id } = req.query;
+    if (!user_id || !msg_id) return res.status(400).send('Missing params');
+
+    try {
+        const userId = parseInt(user_id);
+        const msgId = parseInt(msg_id);
+        const chatId = chat_id ? parseInt(chat_id) : userId;
+
+        // 0. Strict server-side cooldown check
+        const lastClaim = claimCooldowns.get(userId) || 0;
+        if (Date.now() - lastClaim < 60 * 60 * 1000) {
+            return res.status(429).json({ success: false, error: 'Cooldown active' });
+        }
+
+        // 1. Update cooldowns
+        claimCooldowns.set(userId, Date.now());
+        dropCooldowns.set(userId, Date.now());
+
+        // 2. Record claim
+        await sb.recordBonusClaim(userId).catch(e => console.error("Failed to record drop claim:", e));
+
+        // 3. Schedule reminder
+        pendingReminders.set(userId, Date.now() + (60 * 60 * 1000));
+
+        // 4. Get all cricket players + user's owned list
+        const allPlayers = await sb.getCricketPlayers();
+        const ownedRecords = await sb.getUserOwnedPlayers(userId);
+        const ownedCricketIds = ownedRecords.filter(o => o.sport === 'cricket').map(o => o.player_id);
+        const ownedCount = ownedCricketIds.length;
+
+        // 5. Pick a random player via weighted OVR selection
+        const pickedPlayer = getRandomPlayerDrop(allPlayers, ownedCricketIds);
+
+        const profile = await sb.getProfile(userId);
+        const userName = profile ? escapeHTML(profile.first_name) : "User";
+
+        // 6. If no unowned player available or squad is full (25), fall back to coins
+        if (!pickedPlayer || ownedCount >= 25) {
+            const coinAmount = getRandomReward();
+            const newBal = await sb.addCoins(userId, coinAmount);
+
+            if (msgId && msgId !== 0) {
+                await bot.api.editMessageText(chatId, msgId,
+                    `✅ <b>Mystery Drop Claimed!</b>\n\n<a href="tg://user?id=${userId}">${userName}</a> earned <b>${coinAmount}</b> coins!\n\n<i>Your squad is full! Sell a player to make room for card drops.</i>`,
+                    { parse_mode: 'HTML' }
+                ).catch(e => console.error("Edit failed:", e));
+            }
+
+            return res.json({
+                success: true,
+                type: 'coins',
+                coinAmount,
+                newBal,
+                reason: ownedCount >= 25 ? 'squad_full' : 'all_owned'
+            });
+        }
+
+        // 7. Award the player to the user
+        const awardResult = await sb.awardPlayer(userId, pickedPlayer.id, 'cricket');
+
+        if (!awardResult.success && !awardResult.alreadyOwned) {
+            return res.status(500).json({ success: false, error: 'Failed to award player' });
+        }
+
+        // 8. Build rarity info
+        const rarity = getPlayerDropRarity(pickedPlayer.ovr);
+        const imageUrl = getCricketPlayerImageUrl(pickedPlayer.name);
+
+        // 9. Edit bot message
+        if (msgId && msgId !== 0) {
+            await bot.api.editMessageText(chatId, msgId,
+                `🃏 <b>Mystery Drop Claimed!</b>\n\n<a href="tg://user?id=${userId}">${userName}</a> received ${rarity.emoji} <b>${escapeHTML(pickedPlayer.name)}</b> (${pickedPlayer.ovr} OVR ${rarity.label})!`,
+                { parse_mode: 'HTML' }
+            ).catch(e => console.error("Edit failed:", e));
+        }
+
+        res.json({
+            success: true,
+            type: 'player',
+            player: {
+                id: pickedPlayer.id,
+                name: pickedPlayer.name,
+                country: pickedPlayer.country,
+                role: pickedPlayer.role,
+                ovr: pickedPlayer.ovr,
+                tier: pickedPlayer.tier || 'Normal',
+                image_url: imageUrl
+            },
+            rarity,
+            alreadyOwned: awardResult.alreadyOwned || false
+        });
+
+    } catch (error) {
+        console.error('Drop player error:', error);
+        res.status(500).json({ success: false, error: 'internal error' });
     }
 });
 
@@ -6130,7 +6298,7 @@ if (require.main === module) {
         try {
           const kb = new InlineKeyboard().url("🎁 Claim Mystery Drop", `https://t.me/${botInfo?.username || 'bot'}?start=drop`);
           await bot.api.sendMessage(userId, 
-            "🎁 <b>Your Mystery Drop is available again!</b>\n\nYou can now claim another reward. Will you hit the 5,000 coin jackpot this time? 🍀", 
+            "🃏 <b>Your Mystery Player Drop is ready!</b>\n\nYou can now claim another random cricket player card. Will you land a 💎 ELITE card this time? 🍀", 
             { parse_mode: 'HTML', reply_markup: kb }
           );
         } catch (e) {
