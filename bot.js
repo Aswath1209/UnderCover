@@ -1188,7 +1188,7 @@ async function handleDropCommand(ctx) {
   const kb = new InlineKeyboard().url("📺 Watch & Claim Mystery Drop", directLink);
 
   await ctx.api.editMessageText(ctx.chat.id, msg.message_id,
-    "🃏 <b>Mystery Player Drop!</b>\n\nWatch a short video ad to receive a <b>random cricket player card</b>! Higher OVR = rarer drop. Max OVR: <b>86</b>. 🎴",
+    "🃏 <b>Mystery Drop is here!</b>\n\nTap below to claim your reward.",
     { parse_mode: 'HTML', reply_markup: kb }
   );
 }
