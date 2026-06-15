@@ -236,6 +236,11 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 const bot = new Bot(process.env.BOT_TOKEN);
+const { autoRetry } = require('@grammyjs/auto-retry');
+bot.api.config.use(autoRetry({
+  maxRetryAttempts: 3,
+  maxDelaySeconds: 30,
+}));
 let botInfo = null;
 const pendingReminders = new Map();
 
