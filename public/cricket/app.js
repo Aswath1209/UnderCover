@@ -20,11 +20,6 @@ let activeScorecardTab = 'innings1'; // 'innings1' or 'innings2'
 let lastBallUniqueId = null;
 let wasMyTurn = false;
 
-let currentSetupBatActiveSlot = 'striker';
-let setupSelectedStriker = null;
-let setupSelectedNonStriker = null;
-let setupSelectedBowler = null;
-
 // Initial Setup
 async function init() {
   const cleanParam = (val) => {
@@ -413,115 +408,78 @@ function renderSetupScreen() {
     battingSetup.classList.remove('hidden');
     bowlingSetup.classList.add('hidden');
     
-    const battingGrid = document.getElementById('batting-squad-grid');
-    if (battingGrid) {
+    const strikerContainer = document.getElementById('striker-list');
+    const nonStrikerContainer = document.getElementById('non-striker-list');
+    if (strikerContainer && nonStrikerContainer) {
       const getBatRating = (p) => p.batting_ovr || p.batting_rating || p.rating || p.ovr || 0;
       const sortedBatting = matchState.battingXI.map((p, idx) => ({ p, idx }))
         .sort((a, b) => getBatRating(b.p) - getBatRating(a.p));
 
-      if (setupSelectedStriker === null && setupSelectedNonStriker === null && sortedBatting.length >= 2) {
-        setupSelectedStriker = sortedBatting[0].idx.toString();
-        setupSelectedNonStriker = sortedBatting[1].idx.toString();
+      let sSel = strikerContainer.querySelector('.selection-item.selected')?.dataset.index;
+      let nsSel = nonStrikerContainer.querySelector('.selection-item.selected')?.dataset.index;
+
+      if (sSel === undefined && nsSel === undefined && sortedBatting.length >= 2) {
+        sSel = sortedBatting[0].idx.toString();
+        nsSel = sortedBatting[1].idx.toString();
       }
 
-      const updateBattingUI = () => {
-        const slotStriker = document.getElementById('slot-striker');
-        const slotNonStriker = document.getElementById('slot-non-striker');
-        const valStriker = document.getElementById('slot-val-striker');
-        const valNonStriker = document.getElementById('slot-val-non-striker');
-
-        slotStriker.classList.toggle('active-selection', currentSetupBatActiveSlot === 'striker');
-        slotNonStriker.classList.toggle('active-selection', currentSetupBatActiveSlot === 'non-striker');
-
-        if (setupSelectedStriker !== null) {
-          const p = matchState.battingXI[parseInt(setupSelectedStriker)];
-          valStriker.innerText = p.name;
-          slotStriker.classList.add('filled');
-        } else {
-          valStriker.innerText = 'Select Player';
-          slotStriker.classList.remove('filled');
-        }
-
-        if (setupSelectedNonStriker !== null) {
-          const p = matchState.battingXI[parseInt(setupSelectedNonStriker)];
-          valNonStriker.innerText = p.name;
-          slotNonStriker.classList.add('filled');
-        } else {
-          valNonStriker.innerText = 'Select Player';
-          slotNonStriker.classList.remove('filled');
-        }
-
-        slotStriker.onclick = () => { currentSetupBatActiveSlot = 'striker'; updateBattingUI(); };
-        slotNonStriker.onclick = () => { currentSetupBatActiveSlot = 'non-striker'; updateBattingUI(); };
-
-        battingGrid.innerHTML = '';
+      const buildList = (container, currentSel, otherSel, onSelect) => {
+        container.innerHTML = '';
         sortedBatting.forEach(({ p, idx }) => {
           const div = document.createElement('div');
           div.className = 'selection-item';
-          const isStriker = setupSelectedStriker === idx.toString();
-          const isNonStriker = setupSelectedNonStriker === idx.toString();
-
-          if (isStriker || isNonStriker) div.classList.add('selected');
+          div.dataset.index = idx;
           
-          let roleTag = p.role || 'Batsman';
-          if (isStriker) roleTag = 'STRIKER';
-          if (isNonStriker) roleTag = 'NON-STRIKER';
-
+          const isSelected = currentSel === idx.toString();
+          const isDisabled = otherSel === idx.toString();
+          
+          if (isSelected) div.classList.add('selected');
+          if (isDisabled) div.classList.add('disabled');
+          
           div.innerHTML = `
             <span class="selection-item-name">${p.name}</span>
-            <span class="selection-item-meta">${getBatRating(p)} OVR - ${roleTag}</span>
+            <span class="selection-item-meta">${getBatRating(p)} OVR - ${p.role || 'Batsman'}</span>
           `;
           
-          div.onclick = () => {
-             if (isStriker || isNonStriker) return;
-             if (currentSetupBatActiveSlot === 'striker') {
-               setupSelectedStriker = idx.toString();
-               currentSetupBatActiveSlot = 'non-striker';
-             } else {
-               setupSelectedNonStriker = idx.toString();
-               currentSetupBatActiveSlot = 'striker';
-             }
-             updateBattingUI();
-          };
-          battingGrid.appendChild(div);
+          if (!isDisabled) {
+            div.onclick = () => {
+              onSelect(idx.toString());
+            };
+          }
+          container.appendChild(div);
         });
       };
-      
-      updateBattingUI();
+
+      const updateLists = (newStriker, newNonStriker) => {
+        buildList(strikerContainer, newStriker, newNonStriker, (idx) => updateLists(idx, newNonStriker));
+        buildList(nonStrikerContainer, newNonStriker, newStriker, (idx) => updateLists(newStriker, idx));
+      };
+
+      updateLists(sSel, nsSel);
     }
   } else if (matchState.myRole === 'bowling' && !myConfirmed) {
     bowlingSetup.classList.remove('hidden');
     battingSetup.classList.add('hidden');
     
-    const bowlingGrid = document.getElementById('bowling-squad-grid');
-    if (bowlingGrid) {
+    const container = document.getElementById('bowler-list');
+    if (container) {
       const getBowlRating = (p) => p.bowling_ovr || p.bowling_rating || p.rating || p.ovr || 0;
       const sortedBowling = matchState.bowlingXI.map((p, idx) => ({ p, idx }))
         .sort((a, b) => getBowlRating(b.p) - getBowlRating(a.p));
 
-      if (setupSelectedBowler === null && sortedBowling.length > 0) {
-        setupSelectedBowler = sortedBowling[0].idx.toString();
+      let currentSel = container.querySelector('.selection-item.selected')?.dataset.index;
+      if (currentSel === undefined && sortedBowling.length > 0) {
+        currentSel = sortedBowling[0].idx.toString();
       }
 
-      const updateBowlingUI = () => {
-        const slotBowler = document.getElementById('slot-bowler');
-        const valBowler = document.getElementById('slot-val-bowler');
-
-        if (setupSelectedBowler !== null) {
-          const p = matchState.bowlingXI[parseInt(setupSelectedBowler)];
-          valBowler.innerText = p.name;
-          slotBowler.classList.add('filled');
-        } else {
-          valBowler.innerText = 'Select Player';
-          slotBowler.classList.remove('filled');
-        }
-
-        bowlingGrid.innerHTML = '';
+      const build = (selectedIdx) => {
+        container.innerHTML = '';
         sortedBowling.forEach(({ p, idx }) => {
           const div = document.createElement('div');
           div.className = 'selection-item';
-          const isSelected = setupSelectedBowler === idx.toString();
+          div.dataset.index = idx;
           
+          const isSelected = selectedIdx === idx.toString();
           if (isSelected) div.classList.add('selected');
           
           div.innerHTML = `
@@ -530,14 +488,13 @@ function renderSetupScreen() {
           `;
           
           div.onclick = () => {
-            setupSelectedBowler = idx.toString();
-            updateBowlingUI();
+            build(idx.toString());
           };
-          bowlingGrid.appendChild(div);
+          container.appendChild(div);
         });
       };
 
-      updateBowlingUI();
+      build(currentSel);
     }
   } else {
     // Spectator or already confirmed
@@ -602,12 +559,14 @@ async function submitSetup() {
   const body = { userId };
   
   if (isBatting) {
-    if (setupSelectedStriker === null || setupSelectedNonStriker === null) {
+    const strikerEl = document.querySelector('#striker-list .selection-item.selected');
+    const nonStrikerEl = document.querySelector('#non-striker-list .selection-item.selected');
+    if (!strikerEl || !nonStrikerEl) {
       alert("Please select both Striker and Non-Striker!");
       return;
     }
-    const sIdx = parseInt(setupSelectedStriker);
-    const nsIdx = parseInt(setupSelectedNonStriker);
+    const sIdx = parseInt(strikerEl.dataset.index);
+    const nsIdx = parseInt(nonStrikerEl.dataset.index);
     if (sIdx === nsIdx) {
       alert("Striker and Non-Striker cannot be the same player!");
       return;
@@ -615,11 +574,12 @@ async function submitSetup() {
     body.strikerIdx = sIdx;
     body.nonStrikerIdx = nsIdx;
   } else {
-    if (setupSelectedBowler === null) {
-      alert("Please select an opening bowler!");
+    const bowlerEl = document.querySelector('#bowler-list .selection-item.selected');
+    if (!bowlerEl) {
+      alert("Please select opening bowler!");
       return;
     }
-    body.bowlerIdx = parseInt(setupSelectedBowler);
+    body.bowlerIdx = parseInt(bowlerEl.dataset.index);
   }
 
   document.getElementById('submit-setup-btn').disabled = true;

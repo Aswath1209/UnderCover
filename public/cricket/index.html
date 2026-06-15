@@ -65,23 +65,17 @@
         <!-- BATTING SETUP -->
         <div id="batting-setup" class="setup-section hidden">
           <div class="glass-card">
-            <h3 class="section-title">Opening Batsmen Selection</h3>
-            <p class="section-description">Tap players from your squad to assign them as Striker and Non-Striker.</p>
+            <h3 class="section-title">Select Opening Batsmen</h3>
+            <p class="section-description">Choose who walks out to open the innings.</p>
             
-            <div class="selected-slots-row">
-              <div class="slot-box active-selection" id="slot-striker">
-                <span class="slot-label">STRIKER</span>
-                <span class="slot-value" id="slot-val-striker">Select Player</span>
-              </div>
-              <div class="slot-box" id="slot-non-striker">
-                <span class="slot-label">NON-STRIKER</span>
-                <span class="slot-value" id="slot-val-non-striker">Select Player</span>
-              </div>
+            <div class="form-group">
+              <label>Striker (Batsman 1)</label>
+              <div id="striker-list" class="selection-list"></div>
             </div>
             
-            <div class="form-group mt-3">
-              <label>Your Squad</label>
-              <div id="batting-squad-grid" class="selection-list premium-squad-grid"></div>
+            <div class="form-group">
+              <label>Non-Striker (Batsman 2)</label>
+              <div id="non-striker-list" class="selection-list"></div>
             </div>
           </div>
         </div>
@@ -89,19 +83,12 @@
         <!-- BOWLING SETUP -->
         <div id="bowling-setup" class="setup-section hidden">
           <div class="glass-card">
-            <h3 class="section-title">Opening Bowler Selection</h3>
-            <p class="section-description">Pick the bowler for the first over.</p>
+            <h3 class="section-title">Select Opening Bowler</h3>
+            <p class="section-description">Pick the bowler to bowl the first over of the match.</p>
             
-            <div class="selected-slots-row">
-              <div class="slot-box active-selection" id="slot-bowler">
-                <span class="slot-label">OPENING BOWLER</span>
-                <span class="slot-value" id="slot-val-bowler">Select Player</span>
-              </div>
-            </div>
-            
-            <div class="form-group mt-3">
-              <label>Available Bowlers</label>
-              <div id="bowling-squad-grid" class="selection-list premium-squad-grid"></div>
+            <div class="form-group">
+              <label>Opening Bowler</label>
+              <div id="bowler-list" class="selection-list"></div>
             </div>
           </div>
         </div>
