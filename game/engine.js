@@ -117,9 +117,16 @@ function calculateBallOutcome(
     baseCompatibility = SHOT_BALL_COMPATIBILITY[delivery]?.[shot] ?? 0.5;
   }
 
+  // Make great shots work better, poor shots fail more
+  if (baseCompatibility >= 0.75) {
+    baseCompatibility = Math.min(1.0, baseCompatibility * 1.15);
+  } else if (baseCompatibility <= 0.35) {
+    baseCompatibility = baseCompatibility * 0.4;
+  }
+
   // --- 4. Rating Factor ---
   const ratingDiff = (batsman.batting_rating || 50) - (bowler.bowling_rating || 50);
-  const ratingMultiplier = 1 + (ratingDiff / 120); // More than doubled the weight of rating diff
+  const ratingMultiplier = 1 + (ratingDiff / 90); // Increased OVR effect
 
   // --- Platoon Matchup (Left/Right) ---
   let matchupMultiplier = 1.0;
@@ -253,7 +260,7 @@ function calculateBallOutcome(
     }
   }
 
-  // --- 7. Momentum System ---
+  // --- 7. Momentum System & Match State ---
   const recentOutcomes = context.recentOutcomes || [];
   let momentumRunMult = 1.0;
   let momentumWicketMult = 1.0;
@@ -262,23 +269,38 @@ function calculateBallOutcome(
     const recentRuns = recentOutcomes.reduce((acc, curr) => acc + (curr.runs || 0), 0);
     const recentWickets = recentOutcomes.filter(curr => curr.isWicket).length;
     const recentDots = recentOutcomes.filter(curr => curr.runs === 0 && !curr.isWicket && !curr.isExtra).length;
+    const recentBoundaries = recentOutcomes.filter(curr => curr.isBoundary || curr.isSix).length;
 
     // Batting momentum
-    if (recentRuns >= 12) {
-      momentumRunMult += 0.15;
-      momentumWicketMult += 0.10; // extra aggression carries slight risk
-    } else if (recentRuns >= 8) {
-      momentumRunMult += 0.08;
+    if (recentRuns >= 14 || recentBoundaries >= 2) {
+      momentumRunMult += 0.25;
+      momentumWicketMult += 0.15; // extra aggression carries risk
+    } else if (recentRuns >= 8 || recentBoundaries >= 1) {
+      momentumRunMult += 0.12;
     }
 
     // Bowling momentum
-    if (recentWickets > 0) {
-      momentumWicketMult += 0.25;
+    if (recentWickets >= 2) {
+      momentumWicketMult += 0.40;
+      momentumRunMult -= 0.20;
+    } else if (recentWickets === 1) {
+      momentumWicketMult += 0.20;
       momentumRunMult -= 0.10;
     }
     if (recentDots >= 3) {
-      momentumWicketMult += 0.15;
-      momentumRunMult -= 0.08;
+      momentumWicketMult += 0.25;
+      momentumRunMult -= 0.15;
+    }
+  }
+
+  // Factor in remaining wickets
+  if (context?.wicketsDown !== undefined) {
+    const wicketsLeft = 10 - context.wicketsDown;
+    if (wicketsLeft <= 3) {
+      momentumWicketMult *= 1.3; // Tail end collapses faster
+      momentumRunMult *= 0.85;
+    } else if (wicketsLeft >= 8) {
+      momentumRunMult *= 1.1; // Top order stability
     }
   }
 

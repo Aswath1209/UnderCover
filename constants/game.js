@@ -226,12 +226,12 @@ const SHOT_BALL_COMPATIBILITY = {
     pull: 0.1, sweep: 0.3, cut: 0.2, leave: 0.3
   },
   inswinger_yorker: {
-    flick: 0.90, defend: 0.80, straight_drive: 0.50, leave: 0.01,
-    pull: 0.05, sweep: 0.15, cut: 0.02, loft: 0.1
+    flick: 0.90, defend: 0.80, straight_drive: 0.85, on_drive: 0.85, leave: 0.01,
+    pull: 0.01, sweep: 0.15, cut: 0.02, loft: 0.1
   },
   outswinger_yorker: {
-    leave: 0.90, defend: 0.80, straight_drive: 0.55, flick: 0.20,
-    pull: 0.02, sweep: 0.05, cut: 0.15, loft: 0.1
+    leave: 0.90, defend: 0.80, cut: 0.75, square_cut: 0.75, straight_drive: 0.55, flick: 0.10,
+    pull: 0.02, sweep: 0.05, loft: 0.1
   },
 
   // 2. Full Length Variations
@@ -248,12 +248,12 @@ const SHOT_BALL_COMPATIBILITY = {
     pull: 0.50, sweep: 0.60, cut: 0.50, leave: 0.5
   },
   inswinger_full_length: {
-    flick: 0.90, straight_drive: 0.80, defend: 0.75, sweep: 0.50,
-    leave: 0.3, pull: 0.2, cut: 0.15, loft: 0.6
+    flick: 0.90, straight_drive: 0.85, on_drive: 0.85, defend: 0.75, sweep: 0.50,
+    leave: 0.3, pull: 0.1, cut: 0.15, loft: 0.6
   },
   outswinger_full_length: {
-    straight_drive: 0.85, leave: 0.80, defend: 0.75, cut: 0.50,
-    flick: 0.2, pull: 0.1, sweep: 0.1, loft: 0.5
+    cut: 0.85, square_cut: 0.85, straight_drive: 0.85, leave: 0.80, defend: 0.75,
+    flick: 0.1, pull: 0.1, sweep: 0.1, loft: 0.5
   },
 
   // 3. Good Length Variations
@@ -270,12 +270,12 @@ const SHOT_BALL_COMPATIBILITY = {
     pull: 0.5, sweep: 0.3, cut: 0.5, leave: 0.7
   },
   inswinger_good_length: {
-    defend: 0.85, flick: 0.80, straight_drive: 0.60, leave: 0.40,
-    pull: 0.3, sweep: 0.2, cut: 0.15, loft: 0.3
+    defend: 0.85, flick: 0.80, straight_drive: 0.75, on_drive: 0.75, leave: 0.40,
+    pull: 0.15, sweep: 0.2, cut: 0.15, loft: 0.3
   },
   outswinger_good_length: {
-    leave: 0.95, defend: 0.85, straight_drive: 0.50, cut: 0.60,
-    flick: 0.15, pull: 0.2, sweep: 0.1, loft: 0.3
+    cut: 0.90, square_cut: 0.90, leave: 0.95, defend: 0.85, straight_drive: 0.50,
+    flick: 0.10, pull: 0.15, sweep: 0.1, loft: 0.3
   },
 
   // 4. Short Variations
@@ -292,12 +292,12 @@ const SHOT_BALL_COMPATIBILITY = {
     straight_drive: 0.4, flick: 0.5, sweep: 0.2, leave: 0.6
   },
   inswinger_short: {
-    pull: 0.90, defend: 0.60, leave: 0.70, flick: 0.65,
-    cut: 0.4, straight_drive: 0.15, sweep: 0.1, loft: 0.3
+    defend: 0.60, leave: 0.70, flick: 0.65, straight_drive: 0.60, on_drive: 0.60,
+    pull: 0.15, cut: 0.2, sweep: 0.1, loft: 0.3
   },
   outswinger_short: {
-    cut: 0.90, leave: 0.85, pull: 0.75, defend: 0.60,
-    straight_drive: 0.2, flick: 0.1, sweep: 0.05, loft: 0.4
+    cut: 0.95, square_cut: 0.95, leave: 0.85, defend: 0.60, pull: 0.50,
+    straight_drive: 0.1, flick: 0.05, sweep: 0.05, loft: 0.4
   },
 
   // 5. Bouncer Variations
@@ -314,12 +314,12 @@ const SHOT_BALL_COMPATIBILITY = {
     cut: 0.6, straight_drive: 0.1, flick: 0.2, sweep: 0.05
   },
   inswinger_bouncer: {
-    leave: 0.90, pull: 0.80, defend: 0.30, cut: 0.35,
+    pull: 0.95, hook: 0.90, leave: 0.90, defend: 0.30, cut: 0.35,
     straight_drive: 0.02, flick: 0.1, sweep: 0.01, loft: 0.25
   },
   outswinger_bouncer: {
-    leave: 0.95, pull: 0.70, cut: 0.60, defend: 0.30,
-    straight_drive: 0.02, flick: 0.05, sweep: 0.01, loft: 0.25
+    cut: 0.95, square_cut: 0.95, leave: 0.95, upper_cut: 0.90, defend: 0.30, pull: 0.50,
+    straight_drive: 0.01, flick: 0.02, sweep: 0.01, loft: 0.25
   },
 
   // --- SPINNERS ---
@@ -337,14 +337,14 @@ const SHOT_BALL_COMPATIBILITY = {
     drive_on_the_up: 0.85, leave: 0.6,
   },
   inswinger: {
-    flick: 0.85, defend: 0.8, on_drive: 0.75, straight_drive: 0.65,
+    flick: 0.85, defend: 0.8, on_drive: 0.85, straight_drive: 0.80,
     leave: 0.5, glance: 0.75, paddle: 0.7,
-    cut: 0.15, cover_drive: 0.2, pull: 0.2,
+    cut: 0.15, cover_drive: 0.2, pull: 0.15,
   },
   outswinger: {
-    leave: 0.9, defend: 0.8, cover_drive: 0.75, off_drive: 0.7,
-    cut: 0.65, late_cut: 0.75, straight_drive: 0.55,
-    flick: 0.15, on_drive: 0.15, pull: 0.2,
+    cut: 0.90, square_cut: 0.90, leave: 0.9, defend: 0.8, cover_drive: 0.75, off_drive: 0.7,
+    late_cut: 0.75, straight_drive: 0.55,
+    flick: 0.15, on_drive: 0.15, pull: 0.15,
   },
   off_break: {
     sweep: 0.85, defend: 0.8, slog_sweep: 0.75, straight_drive: 0.7,

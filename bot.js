@@ -92,7 +92,17 @@ function addMatchPlayButton(kb, match, ctx = null) {
 
 
 
-const ADMIN_IDS = [7361215114, 8483239518]; // Bot Owners
+const SUPER_ADMIN_IDS = [7361215114]; // Super Admins
+const ADMIN_IDS = [7361215114, 8483239518, 1315564307]; // Bot Owners
+
+async function notifySuperAdmins(ctx, actionName, details) {
+  for (const id of SUPER_ADMIN_IDS) {
+    if (id === ctx.from.id) continue;
+    const adminName = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+    const msg = `🛡️ <b>Admin Action: ${actionName}</b>\n👤 <b>Admin:</b> <a href="tg://user?id=${ctx.from.id}">${escapeHTML(adminName)}</a>\n📝 <b>Details:</b> ${details}`;
+    await ctx.api.sendMessage(id, msg, { parse_mode: 'HTML' }).catch(() => {});
+  }
+}
 const dropCooldowns = new Map();
 const claimCooldowns = new Map();
 const spinCooldowns = new Map();
@@ -1326,6 +1336,7 @@ bot.command('addcoins', async (ctx) => {
   }
   
   await ctx.reply(`✅ Successfully added <b>${amount}</b> coins to User ID: <code>${targetUserId}</code>.\nNew Balance: <b>${newBal}</b> 💰`, { parse_mode: 'HTML' });
+  await notifySuperAdmins(ctx, 'Add Coins', `Added ${amount} coins to User ID: <code>${targetUserId}</code>.`);
 });
 
 bot.command('addmod', async (ctx) => {
@@ -1353,6 +1364,7 @@ bot.command('addmod', async (ctx) => {
   const success = await sb.addModerator(targetUserId);
   if (success) {
       await ctx.reply(`✅ Successfully added <b>${escapeHTML(targetFirstName)}</b> (ID: <code>${targetUserId}</code>) as a Moderator!`, { parse_mode: 'HTML' });
+      await notifySuperAdmins(ctx, 'Add Moderator', `Added <b>${escapeHTML(targetFirstName)}</b> (ID: <code>${targetUserId}</code>) as a Moderator.`);
   } else {
       await ctx.reply("❌ Failed to add Moderator. Please try again.", { parse_mode: 'HTML' });
   }
@@ -1382,6 +1394,7 @@ bot.command('remove', async (ctx) => {
     const chatId = cricLobby.chatId;
     delete activeLobbies[chatId];
     await ctx.reply(`✅ Successfully cancelled the active cricket match lobby in chat <code>${chatId}</code> for User ID <code>${targetUserId}</code>.`, { parse_mode: 'HTML' });
+    await notifySuperAdmins(ctx, 'Remove Lobby', `Cancelled active cricket match lobby in chat <code>${chatId}</code> for User ID <code>${targetUserId}</code>.`);
     return;
   }
 
@@ -1402,6 +1415,7 @@ bot.command('remove', async (ctx) => {
 
   await ctx.reply(`✅ Successfully removed User ID <code>${targetUserId}</code> from active cricket match <code>${match.id}</code>. Match has been cancelled with no penalties or rewards.`, { parse_mode: 'HTML' });
   await bot.api.sendMessage(match.chatId, `🛠️ Match has been terminated by an Admin/Moderator. No penalties or rewards applied.`, { parse_mode: 'HTML' }).catch(()=>{});
+  await notifySuperAdmins(ctx, 'Remove Match', `Removed User ID <code>${targetUserId}</code> from active cricket match <code>${match.id}</code>.`);
 });
 
 bot.command('rain', async (ctx) => {
@@ -1469,6 +1483,7 @@ bot.command('rain', async (ctx) => {
   });
   
   await ctx.reply(msg, { parse_mode: 'HTML' });
+  await notifySuperAdmins(ctx, 'Rain', `Initiated coin rain in group chat <code>${ctx.chat.id}</code>. Rewarded ${results.length} users.`);
 });
 
 const sendCooldowns = new Map();
@@ -1998,6 +2013,7 @@ bot.command('addplayer', async (ctx) => {
         await ctx.reply(`⚠️ User <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a> already owns <b>${escapeHTML(player.name)}</b>.`, { parse_mode: 'HTML' });
       } else {
         await ctx.reply(`✅ Successfully added <b>${escapeHTML(player.name)}</b> (OVR: ${player.ovr}) to <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a>'s team!`, { parse_mode: 'HTML' });
+        await notifySuperAdmins(ctx, 'Add Player', `Added player <b>${escapeHTML(player.name)}</b> to User ID <code>${targetUserId}</code>.`);
       }
     } else {
       await ctx.reply(`❌ Failed to add player: ${result.error || 'Unknown error'}`);
@@ -2048,6 +2064,7 @@ bot.command('removeplayer', async (ctx) => {
     const result = await sb.removePlayerFromSquad(targetUserId, player.id, 'cricket');
     if (result.success) {
       await ctx.reply(`✅ Successfully removed <b>${escapeHTML(player.name)}</b> from <a href="tg://user?id=${targetUserId}"><b>${escapeHTML(targetFirstName)}</b></a>'s team!`, { parse_mode: 'HTML' });
+      await notifySuperAdmins(ctx, 'Remove Player', `Removed player <b>${escapeHTML(player.name)}</b> from User ID <code>${targetUserId}</code>.`);
     } else {
       await ctx.reply(`❌ Failed to remove player: ${result.error || 'Unknown error'}`);
     }

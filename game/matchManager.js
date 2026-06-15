@@ -156,8 +156,19 @@ class Match {
     this.currentInningsIdx = 0;
     this.status = 'innings1';
     
-    this.strikerIdx = strikerIdx !== undefined ? strikerIdx : 0;
-    this.nonStrikerIdx = nonStrikerIdx !== undefined ? nonStrikerIdx : 1;
+    if (strikerIdx !== undefined && nonStrikerIdx !== undefined) {
+      this.strikerIdx = strikerIdx;
+      this.nonStrikerIdx = nonStrikerIdx;
+    } else {
+      const batsmenWithIdx = battingTeam.xi.map((p, idx) => ({ p, idx }));
+      batsmenWithIdx.sort((a, b) => {
+        if (a.p.batting_archetype === 'Opener' && b.p.batting_archetype !== 'Opener') return -1;
+        if (b.p.batting_archetype === 'Opener' && a.p.batting_archetype !== 'Opener') return 1;
+        return (b.p.batting_rating || 0) - (a.p.batting_rating || 0);
+      });
+      this.strikerIdx = batsmenWithIdx[0].idx;
+      this.nonStrikerIdx = batsmenWithIdx[1].idx;
+    }
     
     this.nextBatsmanIdx = 0;
     while (this.nextBatsmanIdx === this.strikerIdx || this.nextBatsmanIdx === this.nonStrikerIdx) {
@@ -210,9 +221,18 @@ class Match {
     } else {
       // PvE/AI: Auto-select AI roles
       if (battingTeam.telegramId === 'ai') {
-        this.strikerIdx = 0;
-        this.nonStrikerIdx = 1;
-        this.nextBatsmanIdx = 2;
+        const batsmenWithIdx = battingTeam.xi.map((p, idx) => ({ p, idx }));
+        batsmenWithIdx.sort((a, b) => {
+          if (a.p.batting_archetype === 'Opener' && b.p.batting_archetype !== 'Opener') return -1;
+          if (b.p.batting_archetype === 'Opener' && a.p.batting_archetype !== 'Opener') return 1;
+          return (b.p.batting_rating || 0) - (a.p.batting_rating || 0);
+        });
+        this.strikerIdx = batsmenWithIdx[0].idx;
+        this.nonStrikerIdx = batsmenWithIdx[1].idx;
+        this.nextBatsmanIdx = 0;
+        while (this.nextBatsmanIdx === this.strikerIdx || this.nextBatsmanIdx === this.nonStrikerIdx || this.nextBatsmanIdx < 2) {
+          this.nextBatsmanIdx++;
+        }
       }
       if (bowlingTeam.telegramId === 'ai') {
         this.selectBestBowler();
@@ -277,14 +297,33 @@ class Match {
       this.currentBowlerIdx = this.bowlingTeam.xi.length - 1; // absolute fallback
       return;
     }
-    // AI selects bowler with highest bowling rating
+    // Context-aware bowler selection
     let bestIdx = indices[0];
-    let bestRating = -1;
+    let bestScore = -1000;
+    
+    const currentOver = Math.floor(this.currentInnings.balls / 6);
+    const totalOvers = this.totalOvers;
+    let phase = 'middle';
+    if (totalOvers <= 5) {
+      phase = currentOver < 1 ? 'powerplay' : (currentOver >= totalOvers - 1 ? 'death' : 'middle');
+    } else if (totalOvers <= 10) {
+      phase = currentOver < 2 ? 'powerplay' : (currentOver >= totalOvers - 2 ? 'death' : 'middle');
+    } else {
+      phase = currentOver < (totalOvers/3) ? 'powerplay' : (currentOver >= totalOvers - Math.ceil(totalOvers/4) ? 'death' : 'middle');
+    }
+
     indices.forEach(idx => {
       const p = this.bowlingTeam.xi[idx];
-      const rating = p.bowling_rating || 50;
-      if (rating > bestRating) {
-        bestRating = rating;
+      let score = p.bowling_rating || 50;
+      
+      if (this.pitch === 'spin' && p.bowler_type?.includes('spin')) score += 10;
+      if (this.pitch === 'pace' && p.bowler_type?.includes('fast')) score += 10;
+      
+      if (phase === 'death' && p.bowler_type?.includes('fast')) score += 15;
+      if (phase === 'middle' && p.bowler_type?.includes('spin')) score += 15;
+      
+      if (score > bestScore) {
+        bestScore = score;
         bestIdx = idx;
       }
     });
@@ -457,14 +496,68 @@ class Match {
     return outcome;
   }
 
+  triggerSuperOver() {
+    this.isSuperOver = true;
+    this.totalOvers = 1;
+    this.commentary.push({ text: "🔥 <b>SCORES ARE TIED! IT'S TIME FOR A SUPER OVER!</b> 🔥" });
+
+    // Team that batted second bats first in super over
+    const teamBattingSecond = this.battingTeam;
+    const teamBattingFirst = this.bowlingTeam;
+
+    this.innings = [
+      {
+        battingId: teamBattingSecond.telegramId,
+        bowlingId: teamBattingFirst.telegramId,
+        runs: 0, wickets: 0, balls: 0, extras: 0, target: null
+      },
+      {
+        battingId: teamBattingFirst.telegramId,
+        bowlingId: teamBattingSecond.telegramId,
+        runs: 0, wickets: 0, balls: 0, extras: 0, target: null
+      }
+    ];
+    this.currentInningsIdx = 0;
+    this.status = 'innings1';
+    
+    this.strikerIdx = null;
+    this.nonStrikerIdx = null;
+    this.currentBowlerIdx = null;
+    this.nextBatsmanIdx = 2;
+    this.lastBowlerId = null;
+
+    if (this.type === 'pvp') {
+      this.status = 'xi_selection';
+      this.turnState = 'selecting_wicket_batsman';
+    } else {
+      if (teamBattingSecond.telegramId === 'ai') {
+        const batsmenWithIdx = teamBattingSecond.xi.map((p, idx) => ({ p, idx }));
+        batsmenWithIdx.sort((a, b) => (b.p.batting_rating || 0) - (a.p.batting_rating || 0));
+        this.strikerIdx = batsmenWithIdx[0].idx;
+        this.nonStrikerIdx = batsmenWithIdx[1].idx;
+        this.nextBatsmanIdx = 2;
+      } else {
+        this.status = 'xi_selection';
+        this.turnState = 'selecting_wicket_batsman';
+      }
+      if (teamBattingFirst.telegramId === 'ai') {
+        this.selectBestBowler();
+      }
+    }
+
+    return { isSuperOverTriggered: true };
+  }
+
   checkInningsEnded() {
     const current = this.currentInnings;
     if (this.status === 'innings1') {
-      return current.wickets >= 10 || current.balls >= this.totalOvers * 6;
+      const maxWickets = this.isSuperOver ? 2 : 10;
+      return current.wickets >= maxWickets || current.balls >= this.totalOvers * 6;
     }
     if (this.status === 'innings2') {
       const targetChased = current.runs >= current.target;
-      const allOut = current.wickets >= 10;
+      const maxWickets = this.isSuperOver ? 2 : 10;
+      const allOut = current.wickets >= maxWickets;
       const oversFinished = current.balls >= this.totalOvers * 6;
       return targetChased || allOut || oversFinished;
     }
@@ -488,6 +581,11 @@ class Match {
       winner = isHostBatting1 ? this.host : this.guest;
       const isWinnerHost = winner.telegramId && this.host.telegramId && (winner.telegramId.toString() === this.host.telegramId.toString());
       loser = isWinnerHost ? this.guest : this.host;
+    } else if (inn2.runs === inn1.runs && !this.isSuperOver) {
+      return this.triggerSuperOver();
+    } else if (inn2.runs === inn1.runs && this.isSuperOver) {
+      winner = Math.random() < 0.5 ? this.host : this.guest;
+      loser = winner.telegramId === this.host.telegramId ? this.guest : this.host;
     }
 
     const winnerReward = this.totalOvers * gameConstants.WINNER_REWARD_PER_OVER;
@@ -608,7 +706,8 @@ class Match {
       hostConfirmed: this.hostConfirmed,
       guestConfirmed: this.guestConfirmed,
       activeScorecardMessageId: this.activeScorecardMessageId,
-      lastActivity: this.lastActivity
+      lastActivity: this.lastActivity,
+      isSuperOver: this.isSuperOver
     };
   }
 }
@@ -649,6 +748,7 @@ function deserializeMatch(data) {
   match.guestConfirmed = data.guestConfirmed;
   match.activeScorecardMessageId = data.activeScorecardMessageId;
   match.lastActivity = data.lastActivity || Date.now();
+  match.isSuperOver = data.isSuperOver || false;
   return match;
 }
 
