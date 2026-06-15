@@ -4840,7 +4840,7 @@ app.get('/assets/players/:filename', (req, res) => {
     }
 });
 
-app.get('/', (req, res) => res.send('Bot is safely running!'));
+app.get('/', (req, res) => res.redirect('/cricket'));
 
 // Serve cricket static files with caching (7 days for JS/CSS assets)
 app.use('/cricket', express.static(path.join(__dirname, 'public', 'cricket'), {
