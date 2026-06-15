@@ -3305,8 +3305,11 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     if (matchManager.getActiveMatch(user.id) || getUserActiveLobby(user.id)) {
-      return ctx.answerCallbackQuery({ text: "❌ You are already in an active match or lobby!", show_alert: true });
+      return ctx.answerCallbackQuery({ text: "❌ You are already in an active match or lobby!", show_alert: true }).catch(() => {});
     }
+
+    // Answer immediately to avoid timeout while fetching DB records
+    await ctx.answerCallbackQuery({ text: '⏳ Joining match lobby...' }).catch(() => {});
 
     const guestId = user.id;
     const guestUsername = user.username || user.first_name || 'Guest';
@@ -3356,12 +3359,14 @@ bot.on('callback_query:data', async (ctx) => {
       const keyboard = new InlineKeyboard()
         .text('Bat First 🏏', 'cric_decision:bat')
         .text('Bowl First 🎳', 'cric_decision:bowl');
-
-      await ctx.answerCallbackQuery({ text: '✅ Joined match lobby!' });
       await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
     } catch (err) {
       console.error("Lobby join error:", err);
-      ctx.reply("❌ Error joining lobby: " + err.message);
+      if (err.description && err.description.includes("query is too old")) {
+        // Ignore silent timeout errors
+        return;
+      }
+      ctx.reply("❌ Error joining lobby: " + err.message).catch(() => {});
     }
     return;
   }
