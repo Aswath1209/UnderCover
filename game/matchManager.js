@@ -505,6 +505,11 @@ class Match {
     const teamBattingSecond = this.battingTeam;
     const teamBattingFirst = this.bowlingTeam;
 
+    // Reset stats so super over starts clean (and bowler caps do not apply from main match)
+    this.stats = {};
+    this.initPlayerStats(teamBattingFirst.xi);
+    this.initPlayerStats(teamBattingSecond.xi);
+
     this.innings = [
       {
         battingId: teamBattingSecond.telegramId,

@@ -5970,18 +5970,23 @@ async function processBallAndProgress(ctx, match) {
 
           let marginText = '';
           if (result && result.winner) {
-            const inn1 = match.innings[0];
-            const inn2 = match.innings[1];
-            const winnerId = result.winner.telegramId ? result.winner.telegramId.toString() : '';
-            const inn2BattingId = inn2?.battingId ? inn2.battingId.toString() : '';
-            const isWinnerInn2 = winnerId && winnerId === inn2BattingId;
-            
-            if (isWinnerInn2) {
-              const wicketsWonBy = 10 - (inn2?.wickets || 0);
-              marginText = `won by ${wicketsWonBy} wicket${wicketsWonBy > 1 ? 's' : ''}`;
+            if (match.isSuperOver) {
+              marginText = `won the Super Over`;
             } else {
-              const runsWonBy = (inn1?.runs || 0) - (inn2?.runs || 0);
-              marginText = `won by ${runsWonBy} run${runsWonBy > 1 ? 's' : ''}`;
+              const inn1 = match.innings[0];
+              const inn2 = match.innings[1];
+              const winnerId = result.winner.telegramId ? result.winner.telegramId.toString() : '';
+              const inn2BattingId = inn2?.battingId ? inn2.battingId.toString() : '';
+              const isWinnerInn2 = winnerId && winnerId === inn2BattingId;
+              
+              if (isWinnerInn2) {
+                const maxWickets = 10;
+                const wicketsWonBy = maxWickets - (inn2?.wickets || 0);
+                marginText = `won by ${wicketsWonBy} wicket${wicketsWonBy > 1 ? 's' : ''}`;
+              } else {
+                const runsWonBy = (inn1?.runs || 0) - (inn2?.runs || 0);
+                marginText = `won by ${runsWonBy} run${runsWonBy > 1 ? 's' : ''}`;
+              }
             }
           }
 
