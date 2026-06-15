@@ -238,8 +238,8 @@ setInterval(() => {
 const bot = new Bot(process.env.BOT_TOKEN);
 const { autoRetry } = require('@grammyjs/auto-retry');
 bot.api.config.use(autoRetry({
-  maxRetryAttempts: 3,
-  maxDelaySeconds: 30,
+  maxRetryAttempts: 10,
+  maxDelaySeconds: 300,
 }));
 let botInfo = null;
 const pendingReminders = new Map();
@@ -2214,9 +2214,18 @@ bot.command('hilo', async (ctx) => {
   state.messageId = msg.message_id;
 });
 
+const flyCooldowns = new Map();
+
 bot.command('fly', async (ctx) => {
   if (!sb.supabase) return ctx.reply("Database disabled.");
     const userId = ctx.from.id;
+    
+    // Prevent spam clogging the telegram API limit
+    const lastFly = flyCooldowns.get(userId);
+    if (lastFly && Date.now() - lastFly < 4000) {
+        return; // Silently ignore to avoid ratelimit
+    }
+    flyCooldowns.set(userId, Date.now());
     const args = ctx.message.text.split(' ');
     
     const betStr = args[1];
