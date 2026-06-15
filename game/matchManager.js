@@ -496,7 +496,7 @@ class Match {
     return outcome;
   }
 
-  triggerSuperOver() {
+  triggerSuperOver(runs, wickets, balls) {
     this.isSuperOver = true;
     this.totalOvers = 1;
     this.commentary.push({ text: "🔥 <b>SCORES ARE TIED! IT'S TIME FOR A SUPER OVER!</b> 🔥" });
@@ -545,7 +545,12 @@ class Match {
       }
     }
 
-    return { isSuperOverTriggered: true };
+    return { 
+      isSuperOverTriggered: true,
+      tiedRuns: runs,
+      tiedWickets: wickets,
+      tiedBalls: balls
+    };
   }
 
   checkInningsEnded() {
@@ -582,7 +587,7 @@ class Match {
       const isWinnerHost = winner.telegramId && this.host.telegramId && (winner.telegramId.toString() === this.host.telegramId.toString());
       loser = isWinnerHost ? this.guest : this.host;
     } else if (inn2.runs === inn1.runs && !this.isSuperOver) {
-      return this.triggerSuperOver();
+      return this.triggerSuperOver(inn2.runs, inn2.wickets, inn2.balls);
     } else if (inn2.runs === inn1.runs && this.isSuperOver) {
       winner = Math.random() < 0.5 ? this.host : this.guest;
       loser = winner.telegramId === this.host.telegramId ? this.guest : this.host;

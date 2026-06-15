@@ -5941,6 +5941,23 @@ async function processBallAndProgress(ctx, match) {
         try {
           const result = await match.finalizeMatch();
           
+          if (result && result.isSuperOverTriggered) {
+             match.commentary.unshift({
+               type: 'end_of_innings',
+               inningsIdx: 1,
+               runs: result.tiedRuns || 0,
+               wickets: result.tiedWickets || 0,
+               overs: `${Math.floor((result.tiedBalls || 0) / 6)}.${(result.tiedBalls || 0) % 6}`,
+               target: null
+             });
+             if (match.type !== 'pvp') {
+                await sendTelegramMessage(match, `🛎️ <b>Innings Complete!</b>\n\nScores are level! We are going to a <b>SUPER OVER</b>! 🔥`);
+             }
+             matchManager.saveToDb(match);
+             await runGameLoopStep(null, match, true);
+             return;
+          }
+
           match.commentary.unshift({
             type: 'end_of_innings',
             inningsIdx: 1,
