@@ -1001,7 +1001,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('c80aa961-45c1-42b3-aeaa-1099b9985bf1', 'Harleen Deol', 'India', 'batsman', 78, 45, 78, 'leg_spin', 10250, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Balanced'),
   ('c84c88a1-3aa3-4fe2-8c06-e244d5c651d0', 'Sneh Rana', 'India', 'bowler', 46, 77, 77, 'off_spin', 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Balanced'),
   ('c8511a67-d0a2-44dd-a813-1759560b50f8', 'Arlene Kelly', 'Ireland', 'all_rounder', 65, 78, 78, 'fast', 10250, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Balanced'),
-  ('c85aa037-75de-433d-b7e1-43bf579d8b20', 'Shoaib Akhtar', 'Pakistan', 'bowler', 36, 96, 97, 'fast', 3605000, null, '2026-03-12 14:09:43.586112+00', 'Legendary', null, 'Strike'),
+  ('c85aa037-75de-433d-b7e1-43bf579d8b20', 'Shoaib Akhtar', 'Pakistan', 'bowler', 36, 97, 97, 'fast', 3605000, null, '2026-03-12 14:09:43.586112+00', 'Legendary', null, 'Strike'),
   ('c85bfe55-1603-49be-888a-a37beb7259f1', 'Brandon Glover', 'Netherlands', 'bowler', 36, 78, 79, 'fast', 14600, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Balanced'),
   ('c893f9d3-fab6-4e41-b20d-6ced376c51d4', 'Mitchell Santner', 'New Zealand', 'all_rounder', 82, 87, 88, 'off_spin', 650575, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Brute', 'Economy'),
   ('c8963c06-a001-42f3-8e78-be236c6bde44', 'Ricky Bhui', 'India', 'batsman', 77, 29, 77, null, 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),

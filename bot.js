@@ -32,7 +32,6 @@ function resolvePlayerPrice(player, acquiredAt) {
 const gameConstants = require('./constants/game');
 const ai = require('./game/ai');
 const { DEFAULT_XI } = require('./game/matchManager');
-const { generateScoreboardImage } = require('./game/scoreboardGenerator');
 const activeLobbies = {};
 
 function getUserActiveLobby(userId) {
@@ -131,18 +130,11 @@ function getRandomReward() {
  * Pick a random cricket player for the Mystery Drop.
  * OVR range: ~50 to 86 (capped by DB data).
  *
- * Weight formula: w(ovr) = e^(-k * (ovr - 50))   where k = 0.09
+ * Weight formula: w(ovr) = e^(-k * (ovr - 50))   where k = 0.42
  *
- * This gives an exponential decay so that every +1 OVR is ~9% harder to get:
- *   OVR 50 → weight 1.000 (baseline)
- *   OVR 60 → weight 0.407  (~40% chance relative to base)
- *   OVR 70 → weight 0.165  (~16% chance relative to base)
- *   OVR 80 → weight 0.067  (~7% chance relative to base)
- *   OVR 86 → weight 0.041  (~4% chance relative to base)
- *
- * In practice with a real player list the final per-player probability also
- * depends on how many players share each OVR, so high-OVR players are doubly
- * rare (low weight AND fewer of them in the pool).
+ * This gives a very steep exponential decay so that high OVR players (80+)
+ * are very rare, and low OVR players (under 76 OVR) represent about 80% of drops,
+ * making the lowest OVRs (like 64) easily obtainable.
  *
  * @param {Array} players - Full cricketplayers array from DB
  * @param {Array} ownedIds - Player IDs the user already owns (excluded)
@@ -150,7 +142,7 @@ function getRandomReward() {
  */
 function getRandomPlayerDrop(players, ownedIds = []) {
   const MAX_OVR = 86;
-  const K = 0.09; // decay constant
+  const K = 0.42; // decay constant
 
   // Filter to only unowned cricket players at or below the cap
   const ownedSet = new Set(ownedIds);
@@ -2349,9 +2341,13 @@ bot.command(['blackjack', 'deal'], async (ctx) => {
   const betStr = args[1];
 
   if (!betStr || isNaN(betStr) || parseInt(betStr) <= 0) {
-    return ctx.reply("🃏 <b>Blackjack</b>\n\nUsage: /blackjack <bet>\nExample: /blackjack 500", { parse_mode: 'HTML' });
+    return ctx.reply("🃏 <b>Blackjack</b>\n\nUsage: /blackjack <bet>\nExample: /blackjack 500\nMaximum Bet: 10,000 coins", { parse_mode: 'HTML' });
   }
   const bet = parseInt(betStr);
+
+  if (bet > 10000) {
+    return ctx.reply("❌ The maximum bet limit for Blackjack is 10,000 coins.");
+  }
 
   const profile = await sb.getProfile(userId);
   if (!profile || (profile.coins || 0) < bet) {
@@ -2366,10 +2362,20 @@ bot.command(['blackjack', 'deal'], async (ctx) => {
   const deduct = await sb.addCoins(userId, -bet);
   if (deduct === false) return ctx.reply("❌ Error processing bet.");
 
-  const deck = bjManager.createDeck();
-  const playerHand = [deck.pop(), deck.pop()];
-  const dealerHand = [deck.pop(), deck.pop()];
-  
+  let deck = bjManager.createDeck();
+  let playerHand = [deck.pop(), deck.pop()];
+  let dealerHand = [deck.pop(), deck.pop()];
+
+  const shouldLose = Math.random() < 0.75; // 75% chance of forcing a loss
+
+  if (shouldLose) {
+    while (bjManager.calculateScore(playerHand) === 21) {
+      deck = bjManager.createDeck();
+      playerHand = [deck.pop(), deck.pop()];
+      dealerHand = [deck.pop(), deck.pop()];
+    }
+  }
+
   const state = {
     userId,
     bet,
@@ -2377,6 +2383,7 @@ bot.command(['blackjack', 'deal'], async (ctx) => {
     playerHand,
     dealerHand,
     status: 'PLAYING',
+    shouldLose,
     chatId: ctx.chat.id
   };
 
@@ -2394,15 +2401,65 @@ bot.command(['blackjack', 'deal'], async (ctx) => {
   activeBJ.set(userId, state);
 });
 
+function getPlayerHitCard(state) {
+  const pScore = bjManager.calculateScore(state.playerHand);
+  if (state.shouldLose && Math.random() < 0.8) {
+    let targetIndices = [];
+    for (let i = 0; i < state.deck.length; i++) {
+      const tempHand = [...state.playerHand, state.deck[i]];
+      const tempScore = bjManager.calculateScore(tempHand);
+      if (pScore >= 12) {
+        if (tempScore > 21) {
+          targetIndices.push(i);
+        }
+      } else {
+        if (tempScore >= 12 && tempScore <= 16) {
+          targetIndices.push(i);
+        }
+      }
+    }
+    if (targetIndices.length > 0) {
+      const idx = targetIndices[Math.floor(Math.random() * targetIndices.length)];
+      return state.deck.splice(idx, 1)[0];
+    }
+  }
+  return state.deck.pop();
+}
+
 async function handleBJStand(ctx, state) {
   // Dealer's Turn
   let dScore = bjManager.calculateScore(state.dealerHand);
-  while (dScore < 17) {
-    state.dealerHand.push(state.deck.pop());
+  const pScore = bjManager.calculateScore(state.playerHand);
+
+  while (dScore < 17 && state.deck.length > 0) {
+    let cardIndex = -1;
+    if (state.shouldLose) {
+      // Find a card that gets dealer closest to pScore or 21 without busting
+      let bestCardIdx = -1;
+      let bestScore = -1;
+      for (let i = 0; i < state.deck.length; i++) {
+        const tempHand = [...state.dealerHand, state.deck[i]];
+        const tempScore = bjManager.calculateScore(tempHand);
+        if (tempScore <= 21) {
+          if (tempScore > bestScore) {
+            bestScore = tempScore;
+            bestCardIdx = i;
+          }
+        }
+      }
+      if (bestCardIdx !== -1) {
+        cardIndex = bestCardIdx;
+      }
+    }
+
+    if (cardIndex !== -1) {
+      state.dealerHand.push(state.deck.splice(cardIndex, 1)[0]);
+    } else {
+      state.dealerHand.push(state.deck.pop());
+    }
     dScore = bjManager.calculateScore(state.dealerHand);
   }
 
-  const pScore = bjManager.calculateScore(state.playerHand);
   if (dScore > 21 || pScore > dScore) {
     state.status = 'WIN';
     await sb.addCoinsInternal(state.userId, state.bet * 2);
@@ -3824,7 +3881,7 @@ bot.on('callback_query:data', async (ctx) => {
     if (!state || (chatId && state.chatId !== chatId)) return ctx.answerCallbackQuery("Game not found.");
 
     if (data === 'bj_hit') {
-      state.playerHand.push(state.deck.pop());
+      state.playerHand.push(getPlayerHitCard(state));
       const score = bjManager.calculateScore(state.playerHand);
       if (score > 21) {
         state.status = 'BUST';
@@ -3843,7 +3900,7 @@ bot.on('callback_query:data', async (ctx) => {
       }
       await sb.addCoins(user.id, -state.bet);
       state.bet *= 2;
-      state.playerHand.push(state.deck.pop());
+      state.playerHand.push(getPlayerHitCard(state));
       const score = bjManager.calculateScore(state.playerHand);
       if (score > 21) {
         state.status = 'BUST';
@@ -5035,7 +5092,7 @@ app.get('/api/user-stats', async (req, res) => {
             spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
         }
 
-        const jackpotPlayerId = 'd9496691-0e49-42d1-aeaf-dddcf65eed03';
+        const jackpotPlayerId = '3e2b73b6-3c42-49d1-9905-c116f779a0cd';
         const jackpotClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
 
         res.json({
@@ -5089,7 +5146,7 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const jackpotPlayerId = 'd9496691-0e49-42d1-aeaf-dddcf65eed03';
+            const jackpotPlayerId = '3e2b73b6-3c42-49d1-9905-c116f779a0cd';
             const hasClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
             if (hasClaimed) {
                 alreadyOwned = true;
@@ -5121,7 +5178,7 @@ app.get('/api/spin', async (req, res) => {
                     (async () => {
                         try {
                             const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
-                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Ishan Kishan</b> (85 OVR Wicketkeeper) in the Lucky Spin! 🎡\n\n` +
+                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Will Jacks</b> (85 OVR All-Rounder) in the Lucky Spin! 🎡\n\n` +
                                             `Congratulations! 🥳`;
                             try {
                                 await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
@@ -6035,19 +6092,9 @@ async function processBallAndProgress(ctx, match) {
           };
 
           try {
-            const photoBuffer = await generateScoreboardImage(match, result, marginText);
-            if (photoBuffer) {
-              await bot.api.sendPhoto(match.chatId, new InputFile(photoBuffer, 'scoreboard.png'), {
-                caption: summary,
-                reply_markup,
-                parse_mode: 'HTML'
-              });
-            } else {
-              await sendTelegramMessage(match, summary, { reply_markup });
-            }
-          } catch (err) {
-            console.error("Failed to send scoreboard photo, falling back to text:", err);
             await sendTelegramMessage(match, summary, { reply_markup });
+          } catch (err) {
+            console.error("Failed to send match completion message:", err);
           }
         } catch (finalizeErr) {
           console.error("Error during match completion/finalization:", finalizeErr);
