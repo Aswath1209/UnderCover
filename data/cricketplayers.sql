@@ -367,7 +367,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('40145f93-6f14-42dd-a271-fdf0d8b38959', 'Kedar Devdhar', 'India', 'batsman', 77, 30, 76, null, 3250, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
   ('40225bed-f85a-49d9-8577-a36804fd0222', 'Naved Yasin', 'Pakistan', 'batsman', 77, 36, 77, null, 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
   ('405ec5c8-18d3-455b-a6c5-c81df99628d7', 'David Payne', 'England', 'bowler', 43, 76, 76, 'fast', 3250, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Balanced'),
-  ('40624134-adc2-4bc0-84ba-8c6a0e3c0ee6', 'Mithali Raj', 'India', 'batsman', 96, 32, 95, null, 2605950, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
+  ('40624134-adc2-4bc0-84ba-8c6a0e3c0ee6', 'Mithali Raj', 'India', 'batsman', 95, 32, 95, null, 2605950, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
   ('4087a58d-bffe-428e-86bc-8d01e38cfa32', 'Kusal Mendis', 'Sri Lanka', 'batsman', 86, 29, 86, null, 460550, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Finisher', null),
   ('4092703d-af36-4257-b796-98f1f150bfa7', 'Craig Ervine', 'Zimbabwe', 'batsman', 79, 39, 79, null, 14600, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
   ('4102424c-358c-4fa2-b0a3-64921c3bf786', 'Megan Schutt', 'Australia', 'bowler', 47, 89, 89, 'fast', 786750, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Wicket-taker'),
