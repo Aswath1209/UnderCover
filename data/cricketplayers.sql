@@ -628,7 +628,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('76979646-b604-4225-a308-e72a0c474a7d', 'Gudakesh Motie', 'West Indies', 'bowler', 48, 78, 77, 'off_spin', 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Balanced'),
   ('77874633-d1fb-40bf-b292-6cf54471a6fb', 'Akash Madhwal', 'India', 'bowler', 38, 78, 77, 'fast', 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Balanced'),
   ('77bf834f-32aa-43df-9924-257566aa9a79', 'Shahid Afridi', 'Pakistan', 'all_rounder', 87, 90, 93, 'leg_spin', 1905150, null, '2026-03-12 14:09:43.586112+00', 'Gold', 'Brute', 'Strike Bowler'),
-  ('77da4642-246b-411b-8292-47fd9fa5aba1', 'Jacques Kallis', 'South Africa', 'all_rounder', 96, 91, 99, 'fast', 4525000, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Anchor', 'Wicket-taker'),
+  ('77da4642-246b-411b-8292-47fd9fa5aba1', 'Jacques Kallis', 'South Africa', 'all_rounder', 97, 91, 99, 'fast', 4525000, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Anchor', 'Wicket-taker'),
   ('77fca0f8-fd54-4b1f-942d-880cd89133a5', 'Chris Sole', 'Scotland', 'bowler', 15, 73, 73, 'fast', 850, null, '2026-03-12 14:12:13.043998+00', 'Normal', null, 'Strike'),
   ('784b4d59-0ad7-4461-91b9-aa3f4c7f5297', 'Mitchell Swepson', 'Australia', 'bowler', 36, 83, 82, 'leg_spin', 84750, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Economy'),
   ('78749d19-0c6f-4ac9-b2dd-a28e4e711e55', 'Krishnappa Gowtham', 'India', 'all_rounder', 76, 80, 80, 'fast', 31445, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Economy'),
