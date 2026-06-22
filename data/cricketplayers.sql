@@ -605,7 +605,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('718e895f-fa1d-4b2b-946d-2efa1159e79d', 'Odean Smith', 'West Indies', 'all_rounder', 78, 80, 81, 'fast', 56420, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Economy'),
   ('71b541f0-2fbc-4d5d-bab7-9b46cdcb9a9f', 'Rubin Hermann', 'South Africa', 'wicket_keeper', 66, 10, 66, null, 500, null, '2026-03-12 14:12:13.043998+00', 'Normal', 'Anchor', null),
   ('7201dc4d-f5ab-462c-9f80-b4c60cdaca4b', 'Amy Hunter', 'Ireland', 'batsman', 78, 30, 77, null, 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
-  ('720e2f8f-1c69-4629-b0c9-516a011cd67a', 'Morne Morkel', 'South Africa', 'bowler', 36, 93, 94, 'fast', 2195725, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Wicket-taker'),
+  ('720e2f8f-1c69-4629-b0c9-516a011cd67a', 'Morne Morkel', 'South Africa', 'bowler', 36, 94, 94, 'fast', 2195725, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Wicket-taker'),
   ('7232a0b1-55eb-4801-b6d5-081f7b60e87c', 'Sophia Dunkley', 'England', 'batsman', 84, 32, 83, null, 137650, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Brute', null),
   ('725cb7ea-cf80-4518-8cfe-4c1330be1069', 'Donovan Ferreira', 'South Africa', 'batsman', 81, 43, 80, 'off_spin', 31445, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Brute', null),
   ('72871a71-397d-4c34-995d-8199379f9d48', 'Adam Wheater', 'England', 'batsman', 81, 29, 81, null, 56420, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Brute', null),
