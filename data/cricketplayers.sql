@@ -209,7 +209,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('21147829-e707-4299-9cde-cbde782a68d6', 'Gaby Lewis', 'Ireland', 'batsman', 86, 38, 85, null, 335250, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Finisher', null),
   ('3e3e5533-d0f5-4595-b5fe-516827868ff4', 'Noor Ahmad', 'Afghanistan', 'bowler', 48, 84, 84, 'leg_spin', 214750, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Middle Overs'),
   ('21f32eb9-22be-4e48-bd14-31e8c835600f', 'Steve O'' Keefe', 'Australia', 'bowler', 43, 81, 82, 'fast', 84750, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Economy'),
-  ('22099f3c-12bc-40fa-a19a-a58b18b2f41d', 'Martin Crowe', 'New Zealand', 'batsman', 94, 31, 95, null, 2605500, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Opener', null),
+  ('22099f3c-12bc-40fa-a19a-a58b18b2f41d', 'Martin Crowe', 'New Zealand', 'batsman', 94, 31, 94, null, 2605500, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Opener', null),
   ('220b99fd-ec6c-4360-8629-97d24ff76aa7', 'Dan Mousley', 'England', 'all_rounder', 73, 71, 73, 'off_spin', 850, null, '2026-03-12 14:12:13.043998+00', 'Normal', 'Brute', 'Balanced'),
   ('2263449e-b4d7-4da0-b103-07f80a2bbfd0', 'Tayyab Tahir', 'Pakistan', 'batsman', 78, 33, 77, null, 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', null),
   ('229563e6-2fc6-45e6-8668-aa72f4a64732', 'Annabel Sutherland', 'Australia', 'all_rounder', 81, 84, 86, 'fast', 460550, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Brute', 'Economy'),
