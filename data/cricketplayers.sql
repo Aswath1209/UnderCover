@@ -251,7 +251,7 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('28c1932a-fbff-49f2-b190-7aa31a01ee36', 'Sean Abbott', 'Australia', 'bowler', 45, 84, 84, 'fast', 214750, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Economy'),
   ('28c34ebf-bcb0-49e9-a67d-dee3e58407ff', 'Usman Qadir', 'Pakistan', 'bowler', 43, 81, 81, 'leg_spin', 56420, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Economy'),
   ('2907f4f1-ce06-41ac-b5cb-79999b2e5d18', 'Javed Miandad', 'Pakistan', 'batsman', 95, 43, 95, 'leg_spin', 2605500, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Opener', null),
-  ('2928d606-25cf-4f86-8f62-143ecfe9a359', 'Mohd Azharuddin', 'India', 'batsman', 93, 37, 94, null, 2110725, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Opener', null),
+  ('2928d606-25cf-4f86-8f62-143ecfe9a359', 'Mohd Azharuddin', 'India', 'batsman', 94, 37, 94, null, 2110725, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Opener', null),
   ('29a4e6a9-43e6-4743-b2a5-439bd3768d6d', 'L Embuldeniya', 'Sri Lanka', 'bowler', 45, 83, 83, 'fast', 137650, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Economy'),
   ('29a9457c-5c2f-4af7-9752-6da389e69015', 'Daniel Sams', 'Australia', 'all_rounder', 71, 83, 83, 'fast', 137650, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Anchor', 'Economy'),
   ('2a2e1ed4-be62-46f2-b5aa-dfc925380dd2', 'Shane Warne', 'Australia', 'bowler', 45, 98, 99, 'leg_spin', 4525000, null, '2026-03-12 14:09:43.586112+00', 'Legendary', 'Anchor', 'Strike'),
