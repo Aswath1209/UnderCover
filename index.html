@@ -1041,6 +1041,27 @@
             }
         }
 
+        .shop-card-img-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        .shop-player-card-img {
+            width: 100%;
+            aspect-ratio: 1085/1403;
+            object-fit: cover;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+        .shop-player-card-img:hover {
+            transform: scale(1.02);
+        }
+
     </style>
 </head>
 <body>
@@ -1972,23 +1993,35 @@
 
                 const card = document.createElement('div');
                 card.className = `player-card glass-panel ${cardClass}`;
-                card.innerHTML = `
-                    <div>
-                        <div class="player-badge-container">
-                            <span class="player-rating" style="background: ${ovrColor};">${p.ovr} OVR</span>
-                            <span class="player-tier ${tierClass}">${p.tier}</span>
+                
+                if (p.image_url) {
+                    card.innerHTML = `
+                        <div class="shop-card-img-wrapper">
+                            <img class="shop-player-card-img" src="${p.image_url}" alt="${p.name}">
                         </div>
-                        ${avatarHtml}
-                        <div class="player-card-name" title="${p.name}">${p.name}</div>
-                        <div class="player-sub">${flag} ${p.country}</div>
-                        <div class="player-role-badge" style="background: ${roleColor}20; color: ${roleColor}; border: 1px solid ${roleColor}30;">
-                            ${displayRole}
+                        <div style="margin-top: 10px; width: 100%;">
+                            ${btnHtml}
                         </div>
-                    </div>
-                    <div style="margin-top: 10px; width: 100%;">
-                        ${btnHtml}
-                    </div>
-                `;
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div>
+                            <div class="player-badge-container">
+                                <span class="player-rating" style="background: ${ovrColor};">${p.ovr} OVR</span>
+                                <span class="player-tier ${tierClass}">${p.tier}</span>
+                            </div>
+                            ${avatarHtml}
+                            <div class="player-card-name" title="${p.name}">${p.name}</div>
+                            <div class="player-sub">${flag} ${p.country}</div>
+                            <div class="player-role-badge" style="background: ${roleColor}20; color: ${roleColor}; border: 1px solid ${roleColor}30;">
+                                ${displayRole}
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px; width: 100%;">
+                            ${btnHtml}
+                        </div>
+                    `;
+                }
                 grid.appendChild(card);
             });
         }

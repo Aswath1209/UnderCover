@@ -3670,8 +3670,10 @@ bot.on('callback_query:data', async (ctx) => {
       const profile = await sb.getProfile(initiatorId);
       const currentCoins = profile?.coins || 0;
       if (currentCoins < player.buy_price) {
+        const needed = player.buy_price - currentCoins;
         await ctx.editMessageCaption({
-          caption: `❌ You need more to buy ${escapeHTML(player.name)}`,
+          caption: `❌ You need 💰 <b>${needed.toLocaleString()}</b> more coins to buy <b>${escapeHTML(player.name)}</b>.`,
+          parse_mode: 'HTML',
           reply_markup: { inline_keyboard: [] }
         }).catch(() => {});
         return;
