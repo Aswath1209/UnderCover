@@ -979,24 +979,25 @@ bot.command('image', async (ctx) => {
     const xi = squad.slice(0, 11);
     const profile = await sb.getProfile(user.id);
     const teamName = profile && profile.team_name ? profile.team_name : `${user.first_name}'s XI`;
+    const captain = await resolveCaptain(user.id);
 
     const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
     const width = 1200;
-    const height = 820;
+    const height = 980; // slightly taller to fit 225px tall cards
     const canvas = createCanvas(width, height);
     const ctxCanvas = canvas.getContext('2d');
 
     // 1. Draw Background Gradient
     const bgGrad = ctxCanvas.createLinearGradient(0, 0, width, height);
-    bgGrad.addColorStop(0, '#0f1225');
-    bgGrad.addColorStop(0.5, '#131131');
-    bgGrad.addColorStop(1, '#060713');
+    bgGrad.addColorStop(0, '#0a0d1a');
+    bgGrad.addColorStop(0.5, '#120f26');
+    bgGrad.addColorStop(1, '#05060d');
     ctxCanvas.fillStyle = bgGrad;
     ctxCanvas.fillRect(0, 0, width, height);
 
     // 2. Draw Decorative Grid Pattern
-    ctxCanvas.strokeStyle = 'rgba(124, 58, 237, 0.05)';
+    ctxCanvas.strokeStyle = 'rgba(124, 58, 237, 0.04)';
     ctxCanvas.lineWidth = 1;
     const gridSize = 60;
     for (let x = 0; x < width; x += gridSize) {
@@ -1013,27 +1014,27 @@ bot.command('image', async (ctx) => {
     }
 
     // Draw glowing stadium arch effect
-    ctxCanvas.fillStyle = 'rgba(79, 70, 229, 0.08)';
+    ctxCanvas.fillStyle = 'rgba(79, 70, 229, 0.06)';
     ctxCanvas.beginPath();
-    ctxCanvas.arc(width / 2, height + 100, 500, Math.PI, 0);
+    ctxCanvas.arc(width / 2, height + 100, 600, Math.PI, 0);
     ctxCanvas.fill();
 
     // 3. Draw Header
     ctxCanvas.fillStyle = '#ffffff';
-    ctxCanvas.font = 'bold 36px sans-serif';
+    ctxCanvas.font = 'bold 38px sans-serif';
     ctxCanvas.textAlign = 'center';
-    ctxCanvas.fillText('PLAYING XI', width / 2, 65);
+    ctxCanvas.fillText('PLAYING XI', width / 2, 70);
 
     ctxCanvas.fillStyle = '#a78bfa';
-    ctxCanvas.font = 'italic 22px sans-serif';
-    ctxCanvas.fillText(`"${teamName}"`, width / 2, 100);
+    ctxCanvas.font = 'italic 20px sans-serif';
+    ctxCanvas.fillText(`"${teamName}"`, width / 2, 105);
 
     const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
     
-    // Draw OVR badge on the right
+    // Draw OVR badge
     ctxCanvas.fillStyle = 'rgba(167, 139, 250, 0.15)';
     ctxCanvas.beginPath();
-    ctxCanvas.arc(1080, 75, 45, 0, Math.PI * 2);
+    ctxCanvas.arc(1080, 80, 45, 0, Math.PI * 2);
     ctxCanvas.fill();
     ctxCanvas.strokeStyle = '#a78bfa';
     ctxCanvas.lineWidth = 2;
@@ -1041,233 +1042,105 @@ bot.command('image', async (ctx) => {
 
     ctxCanvas.fillStyle = '#ffffff';
     ctxCanvas.font = 'bold 28px sans-serif';
-    ctxCanvas.fillText(String(teamRating), 1080, 73);
+    ctxCanvas.fillText(String(teamRating), 1080, 78);
     ctxCanvas.fillStyle = '#a78bfa';
     ctxCanvas.font = 'bold 12px sans-serif';
-    ctxCanvas.fillText('TEAM OVR', 1080, 95);
+    ctxCanvas.fillText('TEAM OVR', 1080, 100);
 
-    // Helper functions for colors and roles
-    const getOvrColor = (ovr) => {
-      if (ovr >= 90) return '#ff007f'; // Legendary pink
-      if (ovr >= 80) return '#ffd700'; // Gold
-      if (ovr >= 70) return '#82b1ff'; // Silver
-      return '#cd7f32'; // Bronze
-    };
-
-    const roleIcon = (role) => {
-      if (role === 'batsman') return '🏏';
-      if (role === 'wicket_keeper') return '🧤';
-      if (role === 'all_rounder') return '⚡';
-      if (role === 'bowler') return '🥎';
-      return '👤';
-    };
-
-    const countryFlags = {
-      'India': '🇮🇳',
-      'Australia': '🇦🇺',
-      'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-      'South Africa': '🇿🇦',
-      'Pakistan': '🇵🇰',
-      'New Zealand': '🇳🇿',
-      'West Indies': '🌴',
-      'Sri Lanka': '🇱🇰',
-      'Bangladesh': '🇧🇩',
-      'Afghanistan': '🇦🇫',
-      'Ireland': '🇮🇪',
-      'Zimbabwe': '🇿🇼',
-      'Netherlands': '🇳🇱',
-      'Nepal': '🇳🇵',
-      'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-      'USA': '🇺🇸',
-      'Canada': '🇨🇦',
-      'Oman': '🇴🇲',
-      'UAE': '🇦🇪',
-      'Namibia': '🇳🇦'
-    };
-
-    // Pre-load all player images in parallel (trying local cache first, then database/remote url)
-    const loadedImages = await Promise.all(
+    // Pre-load all card images
+    const loadedCards = await Promise.all(
       xi.map(async (p) => {
-        const localPath = getCricketPlayerLocalImagePath(p.name);
-        if (localPath) {
-          try {
-            return await loadImage(localPath);
-          } catch (err) {
-            console.error(`Failed to load local avatar for ${p.name} from ${localPath}:`, err);
-          }
+        try {
+          const cardPath = await getOrGeneratePlayerCardPath(p);
+          return await loadImage(cardPath);
+        } catch (err) {
+          console.error(`Failed to load card for ${p.name}:`, err);
+          return null;
         }
-        
-        if (p.image_url) {
-          // If it's a relative path starting with /assets/players/, map to local file
-          if (p.image_url.startsWith('/assets/players/')) {
-            const relativeFilename = p.image_url.replace('/assets/players/', '').toLowerCase();
-            const actualFilename = cricketImageCache.get(relativeFilename);
-            if (actualFilename) {
-              const fullLocalPath = path.join(crickidexPlayersDir, actualFilename);
-              try {
-                return await loadImage(fullLocalPath);
-              } catch (err) {
-                console.error(`Failed to load avatar from mapped image_url path for ${p.name}:`, err);
-              }
-            }
-          } else if (p.image_url.startsWith('http')) {
-            // It's a remote Wikipedia URL
-            try {
-              const axios = require('axios');
-              const response = await axios.get(p.image_url, {
-                responseType: 'arraybuffer',
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                },
-                timeout: 6000
-              });
-              return await loadImage(Buffer.from(response.data));
-            } catch (err) {
-              console.error(`Failed to load remote avatar for ${p.name} from ${p.image_url}:`, err.message);
-            }
-          }
-        }
-        return null;
       })
     );
 
-    // 4. Render Grid of 11 Player Cards
-    const cardWidth = 240;
-    const cardHeight = 180;
-
+    const cardWidth = 180;
+    const cardHeight = 225; // 4:5 ratio
     const positions = [];
 
-    // Row 1 (y = 150)
+    // Row 1 (y = 160)
     let marginRow1 = (width - (4 * cardWidth)) / 5;
     for (let i = 0; i < 4; i++) {
-      positions.push({ x: marginRow1 + i * (cardWidth + marginRow1), y: 150 });
+      positions.push({ x: marginRow1 + i * (cardWidth + marginRow1), y: 160 });
     }
 
-    // Row 2 (y = 370)
+    // Row 2 (y = 425)
     let marginRow2 = (width - (4 * cardWidth)) / 5;
     for (let i = 0; i < 4; i++) {
-      positions.push({ x: marginRow2 + i * (cardWidth + marginRow2), y: 370 });
+      positions.push({ x: marginRow2 + i * (cardWidth + marginRow2), y: 425 });
     }
 
-    // Row 3 (y = 590) - centered 3 players
+    // Row 3 (y = 690)
     let marginRow3 = (width - (3 * cardWidth)) / 4;
     for (let i = 0; i < 3; i++) {
-      positions.push({ x: marginRow3 + i * (cardWidth + marginRow3), y: 590 });
+      positions.push({ x: marginRow3 + i * (cardWidth + marginRow3), y: 690 });
     }
 
     for (let i = 0; i < 11; i++) {
       const p = xi[i];
       const pos = positions[i];
-      const ovrColor = getOvrColor(p.ovr);
-      const img = loadedImages[i];
+      const cardImg = loadedCards[i];
+      const isCaptain = captain && p.id === captain.id;
 
-      // Draw glass card body
-      ctxCanvas.save();
-      drawRoundRect(ctxCanvas, pos.x, pos.y, cardWidth, cardHeight, 16);
-      ctxCanvas.clip();
+      if (!cardImg) continue;
 
-      const cardGrad = ctxCanvas.createLinearGradient(pos.x, pos.y, pos.x, pos.y + cardHeight);
-      cardGrad.addColorStop(0, '#171c2f');
-      cardGrad.addColorStop(1, '#0e111d');
-      ctxCanvas.fillStyle = cardGrad;
-      ctxCanvas.fill();
-
-      ctxCanvas.strokeStyle = p.tier === 'Legendary' ? '#ff007f' : p.tier === 'Gold' ? '#ffd700' : 'rgba(255, 255, 255, 0.15)';
-      ctxCanvas.lineWidth = p.tier === 'Legendary' || p.tier === 'Gold' ? 2 : 1;
-      ctxCanvas.stroke();
-
-      const shadowGrad = ctxCanvas.createRadialGradient(
-        pos.x + cardWidth/2, pos.y + cardHeight/2, 10,
-        pos.x + cardWidth/2, pos.y + cardHeight/2, cardWidth/2
-      );
-      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.4)');
-      ctxCanvas.fillStyle = shadowGrad;
-      ctxCanvas.fill();
-
-      ctxCanvas.restore();
-
-      // Draw OVR rating badge
-      ctxCanvas.fillStyle = ovrColor;
-      drawRoundRect(ctxCanvas, pos.x + 12, pos.y + 12, 64, 24, 6);
-      ctxCanvas.fill();
-
-      ctxCanvas.fillStyle = '#000000';
-      ctxCanvas.font = 'bold 12px sans-serif';
-      ctxCanvas.textAlign = 'center';
-      ctxCanvas.fillText(`${p.ovr} OVR`, pos.x + 44, pos.y + 28);
-
-      // Draw Pos Number
-      ctxCanvas.fillStyle = 'rgba(255,255,255,0.1)';
-      ctxCanvas.beginPath();
-      ctxCanvas.arc(pos.x + 90, pos.y + 24, 12, 0, Math.PI * 2);
-      ctxCanvas.fill();
-      ctxCanvas.fillStyle = '#ffffff';
-      ctxCanvas.font = '10px sans-serif';
-      ctxCanvas.fillText(String(i + 1), pos.x + 90, pos.y + 27);
-
-      // Draw Role icon
-      ctxCanvas.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      ctxCanvas.beginPath();
-      ctxCanvas.arc(pos.x + cardWidth - 24, pos.y + 24, 16, 0, Math.PI * 2);
-      ctxCanvas.fill();
-      ctxCanvas.font = '14px sans-serif';
-      ctxCanvas.fillText(roleIcon(p.role), pos.x + cardWidth - 24, pos.y + 29);
-
-      const avX = pos.x + cardWidth / 2;
-      const avY = pos.y + 85;
-      const avRadius = 34;
-
-      if (img) {
+      if (isCaptain) {
         ctxCanvas.save();
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
-        ctxCanvas.clip();
-        ctxCanvas.drawImage(img, avX - avRadius, avY - avRadius, avRadius * 2, avRadius * 2);
+        // Golden glowing shadow aura
+        ctxCanvas.shadowColor = '#ffd700';
+        ctxCanvas.shadowBlur = 30;
+        ctxCanvas.shadowOffsetX = 0;
+        ctxCanvas.shadowOffsetY = 0;
+
+        // Draw card image with shadow applied
+        ctxCanvas.drawImage(cardImg, pos.x, pos.y, cardWidth, cardHeight);
         ctxCanvas.restore();
 
-        ctxCanvas.strokeStyle = ovrColor;
-        ctxCanvas.lineWidth = 2;
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
-        ctxCanvas.stroke();
+        // Draw a premium gold border around the captain card
+        ctxCanvas.strokeStyle = '#ffd700';
+        ctxCanvas.lineWidth = 3;
+        ctxCanvas.strokeRect(pos.x, pos.y, cardWidth, cardHeight);
+
+        // Draw Captain Badge: A clean gold pill badge with text "CAPTAIN"
+        const badgeW = 90;
+        const badgeH = 20;
+        const badgeX = pos.x + cardWidth / 2 - badgeW / 2;
+        const badgeY = pos.y - 12;
+
+        ctxCanvas.fillStyle = '#ffd700';
+        drawRoundRect(ctxCanvas, badgeX, badgeY, badgeW, badgeH, 4);
+        ctxCanvas.fill();
+
+        // Write "CAPTAIN" inside badge
+        ctxCanvas.fillStyle = '#000000';
+        ctxCanvas.font = 'bold 11px sans-serif';
+        ctxCanvas.textAlign = 'center';
+        ctxCanvas.fillText('CAPTAIN', pos.x + cardWidth / 2, badgeY + 14);
       } else {
-        ctxCanvas.save();
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
-        ctxCanvas.clip();
-
-        ctxCanvas.fillStyle = '#111422';
-        ctxCanvas.fill();
-
-        ctxCanvas.fillStyle = ovrColor;
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY - 3, avRadius * 0.4, 0, Math.PI * 2);
-        ctxCanvas.fill();
-
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY + avRadius * 1.05, avRadius * 0.82, Math.PI, 0, false);
-        ctxCanvas.fill();
-
-        ctxCanvas.restore();
-
-        ctxCanvas.strokeStyle = ovrColor;
-        ctxCanvas.lineWidth = 1.5;
-        ctxCanvas.beginPath();
-        ctxCanvas.arc(avX, avY, avRadius, 0, Math.PI * 2);
-        ctxCanvas.stroke();
+        // Draw normal card
+        ctxCanvas.drawImage(cardImg, pos.x, pos.y, cardWidth, cardHeight);
       }
 
-      // Draw Player Name
-      ctxCanvas.fillStyle = '#ffffff';
-      ctxCanvas.font = 'bold 14px sans-serif';
-      ctxCanvas.textAlign = 'center';
-      ctxCanvas.fillText(p.name, pos.x + cardWidth/2, pos.y + 142);
+      // Draw Pos Number Badge at top-left of each card
+      ctxCanvas.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctxCanvas.beginPath();
+      ctxCanvas.arc(pos.x + 20, pos.y + 20, 14, 0, Math.PI * 2);
+      ctxCanvas.fill();
+      
+      ctxCanvas.strokeStyle = isCaptain ? '#ffd700' : 'rgba(255, 255, 255, 0.4)';
+      ctxCanvas.lineWidth = 1.5;
+      ctxCanvas.stroke();
 
-      const flag = countryFlags[p.country] || '🏳️';
-      ctxCanvas.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctxCanvas.font = '10px sans-serif';
-      ctxCanvas.fillText(`${(p.role || '').toUpperCase().replace('_', ' ')}  ${flag} ${p.country || 'N/A'}`, pos.x + cardWidth/2, pos.y + 162);
+      ctxCanvas.fillStyle = '#ffffff';
+      ctxCanvas.font = 'bold 12px sans-serif';
+      ctxCanvas.textAlign = 'center';
+      ctxCanvas.fillText(String(i + 1), pos.x + 20, pos.y + 24);
     }
 
     const buffer = canvas.toBuffer('image/png');
