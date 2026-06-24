@@ -605,7 +605,7 @@ async function getUserOwnedPlayers(userId) {
       console.error("Error fetching owned players:", error);
       return [];
     }
-    return data || [];
+    return (data || []).filter(o => o.sport === 'cricket' || o.sport === 'football');
   } catch (e) {
     console.error("Failed to get user owned players:", e);
     return [];
@@ -1282,7 +1282,54 @@ async function updateUserRating(userId) {
   }
 }
 
+async function getCaptain(userId, sport = 'cricket') {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from('user_owned_players')
+      .select('player_id')
+      .eq('user_id', userId)
+      .eq('sport', `captain_${sport}`)
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return data[0].player_id;
+  } catch (e) {
+    console.error("Error in getCaptain:", e);
+    return null;
+  }
+}
+
+async function setCaptain(userId, playerId, sport = 'cricket') {
+  if (!supabase) return { success: false, error: 'Database disabled' };
+  try {
+    // Delete existing captain first
+    await supabase.from('user_owned_players')
+      .delete()
+      .eq('user_id', userId)
+      .eq('sport', `captain_${sport}`);
+    
+    if (playerId) {
+      const { error } = await supabase.from('user_owned_players')
+        .insert({
+          user_id: userId,
+          player_id: playerId,
+          sport: `captain_${sport}`,
+          squad_order: 0
+        });
+      if (error) {
+        console.error("Error setting captain:", error);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("Error in setCaptain:", e);
+    return { success: false, error: e.message };
+  }
+}
+
 module.exports = {
+  getCaptain,
+  setCaptain,
   supabase,
   getUserTeamRating,
   updateUserRating,

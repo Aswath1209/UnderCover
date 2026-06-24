@@ -258,6 +258,34 @@ async function resolvePlayerForUser(ctx, targetUserId, query) {
   }
 }
 
+async function resolveCaptain(userId) {
+  try {
+    const squad = await sb.getUserCricketTeam(userId);
+    if (!squad || squad.length === 0) return null;
+
+    const assignedCaptainId = await sb.getCaptain(userId, 'cricket');
+    if (assignedCaptainId) {
+      const captainPlayer = squad.find(p => p.id === assignedCaptainId);
+      if (captainPlayer) {
+        return captainPlayer;
+      }
+    }
+
+    // Fallback: highest rated player in the team
+    const sorted = [...squad].sort((a, b) => {
+      if (b.ovr !== a.ovr) return b.ovr - a.ovr;
+      const bBat = b.batting_rating || 0;
+      const aBat = a.batting_rating || 0;
+      if (bBat !== aBat) return bBat - aBat;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sorted[0];
+  } catch (e) {
+    console.error("Error in resolveCaptain:", e);
+    return null;
+  }
+}
 
 function getUserActiveLobby(userId) {
   for (const lobby of Object.values(activeLobbies)) {
@@ -1251,6 +1279,89 @@ bot.command('image', async (ctx) => {
   } catch (e) {
     console.error("Error in /image command:", e);
     await ctx.reply("❌ Failed to generate the Playing XI image. Please try again.");
+  }
+});
+
+bot.command('captain', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+
+  const userId = ctx.from.id;
+  const query = ctx.match?.trim();
+
+  try {
+    const squad = await sb.getUserCricketTeam(userId);
+    if (!squad || squad.length === 0) {
+      return ctx.reply("❌ You don't have any players in your Cricket squad yet. Use /claim or /shop to get players!", { parse_mode: 'HTML' });
+    }
+
+    if (query) {
+      // Find matching player in user's cricket squad
+      const matches = squad.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      if (matches.length === 0) {
+        return ctx.reply(`❌ No player matching "<b>${escapeHTML(query)}</b>" was found in your Cricket squad.`, { parse_mode: 'HTML' });
+      }
+
+      let chosen = null;
+      if (matches.length === 1) {
+        chosen = matches[0];
+      } else {
+        const exactMatch = matches.find(p => p.name.toLowerCase() === query.toLowerCase());
+        if (exactMatch) {
+          chosen = exactMatch;
+        } else {
+          const list = matches.slice(0, 10).map(p => `• <b>${escapeHTML(p.name)}</b> (OVR: ${p.ovr})`).join('\n');
+          const truncated = matches.length > 10 ? `\n...and ${matches.length - 10} more.` : '';
+          return ctx.reply(
+            `🔍 <b>Multiple matching players found in your squad:</b>\n\n${list}${truncated}\n\n` +
+            `<i>Please specify a more precise name.</i>`,
+            { parse_mode: 'HTML' }
+          );
+        }
+      }
+
+      const res = await sb.setCaptain(userId, chosen.id, 'cricket');
+      if (res.success) {
+        return ctx.reply(`👑 <b>${escapeHTML(chosen.name)}</b> (OVR: ${chosen.ovr}) has been successfully appointed as your Cricket Team Captain!`, { parse_mode: 'HTML' });
+      } else {
+        return ctx.reply(`❌ Failed to update captain: ${res.error}`);
+      }
+    } else {
+      // Resolve and display current captain
+      const assignedCaptainId = await sb.getCaptain(userId, 'cricket');
+      let captain = null;
+      let isDefault = true;
+
+      if (assignedCaptainId) {
+        captain = squad.find(p => p.id === assignedCaptainId);
+        if (captain) {
+          isDefault = false;
+        }
+      }
+
+      if (!captain) {
+        // Fallback: highest rated player
+        const sorted = [...squad].sort((a, b) => {
+          if (b.ovr !== a.ovr) return b.ovr - a.ovr;
+          const bBat = b.batting_rating || 0;
+          const aBat = a.batting_rating || 0;
+          if (bBat !== aBat) return bBat - aBat;
+          return a.name.localeCompare(b.name);
+        });
+        captain = sorted[0];
+        isDefault = true;
+      }
+
+      let msg = `👑 <b>CRICKET TEAM CAPTAIN</b>\n\n`;
+      msg += `• <b>Name:</b> <b>${escapeHTML(captain.name)}</b>\n`;
+      msg += `• <b>Rating:</b> <code>${captain.ovr} OVR</code>\n`;
+      msg += `• <b>Role:</b> <code>${captain.role.toUpperCase().replace('_', ' ')}</code>\n`;
+      msg += `• <b>Status:</b> ${isDefault ? '⚠️ <i>Default Captain (highest OVR)</i>' : '✅ <i>Appointed Captain</i>'}\n\n`;
+      msg += `ℹ️ <i>To assign a different player as captain, use:</i>\n<code>/captain &lt;player_name&gt;</code>`;
+      return ctx.reply(msg, { parse_mode: 'HTML' });
+    }
+  } catch (error) {
+    console.error("Error in /captain command:", error);
+    ctx.reply("❌ An error occurred while processing the /captain command.");
   }
 });
 
@@ -4063,6 +4174,8 @@ bot.on('callback_query:data', async (ctx) => {
         return;
       }
       
+      const captain = await resolveCaptain(targetUserId);
+      
       const roleIcon = (role) => {
         if (role === 'batsman') return '🏏';
         if (role === 'wicket_keeper') return '🧤';
@@ -4111,7 +4224,8 @@ bot.on('callback_query:data', async (ctx) => {
           msg += `\n${group.title}\n`;
           group.players.forEach(p => {
             const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-            msg += `• <b>${p.displayIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}\n`;
+            const captainLabel = captain && p.id === captain.id ? ' 👑' : '';
+            msg += `• <b>${p.displayIdx}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}${captainLabel}\n`;
           });
         }
       });
@@ -4122,7 +4236,8 @@ bot.on('callback_query:data', async (ctx) => {
         const bench = team.slice(11);
         bench.forEach((p, idx) => {
           const tierIndicator = p.tier === 'Legendary' ? ' 💎' : p.tier === 'Gold' ? ' ⭐' : '';
-          msg += `• <b>${idx + 12}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}\n`;
+          const captainLabel = captain && p.id === captain.id ? ' 👑' : '';
+          msg += `• <b>${idx + 12}.</b> ${roleIcon(p.role)} <b>${escapeHTML(p.name)}</b> (<code>${p.ovr} OVR</code>)${tierIndicator}${captainLabel}\n`;
         });
       }
       
