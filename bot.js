@@ -988,16 +988,26 @@ bot.command('image', async (ctx) => {
     const canvas = createCanvas(width, height);
     const ctxCanvas = canvas.getContext('2d');
 
-    // 1. Draw Background Gradient
-    const bgGrad = ctxCanvas.createLinearGradient(0, 0, width, height);
-    bgGrad.addColorStop(0, '#0a0d1a');
-    bgGrad.addColorStop(0.5, '#120f26');
-    bgGrad.addColorStop(1, '#05060d');
-    ctxCanvas.fillStyle = bgGrad;
+    // 1. Draw Stadium Background
+    try {
+      const bgImg = await loadImage(path.join(__dirname, 'assets', 'stadium_bg.png'));
+      ctxCanvas.drawImage(bgImg, 0, 0, width, height);
+    } catch (err) {
+      console.error("Failed to load stadium background, using fallback gradient:", err);
+      const bgGrad = ctxCanvas.createLinearGradient(0, 0, width, height);
+      bgGrad.addColorStop(0, '#0a0d1a');
+      bgGrad.addColorStop(0.5, '#120f26');
+      bgGrad.addColorStop(1, '#05060d');
+      ctxCanvas.fillStyle = bgGrad;
+      ctxCanvas.fillRect(0, 0, width, height);
+    }
+
+    // 2. Apply a dark atmospheric glass overlay
+    ctxCanvas.fillStyle = 'rgba(11, 10, 26, 0.72)';
     ctxCanvas.fillRect(0, 0, width, height);
 
-    // 2. Draw Decorative Grid Pattern
-    ctxCanvas.strokeStyle = 'rgba(124, 58, 237, 0.04)';
+    // Draw premium cyber stadium grid overlay
+    ctxCanvas.strokeStyle = 'rgba(0, 242, 254, 0.03)';
     ctxCanvas.lineWidth = 1;
     const gridSize = 60;
     for (let x = 0; x < width; x += gridSize) {
@@ -1014,25 +1024,39 @@ bot.command('image', async (ctx) => {
     }
 
     // Draw glowing stadium arch effect
-    ctxCanvas.fillStyle = 'rgba(79, 70, 229, 0.06)';
+    ctxCanvas.fillStyle = 'rgba(79, 70, 229, 0.05)';
     ctxCanvas.beginPath();
     ctxCanvas.arc(width / 2, height + 100, 600, Math.PI, 0);
     ctxCanvas.fill();
 
-    // 3. Draw Header
+    // 3. Draw Premium Header Banner
+    ctxCanvas.save();
+    ctxCanvas.fillStyle = 'rgba(255, 255, 255, 0.02)';
+    drawRoundRect(ctxCanvas, 300, 20, 600, 100, 12);
+    ctxCanvas.fill();
+    ctxCanvas.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctxCanvas.lineWidth = 1;
+    ctxCanvas.stroke();
+    ctxCanvas.restore();
+
+    // Draw Glowing "PLAYING XI" Title
+    ctxCanvas.save();
     ctxCanvas.fillStyle = '#ffffff';
-    ctxCanvas.font = 'bold 38px sans-serif';
+    ctxCanvas.font = 'bold 36px sans-serif';
     ctxCanvas.textAlign = 'center';
-    ctxCanvas.fillText('PLAYING XI', width / 2, 70);
+    ctxCanvas.shadowColor = '#00f2fe';
+    ctxCanvas.shadowBlur = 15;
+    ctxCanvas.fillText('PLAYING XI', width / 2, 65);
+    ctxCanvas.restore();
 
     ctxCanvas.fillStyle = '#a78bfa';
-    ctxCanvas.font = 'italic 20px sans-serif';
-    ctxCanvas.fillText(`"${teamName}"`, width / 2, 105);
+    ctxCanvas.font = 'italic 18px sans-serif';
+    ctxCanvas.fillText(`"${teamName}"`, width / 2, 98);
 
     const teamRating = Math.round(xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / 11);
     
     // Draw OVR badge
-    ctxCanvas.fillStyle = 'rgba(167, 139, 250, 0.15)';
+    ctxCanvas.fillStyle = 'rgba(167, 139, 250, 0.12)';
     ctxCanvas.beginPath();
     ctxCanvas.arc(1080, 80, 45, 0, Math.PI * 2);
     ctxCanvas.fill();
@@ -1064,22 +1088,22 @@ bot.command('image', async (ctx) => {
     const cardHeight = 225; // 4:5 ratio
     const positions = [];
 
-    // Row 1 (y = 160)
+    // Row 1 (y = 170)
     let marginRow1 = (width - (4 * cardWidth)) / 5;
     for (let i = 0; i < 4; i++) {
-      positions.push({ x: marginRow1 + i * (cardWidth + marginRow1), y: 160 });
+      positions.push({ x: marginRow1 + i * (cardWidth + marginRow1), y: 170 });
     }
 
-    // Row 2 (y = 425)
+    // Row 2 (y = 435)
     let marginRow2 = (width - (4 * cardWidth)) / 5;
     for (let i = 0; i < 4; i++) {
-      positions.push({ x: marginRow2 + i * (cardWidth + marginRow2), y: 425 });
+      positions.push({ x: marginRow2 + i * (cardWidth + marginRow2), y: 435 });
     }
 
-    // Row 3 (y = 690)
+    // Row 3 (y = 700)
     let marginRow3 = (width - (3 * cardWidth)) / 4;
     for (let i = 0; i < 3; i++) {
-      positions.push({ x: marginRow3 + i * (cardWidth + marginRow3), y: 690 });
+      positions.push({ x: marginRow3 + i * (cardWidth + marginRow3), y: 700 });
     }
 
     for (let i = 0; i < 11; i++) {
@@ -1107,11 +1131,32 @@ bot.command('image', async (ctx) => {
         ctxCanvas.lineWidth = 3;
         ctxCanvas.strokeRect(pos.x, pos.y, cardWidth, cardHeight);
 
+        // Draw Gold Crown above the card
+        ctxCanvas.fillStyle = '#ffd700';
+        ctxCanvas.save();
+        ctxCanvas.shadowColor = '#ffd700';
+        ctxCanvas.shadowBlur = 10;
+        ctxCanvas.beginPath();
+        const cx = pos.x + cardWidth / 2;
+        const cy = pos.y - 22;
+        const cw = 24;
+        const ch = 16;
+        ctxCanvas.moveTo(cx - cw/2, cy + ch/2);
+        ctxCanvas.lineTo(cx + cw/2, cy + ch/2);
+        ctxCanvas.lineTo(cx + cw/2, cy - ch/4);
+        ctxCanvas.lineTo(cx + cw/4, cy + ch/8);
+        ctxCanvas.lineTo(cx, cy - ch/2);
+        ctxCanvas.lineTo(cx - cw/4, cy + ch/8);
+        ctxCanvas.lineTo(cx - cw/2, cy - ch/4);
+        ctxCanvas.closePath();
+        ctxCanvas.fill();
+        ctxCanvas.restore();
+
         // Draw Captain Badge: A clean gold pill badge with text "CAPTAIN"
         const badgeW = 90;
         const badgeH = 20;
         const badgeX = pos.x + cardWidth / 2 - badgeW / 2;
-        const badgeY = pos.y - 12;
+        const badgeY = pos.y - 7;
 
         ctxCanvas.fillStyle = '#ffd700';
         drawRoundRect(ctxCanvas, badgeX, badgeY, badgeW, badgeH, 4);
