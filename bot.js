@@ -5325,7 +5325,9 @@ app.get('/api/cards/:playerId.jpg', async (req, res) => {
             return res.status(404).send('Player not found');
         }
         const cardPath = await getOrGeneratePlayerCardPath(player);
-        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 days
+        const stat = fs.statSync(cardPath);
+        res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour browser cache
+        res.setHeader('ETag', `W/"${stat.size}-${stat.mtimeMs}"`);
         res.sendFile(cardPath);
     } catch (error) {
         console.error('Error serving card image:', error);

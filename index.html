@@ -1992,11 +1992,18 @@
                      </div>`;
 
                 const card = document.createElement('div');
-                card.className = `player-card glass-panel ${cardClass}`;
                 
                 if (p.image_url) {
+                    card.style.padding = '0';
+                    card.style.border = 'none';
+                    card.style.background = 'none';
+                    card.style.boxShadow = 'none';
+                    card.style.display = 'flex';
+                    card.style.flexDirection = 'column';
+                    card.style.alignItems = 'center';
+                    
                     card.innerHTML = `
-                        <div class="shop-card-img-wrapper">
+                        <div class="shop-card-img-wrapper" style="margin: 0; padding: 0; border: none; background: none;">
                             <img class="shop-player-card-img" src="${p.image_url}" alt="${p.name}">
                         </div>
                         <div style="margin-top: 10px; width: 100%;">
@@ -2004,6 +2011,7 @@
                         </div>
                     `;
                 } else {
+                    card.className = `player-card glass-panel ${cardClass}`;
                     card.innerHTML = `
                         <div>
                             <div class="player-badge-container">
