@@ -1278,3 +1278,8 @@ INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting
   ('ff899d17-44c8-4d31-ac01-362461f12f35', 'Mehran Khan', 'Oman', 'bowler', 44, 77, 77, 'off_spin', 6755, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Balanced'),
   ('ffa51cdf-12d5-4824-be6c-d50b3ac5d7ca', 'Yashasvi Jaiswal', 'India', 'batsman', 85, 46, 85, 'leg_spin', 335250, null, '2026-03-12 14:09:43.586112+00', 'Normal', 'Finisher', 'Balanced'),
   ('ffade93c-9da4-4556-a0c6-19d1ec07050c', 'Sonny Baker', 'England', 'bowler', 34, 77, 76, 'fast', 3250, null, '2026-03-12 14:09:43.586112+00', 'Normal', null, 'Balanced');
+
+-- Manually inserted legends
+INSERT INTO "public"."cricketplayers" ("id", "name", "country", "role", "batting_rating", "bowling_rating", "ovr", "bowler_type", "buy_price", "image_url", "created_at", "tier", "batting_archetype", "bowling_archetype") VALUES
+  ('e1d100e4-1b57-09e6-9b62-b03020e641de', 'Malcolm Marshall', 'West Indies', 'bowler', 46, 98, 98, 'fast', 4155500, null, '2026-03-12 14:09:43.586112+00', 'Legendary', null, 'Strike'),
+  ('b2a5c8e9-df72-4bc6-8d19-ee340dfcf25b', 'Stuart Broad', 'England', 'bowler', 42, 95, 95, 'fast', 2605500, null, '2026-03-12 14:09:43.586112+00', 'Legendary', null, 'Strike');

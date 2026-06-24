@@ -32,7 +32,232 @@ function resolvePlayerPrice(player, acquiredAt) {
 const gameConstants = require('./constants/game');
 const ai = require('./game/ai');
 const { DEFAULT_XI } = require('./game/matchManager');
+const fs = require('fs');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+
+// Register Lemon Milk font
+try {
+  GlobalFonts.registerFromPath(path.join(__dirname, 'assets', 'fonts', 'LEMONMILK-BoldItalic.otf'), 'Lemon Milk');
+} catch (e) {
+  console.error("Error registering Lemon Milk:", e);
+}
+
 const activeLobbies = {};
+const activeTransactions = new Map();
+const cardFileIdCache = new Map();
+let cardFilesCache = [];
+
+function refreshCardFilesCache() {
+  try {
+    const dir = path.join(__dirname, 'assets', 'cards');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cardFilesCache = fs.readdirSync(dir);
+  } catch (e) {
+    console.error("Error reading cards directory:", e);
+  }
+}
+refreshCardFilesCache();
+
+const countryFlags = {
+  'India': '🇮🇳', 'Australia': '🇦🇺', 'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'New Zealand': '🇳🇿',
+  'South Africa': '🇿🇦', 'Pakistan': '🇵🇰', 'West Indies': '🌴', 'West Indies': '🏝️', 'Sri Lanka': '🇱🇰',
+  'Bangladesh': '🇧🇩', 'Afghanistan': '🇦🇫', 'Zimbabwe': '🇿🇼', 'Ireland': '🇮🇪',
+  'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Netherlands': '🇳🇱', 'Namibia': '🇳🇦', 'Nepal': '🇳🇵',
+  'UAE': '🇦🇪', 'Oman': '🇴🇲', 'USA': '🇺🇸', 'Argentina': '🇦🇷', 'Portugal': '🇵🇹',
+  'France': '🇫🇷', 'Norway': '🇳🇴', 'Belgium': '🇧🇪', 'Brazil': '🇧🇷', 'Egypt': '🇪🇬',
+  'Croatia': '🇭🇷', 'Germany': '🇩🇪', 'Spain': '🇪🇸', 'Italy': '🇮🇹', 'Poland': '🇵🇱',
+  'Senegal': '🇸🇳', 'South Korea': '🇰🇷', 'Korea Republic': '🇰🇷', 'Uruguay': '🇺🇾',
+  'Canada': '🇨🇦', 'Morocco': '🇲🇦', 'Japan': '🇯🇵', 'Colombia': '🇨🇴'
+};
+
+function findPreexistingCard(playerName) {
+  const target = playerName.toLowerCase().replace(/[\s_]+/g, '');
+  const matchedFile = cardFilesCache.find(f => f.toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[\s_]+/g, '') === target);
+  if (matchedFile) {
+    return path.join(__dirname, 'assets', 'cards', matchedFile);
+  }
+  return null;
+}
+
+async function getOrGeneratePlayerCardPath(player) {
+  const existingPath = findPreexistingCard(player.name);
+  if (existingPath) {
+    return existingPath;
+  }
+
+  const templatePath = path.join(__dirname, 'assets', 'CricTemplate.jpeg');
+  const template = await loadImage(templatePath);
+  const width = template.width;
+  const height = template.height;
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.drawImage(template, 0, 0, width, height);
+
+  const name = player.name.toUpperCase();
+  const batting = String(player.batting_rating || 0);
+  const bowling = String(player.bowling_rating || 0);
+  const ovr = String(player.ovr || 0);
+
+  const battingBowlingSize = 110;
+  const overallSize = battingBowlingSize * 0.9;
+  const nameSize = battingBowlingSize * 0.6;
+
+  const nameX = 542.5;
+  const nameY = 1020;
+
+  const battingX = 200;
+  const battingY = 1225;
+
+  const bowlingX = 860;
+  const bowlingY = 1225;
+
+  const ovrX = 542.5;
+  const ovrY = 1253;
+
+  function drawGradientText(text, x, y, fontSize) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${fontSize}px "Lemon Milk"`;
+
+    const yStart = y - fontSize / 2;
+    const yEnd = y + fontSize / 2;
+    const grad = ctx.createLinearGradient(0, yStart, 0, yEnd);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#ff1a1a');
+
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(6, fontSize * 0.08);
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y);
+
+    ctx.fillStyle = grad;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  drawGradientText(name, nameX, nameY, nameSize);
+  drawGradientText(batting, battingX, battingY, battingBowlingSize);
+  drawGradientText(bowling, bowlingX, bowlingY, battingBowlingSize);
+  drawGradientText(ovr, ovrX, ovrY, overallSize);
+
+  const buffer = canvas.toBuffer('image/jpeg', 95);
+
+  const cleanName = player.name.replace(/\s+/g, '_');
+  const targetPath = path.join(__dirname, 'assets', 'cards', `${cleanName}.jpg`);
+  
+  try {
+    fs.writeFileSync(targetPath, buffer);
+    refreshCardFilesCache();
+  } catch (err) {
+    console.error("Error writing generated card image:", err);
+  }
+
+  return targetPath;
+}
+
+async function sendPlayerCard(ctx, player, extraOptions = {}) {
+  const cachedFileId = cardFileIdCache.get(player.id);
+  if (cachedFileId) {
+    try {
+      return await ctx.replyWithPhoto(cachedFileId, extraOptions);
+    } catch (e) {
+      console.warn("Cached file_id expired or invalid, refalling back:", e);
+      cardFileIdCache.delete(player.id);
+    }
+  }
+
+  try {
+    const cardPath = await getOrGeneratePlayerCardPath(player);
+    const file = new InputFile(cardPath);
+    const msg = await ctx.replyWithPhoto(file, extraOptions);
+    if (msg?.photo?.length > 0) {
+      cardFileIdCache.set(player.id, msg.photo[msg.photo.length - 1].file_id);
+    }
+    return msg;
+  } catch (err) {
+    console.error("Failed to send player card:", err);
+    const textFallback = `👤 <b>${escapeHTML(player.name)}</b> (OVR: ${player.ovr})\n🏏 Batting: ${player.batting_rating} | Bowling: ${player.bowling_rating}`;
+    return await ctx.reply(textFallback, { parse_mode: 'HTML', ...extraOptions });
+  }
+}
+
+async function resolvePlayerForUser(ctx, targetUserId, query) {
+  if (!sb.supabase) {
+    await ctx.reply("❌ Database stats are currently disabled.", { parse_mode: 'HTML' });
+    return null;
+  }
+
+  if (!query) return null;
+
+  try {
+    const squad = await sb.getUserCricketTeam(targetUserId);
+    const squadMatches = squad.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+    
+    if (squadMatches.length === 1) {
+      return squadMatches[0];
+    }
+    
+    if (squadMatches.length > 1) {
+      const exactMatch = squadMatches.find(p => p.name.toLowerCase() === query.toLowerCase());
+      if (exactMatch) return exactMatch;
+      
+      const list = squadMatches.slice(0, 10).map(p => `• <b>${escapeHTML(p.name)}</b> (OVR: ${p.ovr})`).join('\n');
+      const truncated = squadMatches.length > 10 ? `\n...and ${squadMatches.length - 10} more.` : '';
+      await ctx.reply(
+        `🔍 <b>Multiple players found in the user's squad matching "${escapeHTML(query)}":</b>\n\n${list}${truncated}\n\n` +
+        `<i>Please specify a more precise name.</i>`,
+        { parse_mode: 'HTML' }
+      );
+      return null;
+    }
+    
+    const cricketFromDb = await sb.getCricketPlayers();
+    if (!cricketFromDb || cricketFromDb.length === 0) {
+      await ctx.reply("❌ No players found in the database.", { parse_mode: 'HTML' });
+      return null;
+    }
+
+    const globalMatches = cricketFromDb.filter(p => 
+      p.name.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (globalMatches.length === 0) {
+      await ctx.reply(`❌ No player matches your search for "<b>${escapeHTML(query)}</b>".`, { parse_mode: 'HTML' });
+      return null;
+    }
+
+    if (globalMatches.length > 1) {
+      const exactMatch = globalMatches.find(p => p.name.toLowerCase() === query.toLowerCase());
+      if (exactMatch) {
+        return exactMatch;
+      } else {
+        const list = globalMatches.slice(0, 10).map(p => `• <b>${escapeHTML(p.name)}</b> (OVR: ${p.ovr})`).join('\n');
+        const truncated = globalMatches.length > 10 ? `\n...and ${globalMatches.length - 10} more.` : '';
+        await ctx.reply(
+          `🔍 <b>Multiple players found matching "${escapeHTML(query)}":</b>\n\n${list}${truncated}\n\n` +
+          `<i>Please specify a more precise name.</i>`,
+          { parse_mode: 'HTML' }
+        );
+        return null;
+      }
+    }
+
+    return globalMatches[0];
+  } catch (error) {
+    console.error("Error in resolvePlayerForUser:", error);
+    await ctx.reply("❌ An error occurred while searching for the player.", { parse_mode: 'HTML' });
+    return null;
+  }
+}
+
 
 function getUserActiveLobby(userId) {
   for (const lobby of Object.values(activeLobbies)) {
@@ -1086,6 +1311,13 @@ bot.command('sell', async (ctx) => {
   }
 
   const userId = ctx.from.id;
+
+  // Check active transaction
+  const active = activeTransactions.get(userId);
+  if (active && Date.now() < active.expiresAt) {
+    return ctx.reply("⚠️ You already have a pending transaction active. Please complete, cancel, or wait for it to expire.");
+  }
+
   await sb.ensureUser(userId, ctx.from.first_name).catch(() => {});
 
   try {
@@ -1159,6 +1391,13 @@ bot.command('sell', async (ctx) => {
     const actualBuyPrice = resolvePlayerPrice(player, player.acquired_at);
     const sellPrice = Math.round(actualBuyPrice * 0.55);
 
+    // Register active transaction
+    activeTransactions.set(userId, {
+      type: 'sell',
+      expiresAt: Date.now() + 3 * 60 * 1000,
+      playerId: player.id
+    });
+
     const text = `⚠️ <b>Confirm Player Sale</b>\n\n` +
                  `Are you sure you want to sell <b>${escapeHTML(player.name)}</b>?\n` +
                  `• OVR: <b>${player.ovr}</b>\n` +
@@ -1171,10 +1410,105 @@ bot.command('sell', async (ctx) => {
       .text("✅ Yes, Sell", `sell_y:${player.sport === 'cricket' ? 'c' : 'f'}:${player.id}:${userId}`)
       .text("❌ No, Cancel", `sell_n:${userId}`);
 
-    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    const sentMsg = await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+
+    // 3 minute timeout
+    const timeoutId = setTimeout(async () => {
+      const currentActive = activeTransactions.get(userId);
+      if (currentActive && currentActive.type === 'sell' && currentActive.messageId === sentMsg.message_id) {
+        activeTransactions.delete(userId);
+        try {
+          await ctx.api.editMessageText(ctx.chat.id, sentMsg.message_id, `❌ Sale request for <b>${escapeHTML(player.name)}</b> has expired.`, { reply_markup: null });
+        } catch (e) {}
+      }
+    }, 3 * 60 * 1000);
+
+    // Update with message details
+    activeTransactions.set(userId, {
+      type: 'sell',
+      expiresAt: Date.now() + 3 * 60 * 1000,
+      playerId: player.id,
+      chatId: ctx.chat.id,
+      messageId: sentMsg.message_id,
+      timeoutId: timeoutId
+    });
+
   } catch (error) {
     console.error("Error in /sell command:", error);
+    activeTransactions.delete(userId);
     await ctx.reply("❌ An error occurred while processing the sale request.");
+  }
+});
+
+bot.command('buy', async (ctx) => {
+  if (!sb.supabase) return ctx.reply("Database stats are currently disabled.");
+
+  const query = ctx.match?.trim();
+  if (!query) {
+    return ctx.reply("❌ Usage: <code>/buy &lt;player name&gt;</code>\nExample: <code>/buy Virat Kohli</code>", { parse_mode: 'HTML' });
+  }
+
+  const userId = ctx.from.id;
+  
+  // Check active transaction
+  const active = activeTransactions.get(userId);
+  if (active && Date.now() < active.expiresAt) {
+    return ctx.reply("⚠️ You already have a pending transaction active. Please complete, cancel, or wait for it to expire.");
+  }
+
+  const player = await resolveCricketPlayer(ctx, query);
+  if (!player) return;
+
+  // Set lock immediately
+  activeTransactions.set(userId, {
+    type: 'buy',
+    expiresAt: Date.now() + 3 * 60 * 1000,
+    playerId: player.id
+  });
+
+  const roleStr = (player.role || 'N/A').toUpperCase().replace('_', ' ');
+  const flag = countryFlags[player.country] || '🏳️';
+  const priceStr = player.buy_price ? player.buy_price.toLocaleString() : 'N/A';
+  const caption = `<b>${roleStr}</b> ${flag}\n\n<blockquote>💰 <b>${priceStr}</b> coins</blockquote>`;
+
+  const kb = new InlineKeyboard()
+    .text("Buy", `buy_confirm:${player.id}:${userId}`)
+    .text("Cancel", `buy_cancel:${player.id}:${userId}`);
+
+  try {
+    const sentMsg = await sendPlayerCard(ctx, player, {
+      caption: caption,
+      parse_mode: 'HTML',
+      reply_markup: kb
+    });
+
+    const timeoutId = setTimeout(async () => {
+      const currentActive = activeTransactions.get(userId);
+      if (currentActive && currentActive.type === 'buy' && currentActive.messageId === sentMsg.message_id) {
+        activeTransactions.delete(userId);
+        try {
+          await ctx.api.editMessageCaption(ctx.chat.id, sentMsg.message_id, {
+            caption: `❌ Buying request for <b>${escapeHTML(player.name)}</b> has expired.`,
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: [] }
+          });
+        } catch (e) {}
+      }
+    }, 3 * 60 * 1000);
+
+    activeTransactions.set(userId, {
+      type: 'buy',
+      expiresAt: Date.now() + 3 * 60 * 1000,
+      playerId: player.id,
+      chatId: ctx.chat.id,
+      messageId: sentMsg.message_id,
+      timeoutId: timeoutId
+    });
+
+  } catch (err) {
+    console.error("Error sending buy player card:", err);
+    activeTransactions.delete(userId);
+    ctx.reply(`❌ Failed to initiate purchase: ${err.message}`);
   }
 });
 
@@ -1689,7 +2023,7 @@ bot.command('cs', async (ctx) => {
     return ctx.reply("❌ Usage: <code>/cs &lt;player name&gt;</code>\nExample: <code>/cs Virat Kohli</code>", { parse_mode: 'HTML' });
   }
 
-  const player = await resolveCricketPlayer(ctx, query);
+  const player = await resolvePlayerForUser(ctx, ctx.from.id, query);
   if (!player) return;
 
   const completedMatches = await sb.getAllCompletedMatches();
@@ -1821,7 +2155,7 @@ bot.command('cs', async (ctx) => {
              `• <b>Best Figures:</b> <code>${bestBowlingStr}</code>\n` +
              `═════════════════════════════`;
 
-  await ctx.reply(message, { parse_mode: 'HTML' });
+  await sendPlayerCard(ctx, player, { caption: message, parse_mode: 'HTML' });
 });
 
 bot.command('ps', async (ctx) => {
@@ -1833,7 +2167,7 @@ bot.command('ps', async (ctx) => {
   const targetUserId = ctx.message.reply_to_message?.from?.id || ctx.from.id;
   const targetFirstName = ctx.message.reply_to_message?.from?.first_name || ctx.from.first_name || "User";
 
-  const player = await resolveCricketPlayer(ctx, query);
+  const player = await resolvePlayerForUser(ctx, targetUserId, query);
   if (!player) return;
 
   if (sb.supabase) {
@@ -1919,7 +2253,8 @@ bot.command('ps', async (ctx) => {
   const teamName = profile?.team_name ? `"${profile.team_name}"` : `${targetFirstName}'s XI`;
 
   if (matchesPlayed === 0) {
-    return ctx.reply(`🏏 <b>${escapeHTML(player.name)}</b> hasn't played any matches for <b>${escapeHTML(teamName)}</b> yet!`, { parse_mode: 'HTML' });
+    const emptyMsg = `🏏 <b>${escapeHTML(player.name)}</b> hasn't played any matches for <b>${escapeHTML(teamName)}</b> yet!`;
+    return await sendPlayerCard(ctx, player, { caption: emptyMsg, parse_mode: 'HTML' });
   }
 
   const battingAvg = dismissals > 0 ? (runs / dismissals).toFixed(2) : (runs > 0 ? `${runs}*` : '0.00');
@@ -1964,7 +2299,7 @@ bot.command('ps', async (ctx) => {
                   `• <b>Best Figures:</b> <code>${bestBowlingStr}</code>\n` +
                   `═════════════════════════════`;
 
-  await ctx.reply(message, { parse_mode: 'HTML' });
+  await sendPlayerCard(ctx, player, { caption: message, parse_mode: 'HTML' });
 });
 
 bot.command('addplayer', async (ctx) => {
@@ -3290,6 +3625,83 @@ bot.on('callback_query:data', async (ctx) => {
   const chatId = ctx.chat.id;
   const user = ctx.from;
 
+  // --- PLAYER BUY CALLBACKS ---
+  if (data.startsWith('buy_confirm:') || data.startsWith('buy_cancel:')) {
+    const parts = data.split(':');
+    const playerId = parts[1];
+    const initiatorId = parseInt(parts[2], 10);
+
+    if (user.id !== initiatorId) {
+      return ctx.answerCallbackQuery({
+        text: "⚠️ Only the player who initiated this buying command can confirm or cancel it.",
+        show_alert: true
+      });
+    }
+
+    await ctx.answerCallbackQuery().catch(() => {});
+
+    // Clear transaction state immediately
+    const active = activeTransactions.get(initiatorId);
+    if (active && active.type === 'buy') {
+      if (active.timeoutId) clearTimeout(active.timeoutId);
+      activeTransactions.delete(initiatorId);
+    }
+
+    if (data.startsWith('buy_cancel:')) {
+      await ctx.editMessageCaption({
+        caption: `❌ Buying request has been cancelled.`,
+        reply_markup: { inline_keyboard: [] }
+      }).catch(() => {});
+      return;
+    }
+
+    try {
+      const cricketFromDb = await sb.getCricketPlayers();
+      const player = cricketFromDb.find(p => p.id === playerId);
+      if (!player) {
+        await ctx.editMessageCaption({
+          caption: "❌ Player details not found.",
+          reply_markup: { inline_keyboard: [] }
+        }).catch(() => {});
+        return;
+      }
+
+      // Check balance
+      const profile = await sb.getProfile(initiatorId);
+      const currentCoins = profile?.coins || 0;
+      if (currentCoins < player.buy_price) {
+        await ctx.editMessageCaption({
+          caption: `❌ You need more to buy ${escapeHTML(player.name)}`,
+          reply_markup: { inline_keyboard: [] }
+        }).catch(() => {});
+        return;
+      }
+
+      const result = await sb.buyPlayer(initiatorId, player.id, 'cricket', player.buy_price);
+      if (result.success) {
+        await ctx.editMessageCaption({
+          caption: `✅ <b>Player Purchased Successfully!</b>\n\n` +
+                   `You bought <b>${escapeHTML(player.name)}</b> for 💰 <b>${player.buy_price.toLocaleString()} coins</b>.\n` +
+                   `Your new balance is: 💰 <b>${result.newBalance.toLocaleString()} coins</b>.`,
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [] }
+        }).catch(() => {});
+      } else {
+        await ctx.editMessageCaption({
+          caption: `❌ Purchase failed: ${result.error}`,
+          reply_markup: { inline_keyboard: [] }
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("Error in player buy callback:", err);
+      await ctx.editMessageCaption({
+        caption: "❌ An error occurred during the purchase.",
+        reply_markup: { inline_keyboard: [] }
+      }).catch(() => {});
+    }
+    return;
+  }
+
   // --- CRICKET LOBBY CALLBACKS ---
   if (data === 'cric_cancel_lobby') {
     const lobby = activeLobbies[chatId];
@@ -3823,6 +4235,13 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     await ctx.answerCallbackQuery().catch(() => {});
+
+    // Clear transaction state immediately
+    const active = activeTransactions.get(initiatorId);
+    if (active && active.type === 'sell') {
+      if (active.timeoutId) clearTimeout(active.timeoutId);
+      activeTransactions.delete(initiatorId);
+    }
     
     if (data.startsWith('sell_n:')) {
       await ctx.editMessageText("❌ Player sale cancelled.", { reply_markup: null }).catch(() => {});
@@ -4799,7 +5218,6 @@ bot.catch((err) => {
   console.error(`Error in update ${err.ctx?.update?.update_id}:`, err.error);
 });
 
-const fs = require('fs');
 const express = require('express');
 const app = express();
 app.use(express.json());
@@ -4885,7 +5303,6 @@ function getCricketPlayerImageUrl(name) {
     return null;
 }
 
-// Serve player images case-insensitively with aggressive caching (30 days)
 app.get('/assets/players/:filename', (req, res) => {
     const requested = req.params.filename.toLowerCase();
     const actualFile = cricketImageCache.get(requested);
@@ -4894,6 +5311,23 @@ app.get('/assets/players/:filename', (req, res) => {
         res.sendFile(path.join(crickidexPlayersDir, actualFile));
     } else {
         res.status(404).send('Not found');
+    }
+});
+
+app.get('/api/cards/:playerId.jpg', async (req, res) => {
+    const { playerId } = req.params;
+    try {
+        const cricketFromDb = await sb.getCricketPlayers();
+        const player = cricketFromDb.find(p => p.id === playerId);
+        if (!player) {
+            return res.status(404).send('Player not found');
+        }
+        const cardPath = await getOrGeneratePlayerCardPath(player);
+        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 days
+        res.sendFile(cardPath);
+    } catch (error) {
+        console.error('Error serving card image:', error);
+        res.status(500).send('Error serving card');
     }
 });
 
@@ -5036,7 +5470,7 @@ app.get('/api/drop-player', async (req, res) => {
 
         // 8. Build rarity info
         const rarity = getPlayerDropRarity(pickedPlayer.ovr);
-        const imageUrl = getCricketPlayerImageUrl(pickedPlayer.name);
+        const imageUrl = `/api/cards/${pickedPlayer.id}.jpg`;
 
         // 9. Edit bot message
         if (msgId && msgId !== 0) {
@@ -5243,7 +5677,7 @@ app.get('/api/shop/players', async (req, res) => {
             ovr: p.ovr,
             buy_price: p.buy_price,
             tier: p.tier || 'Normal',
-            image_url: getCricketPlayerImageUrl(p.name)
+            image_url: `/api/cards/${p.id}.jpg`
         }));
 
         res.json({
