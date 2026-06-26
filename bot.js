@@ -1676,11 +1676,15 @@ bot.command('daily', async (ctx) => {
   const userId = ctx.from.id;
   let isMember = false;
   
-  try {
-      const member = await ctx.api.getChatMember(OFFICIAL_GC_ID, userId);
-      isMember = ['member', 'administrator', 'creator'].includes(member.status);
-  } catch (e) {
-      isMember = false;
+  if (ctx.chat && ctx.chat.id === OFFICIAL_GC_ID) {
+      isMember = true;
+  } else {
+      try {
+          const member = await ctx.api.getChatMember(OFFICIAL_GC_ID, userId);
+          isMember = ['member', 'administrator', 'creator', 'restricted'].includes(member.status);
+      } catch (e) {
+          isMember = false;
+      }
   }
   
   const amount = isMember ? 1000 : 500;
