@@ -345,7 +345,41 @@ function addMatchPlayButton(kb, match, ctx = null) {
 
 
 const SUPER_ADMIN_IDS = [7361215114]; // Super Admins
-const ADMIN_IDS = [7361215114, 8483239518, 1315564307]; // Bot Owners
+const HARDCODED_ADMIN_IDS = [7361215114, 8483239518, 1315564307]; // Bot Owners
+let ADMIN_IDS = [...HARDCODED_ADMIN_IDS];
+
+async function loadAdmins() {
+  if (!sb.supabase) return;
+  try {
+    const { data: addedAdmins } = await sb.supabase
+      .from('user_owned_players')
+      .select('user_id')
+      .eq('sport', 'admin')
+      .eq('player_id', 'admin');
+    
+    const { data: removedAdmins } = await sb.supabase
+      .from('user_owned_players')
+      .select('user_id')
+      .eq('sport', 'removed_admin')
+      .eq('player_id', 'removed_admin');
+
+    const addedIds = (addedAdmins || []).map(a => Number(a.user_id));
+    const removedIds = (removedAdmins || []).map(r => Number(r.user_id));
+
+    const currentAdmins = new Set(HARDCODED_ADMIN_IDS);
+    for (const id of addedIds) {
+      currentAdmins.add(id);
+    }
+    for (const id of removedIds) {
+      currentAdmins.delete(id);
+    }
+
+    ADMIN_IDS = Array.from(currentAdmins);
+    console.log("Loaded admins from database:", ADMIN_IDS);
+  } catch (e) {
+    console.error("Error loading admins from database:", e);
+  }
+}
 
 async function notifySuperAdmins(ctx, actionName, details) {
   for (const id of SUPER_ADMIN_IDS) {
@@ -1730,6 +1764,68 @@ bot.command('addmod', async (ctx) => {
   }
 });
 
+bot.command('addadmin', async (ctx) => {
+  if (!SUPER_ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  let targetUserId = null;
+  let targetFirstName = "User";
+
+  if (ctx.message.reply_to_message) {
+      targetUserId = ctx.message.reply_to_message.from.id;
+      targetFirstName = ctx.message.reply_to_message.from.first_name || "User";
+  } else {
+      const args = ctx.message.text.split(' ');
+      if (args.length < 2) {
+          return ctx.reply("❌ Usage: Reply to a user with `/addadmin` or use `/addadmin <userId>`", { parse_mode: 'HTML' });
+      }
+      targetUserId = parseInt(args[1]);
+      if (isNaN(targetUserId)) {
+          return ctx.reply("❌ Invalid User ID specified.");
+      }
+  }
+
+  await sb.ensureUser(targetUserId, targetFirstName).catch(() => {});
+  
+  const success = await sb.addAdmin(targetUserId);
+  if (success) {
+      await loadAdmins();
+      await ctx.reply(`✅ Successfully added <b>${escapeHTML(targetFirstName)}</b> (ID: <code>${targetUserId}</code>) as an Admin!`, { parse_mode: 'HTML' });
+      await notifySuperAdmins(ctx, 'Add Admin', `Added <b>${escapeHTML(targetFirstName)}</b> (ID: <code>${targetUserId}</code>) as an Admin.`);
+  } else {
+      await ctx.reply("❌ Failed to add Admin. Please try again.", { parse_mode: 'HTML' });
+  }
+});
+
+bot.command('removeadmin', async (ctx) => {
+  if (!SUPER_ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  let targetUserId = null;
+  let targetFirstName = "User";
+
+  if (ctx.message.reply_to_message) {
+      targetUserId = ctx.message.reply_to_message.from.id;
+      targetFirstName = ctx.message.reply_to_message.from.first_name || "User";
+  } else {
+      const args = ctx.message.text.split(' ');
+      if (args.length < 2) {
+          return ctx.reply("❌ Usage: Reply to a user with `/removeadmin` or use `/removeadmin <userId>`", { parse_mode: 'HTML' });
+      }
+      targetUserId = parseInt(args[1]);
+      if (isNaN(targetUserId)) {
+          return ctx.reply("❌ Invalid User ID specified.");
+      }
+  }
+
+  const success = await sb.removeAdmin(targetUserId);
+  if (success) {
+      await loadAdmins();
+      await ctx.reply(`✅ Successfully removed User ID <code>${targetUserId}</code> from Admins!`, { parse_mode: 'HTML' });
+      await notifySuperAdmins(ctx, 'Remove Admin', `Removed User ID: <code>${targetUserId}</code> from Admins.`);
+  } else {
+      await ctx.reply("❌ Failed to remove Admin. Please try again.", { parse_mode: 'HTML' });
+  }
+});
+
 bot.command('remove', async (ctx) => {
   const isMod = await sb.checkIsModerator(ctx.from.id);
   const isAdmin = ADMIN_IDS.includes(ctx.from.id);
@@ -3054,10 +3150,16 @@ function convertTelegramToHtml(text, entities) {
     return result;
 }
 
+let activeBroadcastCancel = false;  // Flag to cancel active broadcast
+
 async function sendBroadcast(ctx, targetIds, messageText, replyMessageId, copyCurrentMessageWithCaption = null) {
     let success = 0;
     let failed = 0;
     const total = targetIds.length;
+    
+    // Clear last broadcast tracking in DB and reset cancel flag
+    await sb.clearLastBroadcastMessages();
+    activeBroadcastCancel = false;
     
     let statusMsg;
     try {
@@ -3068,6 +3170,16 @@ async function sendBroadcast(ctx, targetIds, messageText, replyMessageId, copyCu
     }
     
     for (let i = 0; i < total; i++) {
+        // Check cancel flag
+        if (activeBroadcastCancel) {
+            try {
+                await bot.api.sendMessage(ctx.chat.id, `🛑 <b>Broadcast Cancelled by Super Admin</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
+            } catch (e) {}
+            // Reset flag
+            activeBroadcastCancel = false;
+            break;
+        }
+
         const targetId = targetIds[i];
         try {
             let sentMsgId;
@@ -3086,6 +3198,10 @@ async function sendBroadcast(ctx, targetIds, messageText, replyMessageId, copyCu
                 // Standard text broadcast, no default "Announcement" prefix
                 const res = await bot.api.sendMessage(targetId, messageText, { parse_mode: 'HTML' });
                 sentMsgId = res.message_id;
+            }
+            
+            if (sentMsgId) {
+                await sb.saveBroadcastMessage(targetId, sentMsgId);
             }
             
             // Pin the message in both groups and private chats
@@ -3112,10 +3228,66 @@ async function sendBroadcast(ctx, targetIds, messageText, replyMessageId, copyCu
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    try {
-        await bot.api.sendMessage(ctx.chat.id, `🏁 <b>Broadcast Complete</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
-    } catch (e) {}
+    // Only send completion message if we didn't cancel early
+    if (!activeBroadcastCancel) {
+        try {
+            await bot.api.sendMessage(ctx.chat.id, `🏁 <b>Broadcast Complete</b>\n\n✅ Success: ${success}\n❌ Failed: ${failed}`, { parse_mode: 'HTML' });
+        } catch (e) {}
+    }
 }
+
+bot.command('stopbroadcast', async (ctx) => {
+  if (!SUPER_ADMIN_IDS.includes(ctx.from.id)) return;
+  activeBroadcastCancel = true;
+  await ctx.reply("⏳ <b>Signal sent to stop the active broadcast.</b>\nIt will cease on the next message iteration.", { parse_mode: 'HTML' });
+});
+
+bot.command(['revertbroadcast', 'deletebroadcast'], async (ctx) => {
+  if (!SUPER_ADMIN_IDS.includes(ctx.from.id)) return;
+  
+  const messages = await sb.getLastBroadcastMessages();
+  if (messages.length === 0) {
+      return ctx.reply("❌ No broadcast messages in database to revert, or they have already been reverted.");
+  }
+  
+  const total = messages.length;
+  let success = 0;
+  let failed = 0;
+  
+  const statusMsg = await ctx.reply(`🗑️ <b>Reverting last broadcast...</b>\n\nDeleting ${total} messages. Progress: 0/${total}`, { parse_mode: 'HTML' });
+  
+  for (let i = 0; i < total; i++) {
+      const item = messages[i];
+      try {
+          // Unpin the message if possible first
+          await bot.api.unpinChatMessage(item.chatId, item.messageId).catch(() => {});
+          // Delete message
+          await bot.api.deleteMessage(item.chatId, item.messageId);
+          success++;
+      } catch (e) {
+          failed++;
+      }
+      
+      if (i % 10 === 0 || i === total - 1) {
+          try {
+              await bot.api.editMessageText(ctx.chat.id, statusMsg.message_id,
+                  `🗑️ <b>Reverting last broadcast...</b> (${i + 1}/${total})\n\n` +
+                  `✅ Deleted: ${success}\n` +
+                  `❌ Failed: ${failed}`,
+                  { parse_mode: 'HTML' }
+              );
+          } catch (e) {}
+      }
+      
+      // Delay to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  
+  // Clear the database tracking after reverting
+  await sb.clearLastBroadcastMessages();
+  
+  await ctx.reply(`🏁 <b>Revert Complete</b>\n\n✅ Successfully deleted: ${success}\n❌ Failed/Skipped: ${failed}`, { parse_mode: 'HTML' });
+});
 
 bot.on(['message:text', 'message:caption'], async (ctx, next) => {
   const rawText = ctx.message.text || ctx.message.caption || '';
@@ -3126,7 +3298,7 @@ bot.on(['message:text', 'message:caption'], async (ctx, next) => {
       return next();
   }
   
-  if (!ADMIN_IDS.includes(ctx.from.id)) return;
+  if (!SUPER_ADMIN_IDS.includes(ctx.from.id)) return;
   
   const match = rawText.match(/^\/\S+\s*/);
   const offsetShift = match ? match[0].length : 0;
@@ -6810,6 +6982,10 @@ if (require.main === module) {
     { command: "myword", description: "Re-send your secret word to DM" },
     { command: "settings", description: "Configure game settings" },
     { command: "remove", description: "Admin: Remove user from active cricket match" },
+    { command: "addadmin", description: "SuperAdmin: Promote a user to Admin" },
+    { command: "removeadmin", description: "SuperAdmin: Demote an Admin" },
+    { command: "stopbroadcast", description: "SuperAdmin: Stop active broadcast" },
+    { command: "revertbroadcast", description: "SuperAdmin: Delete last broadcast" },
     { command: "cancel", description: "Cancel current game" },
     { command: "quit", description: "Quit current game" },
     { command: "help", description: "Show bot help" },
@@ -6821,6 +6997,7 @@ if (require.main === module) {
     botInfo = info;
     console.log(`Bot started as @${info.username}`);
     matchManager.loadActiveMatchesFromDb().catch(e => console.error("Match recovery failed:", e));
+    loadAdmins().catch(e => console.error("Admin loading failed:", e));
   });
   bot.start(); 
 

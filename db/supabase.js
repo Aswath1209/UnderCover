@@ -594,6 +594,116 @@ async function addModerator(userId) {
   }
 }
 
+async function checkIsAdmin(userId) {
+  if (!supabase) return false;
+  try {
+    const { data } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', 'admin')
+      .eq('sport', 'admin')
+      .maybeSingle();
+    return !!data;
+  } catch (e) {
+    console.error("checkIsAdmin error:", e);
+    return false;
+  }
+}
+
+async function addAdmin(userId) {
+  if (!supabase) return false;
+  try {
+    await supabase.from('user_owned_players')
+      .delete()
+      .eq('user_id', userId)
+      .eq('player_id', 'removed_admin')
+      .eq('sport', 'removed_admin');
+
+    const isAlreadyAdmin = await checkIsAdmin(userId);
+    if (isAlreadyAdmin) return true;
+    const { error } = await supabase.from('user_owned_players').insert({
+      user_id: userId,
+      player_id: 'admin',
+      sport: 'admin'
+    });
+    return !error;
+  } catch (e) {
+    console.error("addAdmin error:", e);
+    return false;
+  }
+}
+
+async function removeAdmin(userId) {
+  if (!supabase) return false;
+  try {
+    await supabase.from('user_owned_players')
+      .delete()
+      .eq('user_id', userId)
+      .eq('player_id', 'admin')
+      .eq('sport', 'admin');
+
+    const { data: existing } = await supabase.from('user_owned_players')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('player_id', 'removed_admin')
+      .eq('sport', 'removed_admin')
+      .maybeSingle();
+
+    if (!existing) {
+      const { error } = await supabase.from('user_owned_players').insert({
+        user_id: userId,
+        player_id: 'removed_admin',
+        sport: 'removed_admin'
+      });
+      if (error) return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("removeAdmin error:", e);
+    return false;
+  }
+}
+
+async function saveBroadcastMessage(chatId, messageId) {
+  if (!supabase) return;
+  try {
+    await supabase.from('user_owned_players').insert({
+      user_id: chatId,
+      player_id: messageId.toString(),
+      sport: 'last_broadcast'
+    });
+  } catch (e) {
+    console.error("saveBroadcastMessage error:", e);
+  }
+}
+
+async function getLastBroadcastMessages() {
+  if (!supabase) return [];
+  try {
+    const { data } = await supabase.from('user_owned_players')
+      .select('user_id, player_id')
+      .eq('sport', 'last_broadcast');
+    return (data || []).map(row => ({
+      chatId: Number(row.user_id),
+      messageId: Number(row.player_id)
+    }));
+  } catch (e) {
+    console.error("getLastBroadcastMessages error:", e);
+    return [];
+  }
+}
+
+async function clearLastBroadcastMessages() {
+  if (!supabase) return;
+  try {
+    await supabase.from('user_owned_players')
+      .delete()
+      .eq('sport', 'last_broadcast');
+  } catch (e) {
+    console.error("clearLastBroadcastMessages error:", e);
+  }
+}
+
 async function getUserOwnedPlayers(userId) {
   if (!supabase) return [];
   try {
@@ -1370,6 +1480,12 @@ module.exports = {
   recordJackpotClaim,
   checkIsModerator,
   addModerator,
+  checkIsAdmin,
+  addAdmin,
+  removeAdmin,
+  saveBroadcastMessage,
+  getLastBroadcastMessages,
+  clearLastBroadcastMessages,
   DEFAULT_SETTINGS,
   saveCricketMatch,
   getCricketMatchById,
