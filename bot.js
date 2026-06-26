@@ -417,11 +417,10 @@ function getRandomReward() {
  * Pick a random cricket player for the Mystery Drop.
  * OVR range: ~50 to 86 (capped by DB data).
  *
- * Weight formula: w(ovr) = e^(-k * (ovr - 50))   where k = 0.42
+ * Weight formula: w(ovr) = e^(-k * (ovr - 50))   where k = 0.28
  *
- * This gives a very steep exponential decay so that high OVR players (80+)
- * are very rare, and low OVR players (under 76 OVR) represent about 80% of drops,
- * making the lowest OVRs (like 64) easily obtainable.
+ * This gives an exponential decay so that high OVR players (80+)
+ * represent about 10% of drops, and players 76 OVR or above represent about 51% of drops.
  *
  * @param {Array} players - Full cricketplayers array from DB
  * @param {Array} ownedIds - Player IDs the user already owns (excluded)
@@ -429,7 +428,7 @@ function getRandomReward() {
  */
 function getRandomPlayerDrop(players, ownedIds = []) {
   const MAX_OVR = 86;
-  const K = 0.42; // decay constant
+  const K = 0.28; // decay constant
 
   // Filter to only unowned cricket players at or below the cap
   const ownedSet = new Set(ownedIds);
@@ -1606,7 +1605,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Ishan Kishan</b> (85 OVR Wicketkeeper)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Will Jacks</b> (85 OVR All-Rounder)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -6957,7 +6956,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Ishan Kishan" },
+    { command: "spin", description: "🎡 Spin the wheel to win Will Jacks" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },

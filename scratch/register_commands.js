@@ -8,7 +8,7 @@ async function run() {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Ishan Kishan" },
+    { command: "spin", description: "🎡 Spin the wheel to win Will Jacks" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },
