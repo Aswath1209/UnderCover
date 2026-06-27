@@ -8,7 +8,7 @@ function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") 
   const botUsername = ctx.me?.username || bot.botInfo?.username || 'Imposter0_bot';
   
   if (isPrivate) {
-    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com'}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=${tab}`;
+    const miniAppUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-fuxy.onrender.com'}/bonus-app?msg_id=0&chat_id=${ctx.chat.id}&tab=${tab}`;
     kb.webApp(label, miniAppUrl);
   } else {
     const directLink = `https://t.me/${botUsername}/bonus?startapp=${tab}`;

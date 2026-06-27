@@ -297,18 +297,18 @@ function getUserActiveLobby(userId) {
 
 
 function getWebAppUrl(chatId, tab = '') {
-  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-fuxy.onrender.com';
   if (host === 'undefined' || !host) {
-    host = 'undercover-bot.onrender.com';
+    host = 'undercover-fuxy.onrender.com';
   }
   const cleanHost = host.replace(/^https?:\/\//, '');
   return `https://${cleanHost}/bonus-app?msg_id=0&chat_id=${chatId}${tab ? `&tab=${tab}` : ''}`;
 }
 
 function getMatchPlayUrl(match) {
-  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+  let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-fuxy.onrender.com';
   if (host === 'undefined' || !host) {
-    host = 'undercover-bot.onrender.com';
+    host = 'undercover-fuxy.onrender.com';
   }
   const cleanHost = host.replace(/^https?:\/\//, '');
   return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}`;
@@ -2553,7 +2553,7 @@ bot.command('history', async (ctx) => {
 
     const inlineKeyboard = new InlineKeyboard();
 
-    let hostStr = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-bot.onrender.com';
+    let hostStr = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-fuxy.onrender.com';
     const cleanHost = hostStr.replace(/^https?:\/\//, '');
 
     userMatches.forEach((row, idx) => {
