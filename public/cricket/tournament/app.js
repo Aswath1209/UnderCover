@@ -66,6 +66,10 @@ async function checkActiveCampaign() {
   
   if (res && res.campaign) {
     activeCampaign = res.campaign;
+    if (activeCampaign.activeMatchId) {
+      window.location.href = `/cricket?match_id=${activeCampaign.activeMatchId}&chat_id=${userId}&userId=${userId}`;
+      return;
+    }
     renderDashboard();
     showScreen('dashboard-screen');
   } else {
@@ -200,10 +204,10 @@ function setupEventListeners() {
   document.getElementById('play-match-btn').onclick = async () => {
     const res = await apiCall('/api/tournament/match/start', 'POST', { userId });
     
-    if (res && res.campaign) {
-      activeCampaign = res.campaign;
-      loadGameplayScreen();
-      showScreen('gameplay-screen');
+    if (res && res.campaign && res.campaign.activeMatchId) {
+      window.location.href = `/cricket?match_id=${res.campaign.activeMatchId}&chat_id=${userId}&userId=${userId}`;
+    } else {
+      alert('Failed to start campaign match.');
     }
   };
 

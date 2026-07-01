@@ -1,6 +1,5 @@
 const squadsData = require('../data/squads.json');
 const campaignStore = require('../db/campaignStore');
-const pveEngine = require('./pveEngine');
 const supabaseHelper = require('../db/supabase');
 
 /**
@@ -62,14 +61,31 @@ async function resolveSquadRoster(roster, countryName, dbPlayers, supabaseHelper
 
     if (matchCard) {
       resolved.push({
-        ...member,
         id: matchCard.id,
-        ovr: member.ovr,
-        bat: member.bat,
-        bowl: member.bowl
+        name: matchCard.name,
+        role: matchCard.role,
+        ovr: member.ovr, // squad base rating
+        batting_rating: member.bat,
+        bowling_rating: member.bowl,
+        batting_hand: matchCard.batting_hand || member.batting_hand || 'right',
+        batting_archetype: matchCard.batting_archetype || member.batting_archetype || 'Anchor',
+        bowler_type: matchCard.bowler_type || member.bowler_type || 'fast',
+        upgraded: member.upgraded || false
       });
     } else {
-      resolved.push(member);
+      const roleLower = (member.role || 'batsman').toLowerCase().replace(' ', '_');
+      resolved.push({
+        id: member.id || `temp_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        name: member.name,
+        role: roleLower === 'wicketkeeper' ? 'wicket_keeper' : roleLower === 'all-rounder' ? 'all_rounder' : roleLower,
+        ovr: member.ovr || 50,
+        batting_rating: member.bat || member.ovr || 50,
+        bowling_rating: member.bowl || 15,
+        batting_hand: member.batting_hand || 'right',
+        batting_archetype: member.batting_archetype || 'Anchor',
+        bowler_type: member.bowler_type || 'fast',
+        upgraded: member.upgraded || false
+      });
     }
   }
   return resolved;
@@ -80,13 +96,24 @@ const TEAM_TIERS = {
   // IPL Teams
   'CSK': { tier: 'S', multiplier: 1.0 },
   'MI': { tier: 'S', multiplier: 1.0 },
+  'KKR': { tier: 'S', multiplier: 1.0 },
+  'SRH': { tier: 'S', multiplier: 1.0 },
+  'RR': { tier: 'S', multiplier: 1.0 },
   'RCB': { tier: 'A', multiplier: 1.25 },
+  'GT': { tier: 'A', multiplier: 1.25 },
+  'LSG': { tier: 'B', multiplier: 1.5 },
+  'DC': { tier: 'C', multiplier: 2.0 },
   'PBKS': { tier: 'D', multiplier: 3.0 },
   
   // World Cup Teams
   'IND': { tier: 'S', multiplier: 1.0 },
   'AUS': { tier: 'S', multiplier: 1.0 },
+  'ENG': { tier: 'S', multiplier: 1.0 },
+  'SA': { tier: 'A', multiplier: 1.25 },
+  'NZ': { tier: 'A', multiplier: 1.25 },
   'PAK': { tier: 'B', multiplier: 1.5 },
+  'WI': { tier: 'B', multiplier: 1.5 },
+  'AFG': { tier: 'C', multiplier: 2.0 },
   'ZIM': { tier: 'D', multiplier: 3.0 },
   'USA': { tier: 'D', multiplier: 3.0 }
 };
@@ -152,7 +179,6 @@ function generateAIFixturesForRound(round, playerTeam, playerOpponent, teamsList
  * Simulates an AI vs AI match.
  */
 function simulateAIMatch(teamA, teamB) {
-  // Simple random score generator mimicking realistic scores
   const scoreA = Math.floor(Math.random() * 80) + 120; // 120 - 200 runs
   const scoreB = Math.floor(Math.random() * 80) + 120;
   
@@ -201,7 +227,6 @@ async function startCampaign(userId, username, type, edition, playerTeam, diffic
     const ownedPlayers = await supabaseHelper.getUserCricketTeam(userId);
     if (ownedPlayers && ownedPlayers.length > 0) {
       playerSquad = playerSquad.map(member => {
-        // Find matching player by name (case-insensitive and trimmed)
         const matchCard = ownedPlayers.find(op => 
           op.name.trim().toLowerCase() === member.name.trim().toLowerCase()
         );
@@ -210,9 +235,13 @@ async function startCampaign(userId, username, type, edition, playerTeam, diffic
             ...member,
             id: matchCard.id, // Replace with db player id
             ovr: matchCard.ovr,
-            bat: matchCard.batting_rating || member.bat,
-            bowl: matchCard.bowling_rating || member.bowl,
-            upgraded: true // Tag to show in UI
+            role: matchCard.role || member.role,
+            batting_rating: matchCard.batting_rating || member.batting_rating,
+            bowling_rating: matchCard.bowling_rating || member.bowling_rating,
+            batting_hand: matchCard.batting_hand || member.batting_hand,
+            batting_archetype: matchCard.batting_archetype || member.batting_archetype,
+            bowler_type: matchCard.bowler_type || member.bowler_type,
+            upgraded: true
           };
         }
         return member;
@@ -251,7 +280,8 @@ async function startCampaign(userId, username, type, edition, playerTeam, diffic
     schedule,
     standings,
     playerSquad,
-    activeMatchState: null
+    activeMatchState: null,
+    activeMatchId: null
   };
 
   await campaignStore.saveCampaign(userId, campaign);
@@ -268,16 +298,16 @@ async function startNextMatch(userId) {
   }
 
   let opponentTeam = null;
-  let isPlayoffsMatch = false;
 
   if (campaign.status === 'PLAYOFFS' && campaign.playoffsFixture) {
     opponentTeam = campaign.playoffsFixture.opponent;
-    isPlayoffsMatch = true;
   } else {
     const nextFixture = campaign.schedule.find(f => f.round === campaign.currentRound && f.status === 'PENDING');
     if (!nextFixture) {
       if (campaign.status === 'ACTIVE') {
-        return startPlayoffs(campaign);
+        startPlayoffs(campaign);
+        await campaignStore.saveCampaign(userId, campaign);
+        return campaign;
       }
       return null;
     }
@@ -294,101 +324,152 @@ async function startNextMatch(userId) {
     console.error('[TournamentManager] Failed to resolve opponent squad cards:', e);
   }
   
-  // Create match state
-  const matchState = pveEngine.createMatch({
+  const matchId = `camp_${userId}_${Date.now()}`;
+  const matchManager = require('./matchManager');
+  
+  matchManager.createCampaignMatch({
+    dbMatchId: matchId,
+    userId: userId,
+    username: campaign.username,
     playerTeam: campaign.playerTeam,
     opponentTeam: opponentTeam,
-    tournamentType: campaign.type,
-    edition: campaign.edition,
     playerSquad: campaign.playerSquad,
     opponentSquad: opponentSquad,
-    totalOvers: campaign.type === 'ODI_WC' ? 5 : 2, // 5 overs for ODI, 2 for T20
-    maxWickets: 3
+    totalOvers: campaign.type === 'ODI_WC' ? 5 : 2
   });
 
-  campaign.activeMatchState = matchState;
+  campaign.activeMatchState = { status: 'PLAYING' };
+  campaign.activeMatchId = matchId;
   await campaignStore.saveCampaign(userId, campaign);
+  
   return campaign;
 }
 
 /**
- * Plays a ball in the user's active tournament match.
+ * Dummy function for backward compatibility
  */
 async function playMatchBall(userId, playerChoice) {
-  const campaign = await campaignStore.getCampaign(userId);
-  if (!campaign || !campaign.activeMatchState) {
-    return { error: 'No active match found' };
-  }
-
-  const outcome = pveEngine.playBall(campaign.activeMatchState, playerChoice);
-
-  if (outcome.matchCompleted) {
-    await resolveCurrentRound(campaign, campaign.activeMatchState);
-  } else {
-    await campaignStore.saveCampaign(userId, campaign);
-  }
-
-  return {
-    outcome,
-    campaign
-  };
+  return { error: 'Campaign matches are played in the main web app now.' };
 }
 
 /**
- * Resolves current round of matches.
- * Calculates difficulty rewards and transfers coins.
+ * Plays playoffs semifinal matching
  */
-async function resolveCurrentRound(campaign, finishedMatchState) {
-  const playerWon = finishedMatchState.innings === 2 
-    ? (finishedMatchState.firstBatting === 'ai' ? finishedMatchState.player.score >= finishedMatchState.target : finishedMatchState.ai.score < finishedMatchState.target - 1)
-    : (finishedMatchState.firstBatting === 'player' ? finishedMatchState.player.score < finishedMatchState.ai.score : finishedMatchState.ai.score < finishedMatchState.player.score);
+function startPlayoffs(campaign) {
+  const sorted = Object.values(campaign.standings).sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    return b.won - a.won;
+  });
+
+  const playerQualified = sorted.slice(0, 4).some(team => team.teamKey === campaign.playerTeam);
+
+  if (!playerQualified) {
+    campaign.status = 'COMPLETED';
+    campaign.playoffMessage = `❌ Campaign Over! Your team finished ${sorted.findIndex(t => t.teamKey === campaign.playerTeam) + 1}th. You failed to qualify for the playoffs.`;
+  } else {
+    campaign.status = 'PLAYOFFS';
+    const playerRank = sorted.findIndex(t => t.teamKey === campaign.playerTeam);
+    let opponent = '';
+    
+    if (playerRank === 0) opponent = sorted[3].teamKey;
+    else if (playerRank === 1) opponent = sorted[2].teamKey;
+    else if (playerRank === 2) opponent = sorted[1].teamKey;
+    else opponent = sorted[0].teamKey;
+
+    campaign.playoffsFixture = {
+      round: 'SEMIFINAL',
+      opponent: opponent,
+      status: 'PENDING'
+    };
+    campaign.playoffMessage = `🎉 **Playoffs Qualified!** Your team qualified for the Semi-Finals against ${campaign.standings[opponent].name}!`;
+  }
+}
+
+/**
+ * Returns other match playoffs winner dynamically
+ */
+function getOtherPlayoffsWinner(campaign) {
+  const sorted = Object.values(campaign.standings).sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    return b.won - a.won;
+  });
+  
+  const candidates = sorted.slice(0, 4)
+    .map(t => t.teamKey)
+    .filter(t => t !== campaign.playerTeam && t !== campaign.playoffsFixture.opponent);
+
+  return candidates[Math.floor(Math.random() * candidates.length)] || 'AUS';
+}
+
+/**
+ * Resolves campaign match when standard match completes
+ */
+async function resolveCampaignMatch(userId, finishedMatch) {
+  const campaign = await campaignStore.getCampaign(userId);
+  if (!campaign) return;
+
+  const inn1 = finishedMatch.innings[0];
+  const inn2 = finishedMatch.innings[1];
+  
+  let playerWon = false;
+  if (inn2.runs >= inn2.target) {
+    playerWon = inn2.battingId.toString() === userId.toString();
+  } else if (inn2.runs < inn1.runs) {
+    playerWon = inn1.battingId.toString() === userId.toString();
+  } else {
+    playerWon = Math.random() < 0.5;
+  }
 
   const multiplier = getTeamRewardMultiplier(campaign.playerTeam);
   let coinsEarned = 0;
   let messageExtra = '';
 
+  let playerRuns = 0;
+  let oppRuns = 0;
+  if (inn1.battingId.toString() === userId.toString()) {
+    playerRuns = inn1.runs;
+    oppRuns = inn2.runs;
+  } else {
+    playerRuns = inn2.runs;
+    oppRuns = inn1.runs;
+  }
+
   if (campaign.status === 'PLAYOFFS' && campaign.playoffsFixture) {
     const fixture = campaign.playoffsFixture;
     fixture.status = 'COMPLETED';
     fixture.result = playerWon ? 'WON' : 'LOST';
-    fixture.playerScore = finishedMatchState.player.score;
-    fixture.opponentScore = finishedMatchState.ai.score;
+    fixture.playerScore = playerRuns;
+    fixture.opponentScore = oppRuns;
 
     if (playerWon) {
       if (fixture.round === 'SEMIFINAL') {
-        // Qualify to Final
         campaign.playoffsFixture = {
           round: 'GRAND_FINAL',
           opponent: getOtherPlayoffsWinner(campaign),
           status: 'PENDING'
         };
-        // Semifinal win reward
         coinsEarned = Math.floor(10000 * multiplier);
         messageExtra = `🏆 Semifinal Victory! You won ${coinsEarned.toLocaleString()} coins! (Difficulty Multiplier: ${multiplier}x)`;
       } else if (fixture.round === 'GRAND_FINAL') {
-        // CHAMPION!
         campaign.status = 'COMPLETED';
         campaign.winner = campaign.playerTeam;
-        
-        // Tournament victory rewards (Base: 50,000)
         coinsEarned = Math.floor(50000 * multiplier);
         messageExtra = `🏆 CHAMPIONS! You won ${coinsEarned.toLocaleString()} coins for winning the tournament! (Difficulty Multiplier: ${multiplier}x)`;
       }
     } else {
-      // Knocked out!
       campaign.status = 'COMPLETED';
       campaign.winner = fixture.opponent;
       messageExtra = `❌ You were knocked out of the playoffs! Better luck next campaign.`;
     }
   } else {
-    // Normal group match
     const fixture = campaign.schedule.find(f => f.round === campaign.currentRound);
-    fixture.status = 'COMPLETED';
-    fixture.result = playerWon ? 'WON' : 'LOST';
-    fixture.playerScore = finishedMatchState.player.score;
-    fixture.opponentScore = finishedMatchState.ai.score;
+    if (fixture) {
+      fixture.status = 'COMPLETED';
+      fixture.result = playerWon ? 'WON' : 'LOST';
+      fixture.playerScore = playerRuns;
+      fixture.opponentScore = oppRuns;
+    }
 
-    // Update standings for player and opponent
     const playerStand = campaign.standings[campaign.playerTeam];
     const oppStand = campaign.standings[fixture.opponentTeam];
     
@@ -399,8 +480,6 @@ async function resolveCurrentRound(campaign, finishedMatchState) {
       playerStand.won++;
       playerStand.pts += 2;
       oppStand.lost++;
-      
-      // Match win reward (Base: 2,500)
       coinsEarned = Math.floor(2500 * multiplier);
       messageExtra = `🏏 Match Won! You earned ${coinsEarned.toLocaleString()} coins. (Difficulty Multiplier: ${multiplier}x)`;
     } else {
@@ -410,8 +489,8 @@ async function resolveCurrentRound(campaign, finishedMatchState) {
       messageExtra = `Match Lost. No coins rewarded.`;
     }
 
-    // Simulate other fixtures in this round
-    if (fixture.otherFixtures) {
+    // Simulate other AI matches in this round
+    if (fixture && fixture.otherFixtures) {
       fixture.otherFixtures.forEach(fix => {
         const res = simulateAIMatch(fix.teamA, fix.teamB);
         fix.status = 'COMPLETED';
@@ -419,7 +498,6 @@ async function resolveCurrentRound(campaign, finishedMatchState) {
         fix.scoreA = res.scoreA;
         fix.scoreB = res.scoreB;
 
-        // Update standings
         const standA = campaign.standings[fix.teamA];
         const standB = campaign.standings[fix.teamB];
         standA.played++;
@@ -437,20 +515,17 @@ async function resolveCurrentRound(campaign, finishedMatchState) {
       });
     }
 
-    // Advance round
     campaign.currentRound++;
 
-    // Check if group stage is completed
     const totalRounds = Object.keys(campaign.standings).length - 1;
     if (campaign.currentRound > totalRounds) {
       startPlayoffs(campaign);
     }
   }
 
-  // Clear active match state
   campaign.activeMatchState = null;
+  campaign.activeMatchId = null;
 
-  // Add coins to user if earned
   if (coinsEarned > 0) {
     try {
       await supabaseHelper.addCoins(campaign.userId, coinsEarned);
@@ -459,66 +534,40 @@ async function resolveCurrentRound(campaign, finishedMatchState) {
     }
   }
 
-  // Set response message to display to the user
   campaign.lastRewardMessage = messageExtra;
-
   await campaignStore.saveCampaign(campaign.userId, campaign);
-}
 
-/**
- * Plays playoffs semifinal matching
- */
-function startPlayoffs(campaign) {
-  // Sort standings
-  const sorted = Object.values(campaign.standings).sort((a, b) => {
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    return b.won - a.won;
-  });
+  // Send bot notification
+  try {
+    const sb = require('../db/supabase');
+    const { bot } = require('../bot');
+    const { escapeHTML } = require('../utils');
+    const profile = await sb.getProfile(userId);
+    const username = profile ? profile.first_name : 'Player';
+    const text = `🏆 <b>Tournament Match Resolved!</b>\n\n` +
+                 `👤 Player: <b>${escapeHTML(username)}</b>\n` +
+                 `⚔️ Matchup: <b>${campaign.playerTeam}</b> vs <b>${finishedMatch.guest.username}</b>\n` +
+                 `📈 Outcome: <b>${playerWon ? 'WON ✅' : 'LOST ❌'}</b>\n` +
+                 `📊 Score: ${inn1.runs}/${inn1.wickets} vs ${inn2.runs}/${inn2.wickets}\n\n` +
+                 `${messageExtra}`;
 
-  const playerQualified = sorted.slice(0, 4).some(team => team.teamKey === campaign.playerTeam);
-
-  if (!playerQualified) {
-    campaign.status = 'COMPLETED';
-    campaign.playoffMessage = `❌ Campaign Over! Your team finished ${sorted.findIndex(t => t.teamKey === campaign.playerTeam) + 1}th. You failed to qualify for the playoffs.`;
-  } else {
-    campaign.status = 'PLAYOFFS';
-    // Player is paired 1st vs 4th or 2nd vs 3rd depending on standings rank
-    const playerRank = sorted.findIndex(t => t.teamKey === campaign.playerTeam);
-    let opponent = '';
-    
-    if (playerRank === 0) opponent = sorted[3].teamKey; // 1st vs 4th
-    else if (playerRank === 1) opponent = sorted[2].teamKey; // 2nd vs 3rd
-    else if (playerRank === 2) opponent = sorted[1].teamKey; // 3rd vs 2nd
-    else opponent = sorted[0].teamKey; // 4th vs 1st
-
-    campaign.playoffsFixture = {
-      round: 'SEMIFINAL',
-      opponent: opponent,
-      status: 'PENDING'
+    const cleanHost = process.env.WEBAPP_URL ? process.env.WEBAPP_URL.replace(/^https?:\/\//, '') : 'undercover-fuxy.onrender.com';
+    const webAppUrl = `https://${cleanHost}/cricket/tournament?userId=${userId}`;
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🎮 Launch Campaign Dashboard", web_app: { url: webAppUrl } }]
+      ]
     };
-    campaign.playoffMessage = `🎉 **Playoffs Qualified!** Your team qualified for the Semi-Finals against ${campaign.standings[opponent].name}!`;
+
+    await bot.api.sendMessage(userId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+  } catch (err) {
+    console.error("Failed to send tournament completion telegram notification:", err);
   }
-}
-
-/**
- * Returns other match playoffs winner dynamically
- */
-function getOtherPlayoffsWinner(campaign) {
-  // Returns a random team from top 4 that is NOT the player and NOT the player's semifinal opponent
-  const sorted = Object.values(campaign.standings).sort((a, b) => {
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    return b.won - a.won;
-  });
-  
-  const candidates = sorted.slice(0, 4)
-    .map(t => t.teamKey)
-    .filter(t => t !== campaign.playerTeam && t !== campaign.playoffsFixture.opponent);
-
-  return candidates[Math.floor(Math.random() * candidates.length)] || 'AUS';
 }
 
 module.exports = {
   startCampaign,
   startNextMatch,
-  playMatchBall
+  playMatchBall,
+  resolveCampaignMatch
 };

@@ -627,17 +627,31 @@ class Match {
      // Award rewards directly in the database
     if (winner && winner.telegramId !== 'ai') {
       const winnerName = winner.username || 'User';
-      await sb.addCoins(winner.telegramId, winnerReward).catch(e => console.error("Failed to add coins to winner:", e));
+      if (!this.campaignUserId) {
+        await sb.addCoins(winner.telegramId, winnerReward).catch(e => console.error("Failed to add coins to winner:", e));
+      }
       await sb.recordWin(winner.telegramId, winnerName, this.chatId).catch(e => console.error("Failed to record win:", e));
     }
     if (loser && loser.telegramId !== 'ai') {
       const loserName = loser.username || 'User';
-      await sb.addCoins(loser.telegramId, loserReward).catch(e => console.error("Failed to add coins to loser:", e));
+      if (!this.campaignUserId) {
+        await sb.addCoins(loser.telegramId, loserReward).catch(e => console.error("Failed to add coins to loser:", e));
+      }
       await sb.recordLoss(loser.telegramId, loserName, this.chatId).catch(e => console.error("Failed to record loss:", e));
     }
 
     // Sync to Supabase
     saveToDb(this);
+
+    // Resolve campaign match if this is a campaign match
+    if (this.campaignUserId) {
+      try {
+        const tournamentManager = require('./tournamentManager');
+        await tournamentManager.resolveCampaignMatch(this.campaignUserId, this);
+      } catch (err) {
+        console.error("Failed to resolve campaign match in tournamentManager:", err);
+      }
+    }
 
     // Cleanup active match
     delete activeMatches[this.host.telegramId];
@@ -831,6 +845,49 @@ function createMatchFromLobby({ dbMatchId, lobby }) {
   return match;
 }
 
+function createCampaignMatch({ dbMatchId, userId, username, playerTeam, opponentTeam, playerSquad, opponentSquad, totalOvers }) {
+  const squadsData = require('../data/squads.json');
+  
+  const playerTeamName = squadsData.IPL?.["2026"]?.[playerTeam]?.name || squadsData.T20_WC?.["2026"]?.[playerTeam]?.name || playerTeam;
+  const oppTeamName = squadsData.IPL?.["2026"]?.[opponentTeam]?.name || squadsData.T20_WC?.["2026"]?.[opponentTeam]?.name || opponentTeam;
+
+  const match = new Match({
+    id: dbMatchId,
+    type: 'pve',
+    chatId: parseInt(userId),
+    totalOvers: totalOvers,
+    pitch: ['batting', 'bowling', 'balanced', 'spin', 'pace'][Math.floor(Math.random() * 5)],
+    host: {
+      telegramId: userId.toString(),
+      username: username,
+      teamName: playerTeamName,
+      xi: playerSquad
+    },
+    guest: {
+      telegramId: 'ai',
+      username: oppTeamName,
+      teamName: oppTeamName,
+      xi: opponentSquad
+    }
+  });
+
+  // Random toss winner and decision for campaign match
+  const tossWinner = Math.random() < 0.5 ? 'host' : 'guest';
+  match.tossWinnerId = tossWinner === 'host' ? userId.toString() : 'ai';
+  match.tossDecision = Math.random() < 0.5 ? 'bat' : 'bowl';
+
+  match.campaignUserId = userId.toString();
+  match.status = 'xi_selection'; // Start at XI selection phase
+
+  // Add to activeMatches maps
+  activeMatches[userId.toString()] = match;
+  activeMatches[match.id] = match;
+
+  saveToDb(match);
+
+  return match;
+}
+
 function getActiveMatch(userIdOrChatId) {
   return activeMatches[userIdOrChatId] || null;
 }
@@ -847,6 +904,7 @@ module.exports = {
   saveToDb,
   loadActiveMatchesFromDb,
   createMatchFromLobby,
+  createCampaignMatch,
   getActiveMatch,
   getMatch,
   DEFAULT_XI

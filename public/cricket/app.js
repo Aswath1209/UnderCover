@@ -62,10 +62,14 @@ async function init() {
 
   // Bind exit handlers
   const handleExit = () => {
-    if (tg) {
-      tg.close();
+    if (matchId && matchId.startsWith('camp_')) {
+      window.location.href = `/cricket/tournament?userId=${userId}`;
     } else {
-      window.location.reload();
+      if (tg) {
+        tg.close();
+      } else {
+        window.location.reload();
+      }
     }
   };
   
@@ -114,11 +118,15 @@ function setupEventListeners() {
 
   // Close app button
   document.getElementById('close-app-btn').addEventListener('click', () => {
-    if (tg) {
-      tg.close();
+    if (matchId && matchId.startsWith('camp_')) {
+      window.location.href = `/cricket/tournament?userId=${userId}`;
     } else {
-      alert("Match completed! You can return to Telegram.");
-      window.close();
+      if (tg) {
+        tg.close();
+      } else {
+        alert("Match completed! You can return to Telegram.");
+        window.close();
+      }
     }
   });
 
