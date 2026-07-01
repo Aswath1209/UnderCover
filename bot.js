@@ -12,6 +12,9 @@ const sb = require('./db/supabase');
 const path = require('path');
 const footballPlayers = require('./data/footballPlayers.json');
 const matchManager = require('./game/matchManager');
+const tournamentManager = require('./game/tournamentManager');
+const campaignStore = require('./db/campaignStore');
+const squadsData = require('./data/squads.json');
 
 // Support for legacy pricing to prevent players selling corrected cheap cards for new high prices
 const legacyPrices = require('./db/legacyPrices.json');
@@ -694,11 +697,58 @@ bot.command('start', async (ctx) => {
         { parse_mode: 'HTML', reply_markup: kb }
     );
   }
+  if (ctx.match === 'tournament') {
+    const cleanHost = process.env.WEBAPP_URL ? process.env.WEBAPP_URL.replace(/^https?:\/\//, '') : 'undercover-fuxy.onrender.com';
+    const webAppUrl = `https://${cleanHost}/cricket/tournament?userId=${ctx.from.id}`;
+    const kb = new InlineKeyboard().webApp("🎮 Launch Campaign", webAppUrl);
+    return ctx.reply(
+      "🏆 <b>Cricket Tournament Campaign</b> 🏆\n\nLead your team through a full tournament like IPL or the World Cup, matching real-life rosters with your own card upgrades!\n\nClick the button below to launch the campaign interface:",
+      { parse_mode: 'HTML', reply_markup: kb }
+    );
+  }
 
   if (ctx.chat.type === 'private') {
     await ctx.reply("🕵️‍♂️ <b>Welcome to The Undercover Bot!</b>\n\nAdd me to a group chat and send /play to start an intense game of deception.", { parse_mode: 'HTML' });
   } else {
     await ctx.reply("🕵️‍♂️ <b>The Undercover Bot</b> is ready! Send /play to start a new lobby.", { parse_mode: 'HTML' });
+  }
+});
+
+bot.command('tournament', async (ctx) => {
+  const telegramId = ctx.from.id;
+  if (sb.supabase) {
+    await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
+  }
+
+  const isGroup = ctx.chat.id < 0;
+  const botInfo = await bot.api.getMe().catch(() => null);
+  const botUsername = botInfo?.username || 'Imposter0_bot';
+  const cleanHost = process.env.WEBAPP_URL ? process.env.WEBAPP_URL.replace(/^https?:\/\//, '') : 'undercover-fuxy.onrender.com';
+  const webAppUrl = `https://${cleanHost}/cricket/tournament?userId=${telegramId}`;
+
+  if (isGroup) {
+    const redirectUrl = `https://t.me/${botUsername}?start=tournament`;
+    const kb = new InlineKeyboard().url("🎮 Play Tournament Campaign", redirectUrl);
+    return ctx.reply(
+      "🏆 <b>Cricket Tournament Campaign</b> 🏆\n\n" +
+      "Lead your team through a full tournament like IPL or the World Cup, matching real-life rosters with your own card upgrades!\n\n" +
+      "👇 Click below to play in private chat:",
+      {
+        parse_mode: 'HTML',
+        reply_markup: kb
+      }
+    );
+  } else {
+    const kb = new InlineKeyboard().webApp("🎮 Launch Campaign", webAppUrl);
+    return ctx.reply(
+      "🏆 <b>Cricket Tournament Campaign</b> 🏆\n\n" +
+      "Lead your team through a full tournament like IPL or the World Cup, matching real-life rosters with your own card upgrades!\n\n" +
+      "Click the button below to launch the campaign interface:",
+      {
+        parse_mode: 'HTML',
+        reply_markup: kb
+      }
+    );
   }
 });
 
@@ -2804,12 +2854,12 @@ bot.command(['blackjack', 'deal'], async (ctx) => {
   const betStr = args[1];
 
   if (!betStr || isNaN(betStr) || parseInt(betStr) <= 0) {
-    return ctx.reply("🃏 <b>Blackjack</b>\n\nUsage: /blackjack <bet>\nExample: /blackjack 500\nMaximum Bet: 10,000 coins", { parse_mode: 'HTML' });
+    return ctx.reply("🃏 <b>Blackjack</b>\n\nUsage: /blackjack <bet>\nExample: /blackjack 500\nMaximum Bet: 1,00,000 coins", { parse_mode: 'HTML' });
   }
   const bet = parseInt(betStr);
 
-  if (bet > 10000) {
-    return ctx.reply("❌ The maximum bet limit for Blackjack is 10,000 coins.");
+  if (bet > 100000) {
+    return ctx.reply("❌ The maximum bet limit for Blackjack is 1,00,000 coins.");
   }
 
   const profile = await sb.getProfile(userId);
@@ -5932,6 +5982,77 @@ app.get('/api/shop/buy', async (req, res) => {
         console.error('Shop buy error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
+});
+
+// =============================================
+// CRICKET TOURNAMENT CAMPAIGN REST API ENDPOINTS
+// =============================================
+
+// Get current tournament state
+app.get('/api/tournament/state', async (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  try {
+    const campaign = await campaignStore.getCampaign(userId);
+    res.json({ campaign });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get teams for edition
+app.get('/api/tournament/teams', (req, res) => {
+  const { type, edition } = req.query;
+  const teams = squadsData[type]?.[edition] || {};
+  res.json({ teams });
+});
+
+// Start new campaign
+app.post('/api/tournament/start', async (req, res) => {
+  const { userId, username, type, edition, playerTeam } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  try {
+    const campaign = await tournamentManager.startCampaign(userId, username, type, edition, playerTeam);
+    res.json({ campaign });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Start next match in tournament round
+app.post('/api/tournament/match/start', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  try {
+    const campaign = await tournamentManager.startNextMatch(userId);
+    res.json({ campaign });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Play a ball in user match
+app.post('/api/tournament/match/play', async (req, res) => {
+  const { userId, choice } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  try {
+    const result = await tournamentManager.playMatchBall(userId, choice);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset current campaign
+app.post('/api/tournament/reset', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  try {
+    await campaignStore.deleteCampaign(userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =============================================

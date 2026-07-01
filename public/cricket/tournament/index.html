@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cricket Tournament Campaign</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-container">
+
+    <!-- PORTAL / SELECTION SCREEN -->
+    <section id="portal-screen" class="screen active">
+      <div class="header-container">
+        <div class="trophy-badge">🏆</div>
+        <h1 class="glow-text">CAMPAIGN ARENA</h1>
+        <p class="subtitle">Choose a tournament and lead your squad to gold!</p>
+      </div>
+
+      <div class="selection-card glass-card">
+        <!-- Tournament Selection -->
+        <div class="form-group">
+          <label>Select Tournament</label>
+          <div class="selector-grid" id="tour-selector">
+            <button class="selector-btn active" data-tour="IPL">🇮🇳 IPL</button>
+            <button class="selector-btn" data-tour="T20_WC">🏏 T20 WC</button>
+          </div>
+        </div>
+
+        <!-- Edition Selection -->
+        <div class="form-group">
+          <label>Select Edition</label>
+          <div class="selector-grid" id="edition-selector">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Team Selection -->
+        <div class="form-group">
+          <label>Choose Your Franchise</label>
+          <div class="team-grid" id="team-selector">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Difficulty info / reward multiplier display -->
+        <div id="multiplier-badge-container" class="reward-info-card glass-card hidden">
+          <span class="reward-multiplier-tag" id="reward-multiplier-text">1.0x Reward Multiplier</span>
+        </div>
+
+        <button id="start-campaign-btn" class="btn btn-primary btn-block mt-4">🚀 Launch Campaign</button>
+      </div>
+    </section>
+
+    <!-- CAMPAIGN DASHBOARD SCREEN -->
+    <section id="dashboard-screen" class="screen">
+      <header class="app-header">
+        <div class="header-campaign-info">
+          <span class="active-badge" id="dash-campaign-badge">IPL 2026</span>
+          <h2 id="dash-team-title">CSK Lion Kings</h2>
+        </div>
+        <button id="reset-campaign-btn" class="btn btn-danger btn-sm">Reset</button>
+      </header>
+
+      <!-- NAVIGATION TABS -->
+      <div class="tabs-container">
+        <button class="tab-btn active" id="tab-standings">📊 Standings</button>
+        <button class="tab-btn" id="tab-fixtures">📅 Fixtures</button>
+        <button class="tab-btn" id="tab-squad">👥 My Squad</button>
+      </div>
+
+      <!-- STANDINGS PANEL -->
+      <div id="panel-standings" class="tab-panel active">
+        <div class="glass-card">
+          <h3 class="panel-title">Standings Table</h3>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>TEAM</th>
+                <th class="txt-center">P</th>
+                <th class="txt-center">W</th>
+                <th class="txt-center">L</th>
+                <th class="txt-center">PTS</th>
+              </tr>
+            </thead>
+            <tbody id="standings-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FIXTURES PANEL -->
+      <div id="panel-fixtures" class="tab-panel">
+        <div class="fixtures-list" id="fixtures-list-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- SQUAD PANEL -->
+      <div id="panel-squad" class="tab-panel">
+        <div class="glass-card">
+          <h3 class="panel-title">Squad Roster</h3>
+          <p class="section-desc">Standard cards are automatically synced and upgraded with your owned cards stats.</p>
+          <div class="squad-list" id="squad-list-container">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- NEXT MATCH DOCKED ACTION BAR -->
+      <div class="next-match-bar glass-card">
+        <div class="match-info">
+          <span class="label">NEXT MATCHUP</span>
+          <h4 id="next-match-fixtures-label">CSK vs RCB (Round 1)</h4>
+        </div>
+        <button id="play-match-btn" class="btn btn-primary">🎮 Start Match</button>
+      </div>
+    </section>
+
+    <!-- GAMEPLAY CONSOLE SCREEN -->
+    <section id="gameplay-screen" class="screen">
+      <header class="app-header">
+        <button id="quit-gameplay-btn" class="btn btn-secondary btn-sm">Quit</button>
+        <div class="match-header-title">
+          <span id="match-team-header">RCB vs CSK</span>
+        </div>
+        <span class="live-indicator">LIVE</span>
+      </header>
+
+      <!-- LIVE SCOREBOARD CARD -->
+      <div class="live-scoreboard glass-card">
+        <div class="score-main-row">
+          <div class="runs-block">
+            <h1 id="game-score-display">0/0</h1>
+            <p class="overs-display"><span id="game-overs">0.0</span> / <span id="game-total-overs">2.0</span> overs</p>
+          </div>
+          <div class="target-block">
+            <span id="game-innings-badge" class="badge badge-gold">1st INNINGS</span>
+            <div id="game-target-container" class="hidden">
+              <p class="target-val">TARGET: <span id="game-target-val">0</span></p>
+              <p class="runs-needed-val" id="game-runs-needed-msg">Need 0 runs from 0 balls</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREASE / MATCH PARTICIPANTS CARD -->
+      <div class="crease-card glass-card">
+        <div class="crease-player batting-crease">
+          <span class="crease-label">BATTING</span>
+          <h3 id="crease-batsman-name">Virat Kohli</h3>
+          <p class="crease-stats" id="crease-batsman-stats">0 (0b)</p>
+        </div>
+        <div class="crease-divider">VS</div>
+        <div class="crease-player bowling-crease">
+          <span class="crease-label">BOWLING</span>
+          <h3 id="crease-bowler-name">Matheesha Pathirana</h3>
+          <p class="crease-stats" id="crease-bowler-stats">0-0 (0.0 ov)</p>
+        </div>
+      </div>
+
+      <!-- LIVE FEED / COMMENTARY PANEL -->
+      <div class="commentary-card glass-card">
+        <h4 class="card-subtitle">COMMENTARY FEED</h4>
+        <div class="commentary-list" id="game-commentary-feed">
+          <!-- Live commentaries go here -->
+        </div>
+      </div>
+
+      <!-- CONTROL SHEET FOR HAND CRICKET -->
+      <div class="controls-card glass-card">
+        <h3 id="choice-prompt-title" class="glow-text">CHOOSE YOUR SHOT</h3>
+        <p class="choice-subtitle">Select a number between 1 and 6</p>
+        
+        <div class="number-grid">
+          <button class="num-btn" data-val="1">1</button>
+          <button class="num-btn" data-val="2">2</button>
+          <button class="num-btn" data-val="3">3</button>
+          <button class="num-btn" data-val="4">4</button>
+          <button class="num-btn" data-val="5">5</button>
+          <button class="num-btn" data-val="6">6</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- POST MATCH OVERLAY -->
+    <div id="match-result-overlay" class="overlay hidden">
+      <div class="overlay-card glass-card text-center">
+        <div class="result-icon">🏆</div>
+        <h2 id="overlay-result-title">Match Completed</h2>
+        <p id="overlay-result-desc" class="result-desc">India won by 10 runs</p>
+
+        <!-- Dynamic payout status -->
+        <div id="overlay-reward-container" class="payout-badge hidden">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="scorecard-mini">
+          <div class="scorecard-mini-row">
+            <span id="mini-team-a-name">CSK</span>
+            <span id="mini-team-a-score" class="score-val">0/0</span>
+          </div>
+          <div class="scorecard-mini-row">
+            <span id="mini-team-b-name">RCB</span>
+            <span id="mini-team-b-score" class="score-val">0/0</span>
+          </div>
+        </div>
+
+        <button id="close-result-overlay-btn" class="btn btn-primary btn-block mt-4">Continue Campaign</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

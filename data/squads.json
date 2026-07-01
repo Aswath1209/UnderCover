@@ -1,0 +1,118 @@
+{
+  "IPL": {
+    "2026": {
+      "CSK": {
+        "name": "Chennai Super Kings",
+        "logo": "🦁",
+        "roster": [
+          { "id": "ruturaj_csk", "name": "Ruturaj Gaikwad", "role": "Batsman", "ovr": 89, "bat": 91, "bowl": 10 },
+          { "id": "dube_csk", "name": "Shivam Dube", "role": "Batsman", "ovr": 86, "bat": 88, "bowl": 60 },
+          { "id": "jadeja_csk", "name": "Ravindra Jadeja", "role": "All-Rounder", "ovr": 90, "bat": 84, "bowl": 91 },
+          { "id": "dhoni_csk", "name": "MS Dhoni", "role": "Wicketkeeper", "ovr": 84, "bat": 83, "bowl": 0 },
+          { "id": "pathirana_csk", "name": "Matheesha Pathirana", "role": "Bowler", "ovr": 88, "bat": 10, "bowl": 91 },
+          { "id": "tushar_csk", "name": "Tushar Deshpande", "role": "Bowler", "ovr": 81, "bat": 12, "bowl": 83 }
+        ]
+      },
+      "RCB": {
+        "name": "Royal Challengers Bengaluru",
+        "logo": "👑",
+        "roster": [
+          { "id": "kohli_rcb", "name": "Virat Kohli", "role": "Batsman", "ovr": 93, "bat": 95, "bowl": 20 },
+          { "id": "duplessis_rcb", "name": "Faf du Plessis", "role": "Batsman", "ovr": 85, "bat": 86, "bowl": 10 },
+          { "id": "maxwell_rcb", "name": "Glenn Maxwell", "role": "All-Rounder", "ovr": 88, "bat": 86, "bowl": 84 },
+          { "id": "patidar_rcb", "name": "Rajat Patidar", "role": "Batsman", "ovr": 83, "bat": 85, "bowl": 0 },
+          { "id": "siraj_rcb", "name": "Mohammed Siraj", "role": "Bowler", "ovr": 85, "bat": 15, "bowl": 87 },
+          { "id": "dayal_rcb", "name": "Yash Dayal", "role": "Bowler", "ovr": 81, "bat": 10, "bowl": 82 }
+        ]
+      },
+      "MI": {
+        "name": "Mumbai Indians",
+        "logo": "🛡️",
+        "roster": [
+          { "id": "rohit_mi", "name": "Rohit Sharma", "role": "Batsman", "ovr": 90, "bat": 91, "bowl": 10 },
+          { "id": "sky_mi", "name": "Suryakumar Yadav", "role": "Batsman", "ovr": 92, "bat": 95, "bowl": 0 },
+          { "id": "hardik_mi", "name": "Hardik Pandya", "role": "All-Rounder", "ovr": 89, "bat": 85, "bowl": 87 },
+          { "id": "bumrah_mi", "name": "Jasprit Bumrah", "role": "Bowler", "ovr": 97, "bat": 15, "bowl": 98 },
+          { "id": "ishan_mi", "name": "Ishan Kishan", "role": "Wicketkeeper", "ovr": 84, "bat": 85, "bowl": 0 },
+          { "id": "coetzee_mi", "name": "Gerald Coetzee", "role": "Bowler", "ovr": 82, "bat": 20, "bowl": 84 }
+        ]
+      },
+      "PBKS": {
+        "name": "Punjab Kings",
+        "logo": "🦁",
+        "roster": [
+          { "id": "shashank_pbks", "name": "Shashank Singh", "role": "Batsman", "ovr": 81, "bat": 83, "bowl": 10 },
+          { "id": "ashutosh_pbks", "name": "Ashutosh Sharma", "role": "Batsman", "ovr": 79, "bat": 81, "bowl": 0 },
+          { "id": "curran_pbks", "name": "Sam Curran", "role": "All-Rounder", "ovr": 84, "bat": 82, "bowl": 83 },
+          { "id": "jitesh_pbks", "name": "Jitesh Sharma", "role": "Wicketkeeper", "ovr": 78, "bat": 79, "bowl": 0 },
+          { "id": "arshdeep_pbks", "name": "Arshdeep Singh", "role": "Bowler", "ovr": 84, "bat": 10, "bowl": 86 },
+          { "id": "rabada_pbks", "name": "Kagiso Rabada", "role": "Bowler", "ovr": 86, "bat": 15, "bowl": 88 }
+        ]
+      }
+    }
+  },
+  "T20_WC": {
+    "2026": {
+      "IND": {
+        "name": "India",
+        "logo": "🇮🇳",
+        "roster": [
+          { "id": "rohit_ind", "name": "Rohit Sharma", "role": "Batsman", "ovr": 91, "bat": 92, "bowl": 10 },
+          { "id": "kohli_ind", "name": "Virat Kohli", "role": "Batsman", "ovr": 94, "bat": 95, "bowl": 20 },
+          { "id": "pant_ind", "name": "Rishabh Pant", "role": "Wicketkeeper", "ovr": 88, "bat": 89, "bowl": 0 },
+          { "id": "hardik_ind", "name": "Hardik Pandya", "role": "All-Rounder", "ovr": 89, "bat": 86, "bowl": 87 },
+          { "id": "bumrah_ind", "name": "Jasprit Bumrah", "role": "Bowler", "ovr": 97, "bat": 15, "bowl": 98 },
+          { "id": "arshdeep_ind", "name": "Arshdeep Singh", "role": "Bowler", "ovr": 85, "bat": 10, "bowl": 87 }
+        ]
+      },
+      "AUS": {
+        "name": "Australia",
+        "logo": "🇦🇺",
+        "roster": [
+          { "id": "head_aus", "name": "Travis Head", "role": "Batsman", "ovr": 93, "bat": 95, "bowl": 30 },
+          { "id": "warner_aus", "name": "David Warner", "role": "Batsman", "ovr": 86, "bat": 88, "bowl": 0 },
+          { "id": "marsh_aus", "name": "Mitchell Marsh", "role": "All-Rounder", "ovr": 85, "bat": 84, "bowl": 80 },
+          { "id": "maxwell_aus", "name": "Glenn Maxwell", "role": "All-Rounder", "ovr": 88, "bat": 86, "bowl": 84 },
+          { "id": "starc_aus", "name": "Mitchell Starc", "role": "Bowler", "ovr": 90, "bat": 25, "bowl": 92 },
+          { "id": "cummins_aus", "name": "Pat Cummins", "role": "Bowler", "ovr": 91, "bat": 45, "bowl": 91 }
+        ]
+      },
+      "PAK": {
+        "name": "Pakistan",
+        "logo": "🇵🇰",
+        "roster": [
+          { "id": "babar_pak", "name": "Babar Azam", "role": "Batsman", "ovr": 90, "bat": 92, "bowl": 0 },
+          { "id": "rizwan_pak", "name": "Mohammad Rizwan", "role": "Wicketkeeper", "ovr": 88, "bat": 89, "bowl": 0 },
+          { "id": "fakhar_pak", "name": "Fakhar Zaman", "role": "Batsman", "ovr": 82, "bat": 84, "bowl": 10 },
+          { "id": "shadab_pak", "name": "Shadab Khan", "role": "All-Rounder", "ovr": 84, "bat": 79, "bowl": 84 },
+          { "id": "shaheen_pak", "name": "Shaheen Afridi", "role": "Bowler", "ovr": 90, "bat": 30, "bowl": 92 },
+          { "id": "rauf_pak", "name": "Haris Rauf", "role": "Bowler", "ovr": 84, "bat": 10, "bowl": 86 }
+        ]
+      },
+      "ZIM": {
+        "name": "Zimbabwe",
+        "logo": "🇿🇼",
+        "roster": [
+          { "id": "raza_zim", "name": "Sikandar Raza", "role": "All-Rounder", "ovr": 85, "bat": 84, "bowl": 82 },
+          { "id": "williams_zim", "name": "Sean Williams", "role": "All-Rounder", "ovr": 81, "bat": 81, "bowl": 75 },
+          { "id": "ervine_zim", "name": "Craig Ervine", "role": "Batsman", "ovr": 79, "bat": 79, "bowl": 20 },
+          { "id": "madande_zim", "name": "Clive Madande", "role": "Wicketkeeper", "ovr": 67, "bat": 66, "bowl": 0 },
+          { "id": "muzarabani_zim", "name": "Blessing Muzarabani", "role": "Bowler", "ovr": 82, "bat": 30, "bowl": 83 },
+          { "id": "ngarava_zim", "name": "Richard Ngarava", "role": "Bowler", "ovr": 78, "bat": 25, "bowl": 79 }
+        ]
+      },
+      "USA": {
+        "name": "United States",
+        "logo": "🇺🇸",
+        "roster": [
+          { "id": "jones_usa", "name": "Aaron Jones", "role": "Batsman", "ovr": 77, "bat": 78, "bowl": 30 },
+          { "id": "taylor_usa", "name": "Steven Taylor", "role": "Batsman", "ovr": 74, "bat": 75, "bowl": 50 },
+          { "id": "monank_usa", "name": "Monank Patel", "role": "Wicketkeeper", "ovr": 76, "bat": 76, "bowl": 10 },
+          { "id": "corey_usa", "name": "Corey Anderson", "role": "All-Rounder", "ovr": 78, "bat": 76, "bowl": 77 },
+          { "id": "netravalkar_usa", "name": "Saurabh Netravalkar", "role": "Bowler", "ovr": 78, "bat": 32, "bowl": 79 },
+          { "id": "harmeet_usa", "name": "Harmeet Singh", "role": "Bowler", "ovr": 75, "bat": 55, "bowl": 75 }
+        ]
+      }
+    }
+  }
+}
