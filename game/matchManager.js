@@ -834,6 +834,7 @@ function createMatchFromLobby({ dbMatchId, lobby }) {
 
   match.tossWinnerId = lobby.tossWinner.telegramId;
   match.tossDecision = lobby.tossDecision;
+  match.status = 'xi_selection';
 
   // Add to activeMatches maps
   activeMatches[lobby.host.telegramId] = match;

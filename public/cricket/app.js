@@ -370,6 +370,14 @@ async function fetchState() {
       renderGameplayScreen();
       renderResultScreen();
       stopPolling();
+    } else if (matchState.status === 'toss' || matchState.status === 'bat_or_bowl') {
+      showScreen('loading-screen');
+      document.querySelector('.loading-text').innerHTML = `Toss is in progress on Telegram...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Please complete the toss decision in your chat first.</span>`;
+      const spinner = document.querySelector('.cricket-ball-spinner');
+      if (spinner) {
+        spinner.style.animationPlayState = 'running';
+        spinner.style.borderColor = '';
+      }
     }
 
     // Trigger autoplay evaluation after state update
