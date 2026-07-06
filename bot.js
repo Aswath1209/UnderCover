@@ -3844,6 +3844,78 @@ bot.command(['guessword', 'gw'], async (ctx) => {
 
 bot.on('message:text', async (ctx) => {
   if (ctx.chat.type !== 'private') {
+    // 1. Check if there is an active cricket lobby waiting for overs input from the host
+    const cricLobby = activeLobbies[ctx.chat.id];
+    if (cricLobby && cricLobby.status === 'waiting_overs') {
+      if (ctx.from.id.toString() === cricLobby.host.telegramId.toString()) {
+        const text = ctx.message.text.trim();
+        const parsedOvers = parseInt(text);
+        if (!isNaN(parsedOvers) && parsedOvers >= 1 && parsedOvers <= 20) {
+          cricLobby.overs = parsedOvers;
+          cricLobby.status = 'toss_guess';
+          
+          const tossText = 
+            `🪙 <b>TOSS TIME!</b> 🪙\n` +
+            `═════════════════════════════\n` +
+            `• <b>Length:</b> ${parsedOvers} Over(s)\n` +
+            `• Host: @${escapeHTML(cricLobby.host.username)}\n` +
+            `• Guest: @${escapeHTML(cricLobby.guest.username)}\n\n` +
+            `👉 @${escapeHTML(cricLobby.guest.username)}, call the toss:`;
+
+          const keyboard = new InlineKeyboard()
+            .text('Heads 🪙', 'cric_toss_guess:heads')
+            .text('Tails 🪙', 'cric_toss_guess:tails');
+            
+          await ctx.reply(tossText, { parse_mode: 'HTML', reply_markup: keyboard });
+          return;
+        } else {
+          await ctx.reply(`⚠️ Invalid input. @${escapeHTML(cricLobby.host.username)}, please enter a valid number of overs (1-20):`);
+          return;
+        }
+      }
+    }
+
+    // 2. Check if there is an active draft match waiting for overs input from the host
+    const cricMatch = Object.values(matchManager.activeMatches).find(
+      m => m.chatId.toString() === ctx.chat.id.toString() && m.status === 'waiting_overs'
+    );
+    if (cricMatch) {
+      if (ctx.from.id.toString() === cricMatch.host.telegramId.toString()) {
+        const text = ctx.message.text.trim();
+        const parsedOvers = parseInt(text);
+        if (!isNaN(parsedOvers) && parsedOvers >= 1 && parsedOvers <= 20) {
+          cricMatch.totalOvers = parsedOvers;
+          cricMatch.status = 'toss_guess';
+          matchManager.saveToDb(cricMatch);
+          
+          const hostList = cricMatch.host.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+          const guestList = cricMatch.guest.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+
+          const summaryText = 
+            `🎉 <b>DRAFT COMPLETE!</b> 🎉\n` +
+            `═════════════════════════════\n` +
+            `🟢 <b>@${escapeHTML(cricMatch.host.username)}'s XI:</b>\n` +
+            `${escapeHTML(hostList)}\n\n` +
+            `🔵 <b>@${escapeHTML(cricMatch.guest.username)}'s XI:</b>\n` +
+            `${escapeHTML(guestList)}\n` +
+            `═════════════════════════════\n\n` +
+            `🪙 <b>TOSS TIME!</b> 🪙\n` +
+            `• <b>Length:</b> ${parsedOvers} Over(s)\n\n` +
+            `👉 @${escapeHTML(cricMatch.guest.username)}, call the toss:`;
+
+          const keyboard = new InlineKeyboard()
+            .text('Heads 🪙', `cric_draft_toss_guess:heads:${cricMatch.id}`)
+            .text('Tails 🪙', `cric_draft_toss_guess:tails:${cricMatch.id}`);
+
+          await ctx.reply(summaryText, { parse_mode: 'HTML', reply_markup: keyboard });
+          return;
+        } else {
+          await ctx.reply(`⚠️ Invalid input. @${escapeHTML(cricMatch.host.username)}, please enter a valid number of overs (1-20):`);
+          return;
+        }
+      }
+    }
+
     const lobby = gameManager.getLobby(ctx.chat.id);
     if (lobby && lobby.state === 'IMPOSTOR_GUESS' && ctx.from.id === lobby.impostorId) {
       const guess = ctx.message.text;
@@ -4244,19 +4316,16 @@ bot.on('callback_query:data', async (ctx) => {
         xi
       };
 
-      lobby.status = 'toss_guess';
+      lobby.status = 'waiting_overs';
       
       const text = 
-        `🪙 <b>TOSS TIME!</b> 🪙\n` +
+        `🤝 <b>@${escapeHTML(guestUsername)} joined the lobby!</b>\n` +
         `═════════════════════════════\n` +
         `• Host: @${escapeHTML(lobby.host.username)}\n` +
         `• Guest: @${escapeHTML(lobby.guest.username)}\n\n` +
-        `👉 @${escapeHTML(lobby.guest.username)}, call the toss:`;
+        `👉 @${escapeHTML(lobby.host.username)}, please reply to this chat with the number of overs for this match (e.g. 1, 5, 10):`;
 
-      const keyboard = new InlineKeyboard()
-        .text('Heads 🪙', 'cric_toss_guess:heads')
-        .text('Tails 🪙', 'cric_toss_guess:tails');
-      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      await ctx.editMessageText(text, { parse_mode: 'HTML' });
     } catch (err) {
       console.error("Lobby join error:", err);
       if (err.description && err.description.includes("query is too old")) {
@@ -4363,8 +4432,8 @@ bot.on('callback_query:data', async (ctx) => {
 
       await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     } else {
-      // Draft complete! Setup toss guess
-      match.status = 'toss_guess';
+      // Draft complete! Ask host for number of overs
+      match.status = 'waiting_overs';
       matchManager.saveToDb(match);
 
       const hostList = match.host.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
@@ -4378,14 +4447,9 @@ bot.on('callback_query:data', async (ctx) => {
         `🔵 <b>@${escapeHTML(match.guest.username)}'s XI:</b>\n` +
         `${escapeHTML(guestList)}\n` +
         `═════════════════════════════\n\n` +
-        `🪙 <b>TOSS TIME!</b> 🪙\n` +
-        `👉 @${escapeHTML(match.guest.username)}, call the toss:`;
+        `👉 @${escapeHTML(match.host.username)}, please reply to this chat with the number of overs for this match (e.g. 1, 5, 10):`;
 
-      const keyboard = new InlineKeyboard()
-        .text('Heads 🪙', `cric_draft_toss_guess:heads:${match.id}`)
-        .text('Tails 🪙', `cric_draft_toss_guess:tails:${match.id}`);
-
-      await ctx.editMessageText(summaryText, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
+      await ctx.editMessageText(summaryText, { parse_mode: 'HTML' }).catch(e => console.error(e));
     }
     return;
   }
