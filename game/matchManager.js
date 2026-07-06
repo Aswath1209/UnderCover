@@ -736,7 +736,10 @@ class Match {
       draftRound: this.draftRound,
       draftTurn: this.draftTurn,
       draftOptions: this.draftOptions,
-      draftPool: this.draftPool
+      draftPool: this.draftPool,
+      iplMode: this.iplMode || false,
+      hostPool: this.hostPool || [],
+      guestPool: this.guestPool || []
     };
   }
 }
@@ -783,6 +786,9 @@ function deserializeMatch(data) {
   match.draftTurn = data.draftTurn;
   match.draftOptions = data.draftOptions || [];
   match.draftPool = data.draftPool || [];
+  match.iplMode = data.iplMode || false;
+  match.hostPool = data.hostPool || [];
+  match.guestPool = data.guestPool || [];
   return match;
 }
 

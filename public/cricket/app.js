@@ -19,6 +19,24 @@ let autoplayActive = false;
 let activeScorecardTab = 'innings1'; // 'innings1' or 'innings2'
 let lastBallUniqueId = null;
 let wasMyTurn = false;
+let selectedRosterPlayers = [];
+
+function getShortTeamName(teamName) {
+  if (!teamName) return '';
+  const name = teamName.trim();
+  const lower = name.toLowerCase();
+  if (lower.includes('chennai super kings') || lower === 'csk') return 'CSK';
+  if (lower.includes('mumbai indians') || lower === 'mi') return 'MI';
+  if (lower.includes('sunrisers hyderabad') || lower === 'srh') return 'SRH';
+  if (lower.includes('royal challengers') || lower === 'rcb') return 'RCB';
+  if (lower.includes('kolkata knight riders') || lower === 'kkr') return 'KKR';
+  if (lower.includes('rajasthan royals') || lower === 'rr') return 'RR';
+  if (lower.includes('delhi capitals') || lower === 'dc') return 'DC';
+  if (lower.includes('gujarat titans') || lower === 'gt') return 'GT';
+  if (lower.includes('lucknow super giants') || lower === 'lsg') return 'LSG';
+  if (lower.includes('punjab kings') || lower === 'pbks') return 'PBKS';
+  return name;
+}
 
 // Initial Setup
 async function init() {
@@ -84,6 +102,7 @@ async function init() {
 function setupEventListeners() {
   // Setup confirm setup lineup button
   document.getElementById('submit-setup-btn').addEventListener('click', submitSetup);
+  document.getElementById('submit-roster-btn').addEventListener('click', submitRosterSelection);
   
   // Delivery Submit
   document.getElementById('submit-delivery-btn').addEventListener('click', submitDelivery);
@@ -255,8 +274,8 @@ function showIdentitySelection(match) {
   container.innerHTML = '';
 
   // Header meta inside selection
-  document.getElementById('header-host-name').innerText = (match.host.teamName || match.host.username || 'HOST').toUpperCase();
-  document.getElementById('header-guest-name').innerText = (match.guest ? (match.guest.teamName || match.guest.username) : 'AI XI').toUpperCase();
+  document.getElementById('header-host-name').innerText = getShortTeamName(match.host.teamName || match.host.username || 'HOST').toUpperCase();
+  document.getElementById('header-guest-name').innerText = getShortTeamName(match.guest ? (match.guest.teamName || match.guest.username) : 'AI XI').toUpperCase();
   document.getElementById('header-match-uuid').innerText = `MATCH ID: ${match.id.substring(0, 6).toUpperCase()}`;
 
   // Host Option
@@ -266,7 +285,7 @@ function showIdentitySelection(match) {
     <span class="user-role-icon">🏏</span>
     <div class="user-info-text">
       <span class="username">@${match.host.username || 'Host'}</span>
-      <span class="team">${match.host.teamName || 'Host Team'}</span>
+      <span class="team">${getShortTeamName(match.host.teamName || 'Host Team')}</span>
     </div>
   `;
   hostBtn.addEventListener('click', () => selectIdentity(match.host.telegramId));
@@ -280,7 +299,7 @@ function showIdentitySelection(match) {
       <span class="user-role-icon">🎳</span>
       <div class="user-info-text">
         <span class="username">@${match.guest.username || 'Guest'}</span>
-        <span class="team">${match.guest.teamName || 'Guest Team'}</span>
+        <span class="team">${getShortTeamName(match.guest.teamName || 'Guest Team')}</span>
       </div>
     `;
     guestBtn.addEventListener('click', () => selectIdentity(match.guest.telegramId));
@@ -357,13 +376,36 @@ async function fetchState() {
     }
     
     // Update Header info
-    document.getElementById('header-host-name').innerText = (matchState.host.teamName || matchState.host.username || 'HOST').toUpperCase();
-    document.getElementById('header-guest-name').innerText = (matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI XI').toUpperCase();
+    document.getElementById('header-host-name').innerText = getShortTeamName(matchState.host.teamName || matchState.host.username || 'HOST').toUpperCase();
+    document.getElementById('header-guest-name').innerText = getShortTeamName(matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI XI').toUpperCase();
     document.getElementById('header-match-uuid').innerText = `MATCH ID: ${matchState.id.substring(0, 6).toUpperCase()}`;
 
     // Route to appropriate screen
     if (matchState.status === 'xi_selection') {
-      renderSetupScreen();
+      const isHost = userId && (matchState.host.telegramId.toString() === userId.toString());
+      const isGuest = userId && matchState.guest && (matchState.guest.telegramId.toString() === userId.toString());
+
+      let needsRoster = false;
+      if (matchState.iplMode) {
+        if (isHost && (!matchState.host.xi || matchState.host.xi.length === 0)) {
+          needsRoster = true;
+        } else if (isGuest && (!matchState.guest.xi || matchState.guest.xi.length === 0)) {
+          needsRoster = true;
+        }
+      }
+
+      if (needsRoster) {
+        renderRosterScreen();
+      } else {
+        const hostEmpty = !matchState.host.xi || matchState.host.xi.length === 0;
+        const guestEmpty = matchState.guest && (!matchState.guest.xi || matchState.guest.xi.length === 0);
+        if (matchState.iplMode && (hostEmpty || guestEmpty)) {
+          showScreen('loading-screen');
+          document.querySelector('.loading-text').innerHTML = `Waiting for players to build their 11-player squads...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Host XI: ${hostEmpty ? '⏳ Pending' : '✅ Ready'}<br>Guest XI: ${guestEmpty ? '⏳ Pending' : '✅ Ready'}</span>`;
+        } else {
+          renderSetupScreen();
+        }
+      }
     } else if (matchState.status === 'innings1' || matchState.status === 'innings2') {
       renderGameplayScreen();
     } else if (matchState.status === 'completed') {
@@ -399,8 +441,8 @@ function renderSetupScreen() {
     setupSubmitBtn.disabled = false;
   }
   
-  const host = matchState.host.teamName || matchState.host.username;
-  const guest = matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI';
+  const host = getShortTeamName(matchState.host.teamName || matchState.host.username);
+  const guest = getShortTeamName(matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI');
   const pitch = matchState.pitch;
   const overs = matchState.totalOvers;
   
@@ -527,7 +569,7 @@ function renderSetupScreen() {
   statusTracker.classList.remove('hidden');
   
   const guestName = matchState.guest ? `@${matchState.guest.username}` : 'AI';
-  const guestTeam = matchState.guest ? matchState.guest.teamName : 'AI XI';
+  const guestTeam = matchState.guest ? getShortTeamName(matchState.guest.teamName) : 'AI XI';
   const guestStatusText = (matchState.guest && matchState.guest.confirmed) ? '✅ SUBMITTED' : (matchState.guest ? '⏳ CHOOSING...' : '✅ READY');
   const guestStatusClass = (matchState.guest && matchState.guest.confirmed) ? 'submitted' : (matchState.guest ? 'pending' : 'submitted');
 
@@ -537,7 +579,7 @@ function renderSetupScreen() {
     <div class="status-row-item">
       <div class="status-user-info">
         <span class="status-username">@${matchState.host.username} (Host)</span>
-        <span class="status-team-name">${matchState.host.teamName}</span>
+        <span class="status-team-name">${getShortTeamName(matchState.host.teamName)}</span>
       </div>
       <span class="status-badge-val ${matchState.host.confirmed ? 'submitted' : 'pending'}">
         ${matchState.host.confirmed ? '✅ SUBMITTED' : '⏳ CHOOSING...'}
@@ -547,7 +589,7 @@ function renderSetupScreen() {
     <div class="status-row-item">
       <div class="status-user-info">
         <span class="status-username">${guestName} (Guest)</span>
-        <span class="status-team-name">${guestTeam}</span>
+        <span class="status-team-name">${getShortTeamName(guestTeam)}</span>
       </div>
       <span class="status-badge-val ${guestStatusClass}">
         ${guestStatusText}
@@ -644,8 +686,8 @@ function renderGameplayScreen() {
   const tossBadge = document.getElementById('toss-badge-display');
   const dec = matchState.tossDecision === 'bat' ? 'ELECTED TO BAT' : 'ELECTED TO BOWL';
   const winnerName = matchState.tossWinnerId === matchState.host.telegramId 
-    ? (matchState.host.teamName || matchState.host.username || 'Host').toUpperCase() 
-    : (matchState.guest ? (matchState.guest.teamName || matchState.guest.username || 'Guest').toUpperCase() : 'AI XI');
+    ? getShortTeamName(matchState.host.teamName || matchState.host.username || 'Host').toUpperCase() 
+    : getShortTeamName(matchState.guest ? (matchState.guest.teamName || matchState.guest.username || 'Guest') : 'AI XI').toUpperCase();
   tossBadge.innerText = `⚫ ${winnerName} WON & ${dec}`;
 
   // Innings 2 Target logic
@@ -1411,11 +1453,11 @@ function renderScorecardPanel() {
   const firstInn = matchState.innings[0] || { runs: 0, wickets: 0, overs: 0, balls: 0, extras: 0 };
   const secondInn = matchState.innings[1] || { runs: 0, wickets: 0, overs: 0, balls: 0, extras: 0 };
 
-  const firstDisplayName = firstTeam.teamName || firstTeam.username || 'HOST';
-  const secondDisplayName = secondTeam ? (secondTeam.teamName || secondTeam.username) : 'AI XI';
+  const firstDisplayName = getShortTeamName(firstTeam.teamName || firstTeam.username || 'HOST');
+  const secondDisplayName = getShortTeamName(secondTeam ? (secondTeam.teamName || secondTeam.username) : 'AI XI');
 
-  const firstNameShort = firstDisplayName.substring(0, 8).toUpperCase();
-  const secondNameShort = secondDisplayName.substring(0, 8).toUpperCase();
+  const firstNameShort = firstDisplayName.toUpperCase();
+  const secondNameShort = secondDisplayName.toUpperCase();
 
   hostLabel.innerText = `${firstNameShort} ${firstInn.runs}/${firstInn.wickets}`;
   guestLabel.innerText = `${secondNameShort} ${secondInn.runs}/${secondInn.wickets}`;
@@ -1428,8 +1470,8 @@ function renderScorecardPanel() {
   const activeInnings = activeScorecardTab === 'innings1' ? firstInn : secondInn;
 
   // Set titles
-  document.getElementById('scorecard-batting-title').innerText = `${activeTeam.teamName.toUpperCase()} BATTING`;
-  document.getElementById('scorecard-bowling-title').innerText = `${opposingTeam.teamName.toUpperCase()} BOWLING`;
+  document.getElementById('scorecard-batting-title').innerText = `${getShortTeamName(activeTeam.teamName || activeTeam.username || 'HOST').toUpperCase()} BATTING`;
+  document.getElementById('scorecard-bowling-title').innerText = `${getShortTeamName(opposingTeam.teamName || opposingTeam.username || 'GUEST').toUpperCase()} BOWLING`;
 
   // Render batting rows
   activeTeam.xi.forEach((player) => {
@@ -1531,8 +1573,8 @@ function renderSquadsPanel() {
   hostList.innerHTML = '';
   guestList.innerHTML = '';
 
-  document.getElementById('squad-host-title').innerText = (matchState.host.teamName || matchState.host.username || 'Host').toUpperCase();
-  document.getElementById('squad-guest-title').innerText = (matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI').toUpperCase();
+  document.getElementById('squad-host-title').innerText = getShortTeamName(matchState.host.teamName || matchState.host.username || 'Host').toUpperCase();
+  document.getElementById('squad-guest-title').innerText = getShortTeamName(matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI').toUpperCase();
 
   matchState.host.xi.forEach(p => {
     const row = document.createElement('div');
@@ -1559,7 +1601,7 @@ function renderResultScreen() {
   const result = matchState.result;
 
   if (result && result.winner) {
-    const winnerDisplayName = result.winner.teamName || result.winner.username || 'WINNER';
+    const winnerDisplayName = getShortTeamName(result.winner.teamName || result.winner.username || 'WINNER');
     document.getElementById('result-winner-title').innerText = 
       `${winnerDisplayName.toUpperCase()} WINS!`;
   } else {
@@ -1606,6 +1648,59 @@ function renderResultScreen() {
 
 function runAutoplayAction() {
   if (!autoplayActive || !matchState || matchState.isProcessing) return;
+
+  // 0. Check if needs roster selection first
+  if (matchState.status === 'xi_selection' && matchState.iplMode) {
+    const isHost = userId && (matchState.host.telegramId.toString() === userId.toString());
+    const isGuest = userId && matchState.guest && (matchState.guest.telegramId.toString() === userId.toString());
+    
+    let needsRoster = false;
+    if (isHost && (!matchState.host.xi || matchState.host.xi.length === 0)) {
+      needsRoster = true;
+    } else if (isGuest && (!matchState.guest.xi || matchState.guest.xi.length === 0)) {
+      needsRoster = true;
+    }
+
+    if (needsRoster) {
+      const pool = isHost ? matchState.hostPool : matchState.guestPool;
+      if (pool && pool.length >= 11 && selectedRosterPlayers.length === 0) {
+        console.log("[Autoplay] Auto-selecting valid 11-player squad...");
+        const keepers = pool.filter(p => p.role === 'wicket_keeper').sort((a, b) => b.ovr - a.ovr);
+        const batsmen = pool.filter(p => p.role === 'batsman').sort((a, b) => b.ovr - a.ovr);
+        const bowlers = pool.filter(p => p.role === 'bowler').sort((a, b) => b.ovr - a.ovr);
+        const allRounders = pool.filter(p => p.role === 'all_rounder').sort((a, b) => b.ovr - a.ovr);
+
+        const selected = [];
+        const usedIds = new Set();
+        const addPlayer = (p) => {
+          if (p && !usedIds.has(p.id) && selected.length < 11) {
+            selected.push(p);
+            usedIds.add(p.id);
+            return true;
+          }
+          return false;
+        };
+
+        if (keepers.length > 0) addPlayer(keepers[0]);
+        for (let i = 0; i < 3; i++) {
+          if (batsmen[i]) addPlayer(batsmen[i]);
+        }
+        for (let i = 0; i < 3; i++) {
+          if (bowlers[i]) addPlayer(bowlers[i]);
+        }
+        if (allRounders.length > 0) addPlayer(allRounders[0]);
+
+        const rest = pool.filter(p => !usedIds.has(p.id)).sort((a, b) => b.ovr - a.ovr);
+        for (const p of rest) {
+          addPlayer(p);
+        }
+
+        selectedRosterPlayers = selected;
+        submitRosterSelection();
+      }
+      return;
+    }
+  }
 
   // 1. Check if it's xi_selection phase and we haven't confirmed yet
   if (matchState.status === 'xi_selection') {
@@ -1790,6 +1885,151 @@ function createParticles(container, color) {
 document.addEventListener('click', () => {
   document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
 });
+
+function renderRosterScreen() {
+  showScreen('roster-screen');
+
+  const isHost = userId && (matchState.host.telegramId.toString() === userId.toString());
+  const pool = isHost ? matchState.hostPool : matchState.guestPool;
+  const teamCode = getShortTeamName(isHost ? matchState.host.teamName : matchState.guest.teamName);
+
+  document.getElementById('roster-team-subtitle').innerText = `Select exactly 11 players for ${teamCode}`;
+
+  const listContainer = document.getElementById('roster-pool-list');
+  listContainer.innerHTML = '';
+
+  if (!pool || pool.length === 0) {
+    listContainer.innerHTML = '<p class="loading-text">No players found in this team pool.</p>';
+    return;
+  }
+
+  pool.forEach(player => {
+    const isSelected = selectedRosterPlayers.some(p => p.id === player.id);
+    const card = document.createElement('div');
+    card.className = `player-card ${isSelected ? 'selected' : ''}`;
+    
+    let stat1Label = "BAT", stat1Val = player.batting_rating || 30;
+    let stat2Label = "BOWL", stat2Val = player.bowling_rating || 30;
+
+    const formattedRole = player.role.toUpperCase().replace('_', ' ');
+
+    card.innerHTML = `
+      <div class="player-card-header">
+        <span class="player-card-name" title="${player.name}">${player.name}</span>
+        <span class="player-card-ovr">${player.ovr} OVR</span>
+      </div>
+      <div class="player-card-details">
+        <span class="player-card-role">${formattedRole}</span>
+        <span class="player-card-archetype">${player.batting_archetype || player.bowling_archetype || ''}</span>
+      </div>
+      <div class="player-card-stats">
+        <span class="player-card-stat">${stat1Label}: ${stat1Val}</span>
+        <span class="player-card-stat">${stat2Label}: ${stat2Val}</span>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      const idx = selectedRosterPlayers.findIndex(p => p.id === player.id);
+      if (idx !== -1) {
+        selectedRosterPlayers.splice(idx, 1);
+        card.classList.remove('selected');
+      } else {
+        if (selectedRosterPlayers.length >= 11) {
+          if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+          return;
+        }
+        selectedRosterPlayers.push(player);
+        card.classList.add('selected');
+      }
+      updateRosterUI(pool);
+    });
+
+    listContainer.appendChild(card);
+  });
+
+  updateRosterUI(pool);
+}
+
+function updateRosterUI(pool) {
+  const count = selectedRosterPlayers.length;
+  document.getElementById('roster-count').innerText = `${count} / 11`;
+  document.getElementById('roster-progress-bar').style.width = `${(count / 11) * 100}%`;
+
+  const batsmen = selectedRosterPlayers.filter(p => p.role === 'batsman').length;
+  const keepers = selectedRosterPlayers.filter(p => p.role === 'wicket_keeper').length;
+  const allRounders = selectedRosterPlayers.filter(p => p.role === 'all_rounder').length;
+  const bowlers = selectedRosterPlayers.filter(p => p.role === 'bowler').length;
+
+  const batValid = batsmen >= 3 && batsmen <= 5;
+  const keeperValid = keepers >= 1 && keepers <= 2;
+  const arValid = allRounders >= 1 && allRounders <= 3;
+  const bowlValid = bowlers >= 3 && bowlers <= 5;
+
+  updateRequirementUI('req-batsmen', `Batsmen: 3-5 (${batsmen})`, batValid);
+  updateRequirementUI('req-keepers', `Keepers: 1-2 (${keepers})`, keeperValid);
+  updateRequirementUI('req-allrounders', `All-Rounders: 1-3 (${allRounders})`, arValid);
+  updateRequirementUI('req-bowlers', `Bowlers: 3-5 (${bowlers})`, bowlValid);
+
+  const cards = document.querySelectorAll('.roster-pool-grid .player-card');
+  cards.forEach((card, i) => {
+    const player = pool[i];
+    const isSelected = selectedRosterPlayers.some(p => p.id === player.id);
+    if (count === 11 && !isSelected) {
+      card.classList.add('disabled');
+    } else {
+      card.classList.remove('disabled');
+    }
+  });
+
+  const allValid = count === 11 && batValid && keeperValid && arValid && bowlValid;
+  const submitBtn = document.getElementById('submit-roster-btn');
+  submitBtn.disabled = !allValid;
+}
+
+function updateRequirementUI(elementId, text, isValid) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.className = `req-item ${isValid ? 'valid' : 'invalid'}`;
+  el.querySelector('.req-status').innerText = isValid ? '✅' : '❌';
+  el.querySelector('.req-text').innerText = text;
+}
+
+async function submitRosterSelection() {
+  if (selectedRosterPlayers.length !== 11) return;
+  
+  const submitBtn = document.getElementById('submit-roster-btn');
+  submitBtn.disabled = true;
+  submitBtn.innerText = 'Submitting...';
+
+  try {
+    const response = await fetch('/api/match/select-ipl-xi', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: userId,
+        matchId: matchId,
+        selectedXi: selectedRosterPlayers
+      })
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to submit squad');
+    }
+
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    
+    selectedRosterPlayers = [];
+    await fetchState();
+  } catch (err) {
+    console.error("Submit roster error:", err);
+    alert(err.message);
+    submitBtn.disabled = false;
+    submitBtn.innerText = 'Confirm 11-Player Squad';
+  }
+}
 
 // Start execution
 init();

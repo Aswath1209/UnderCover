@@ -2259,6 +2259,208 @@ bot.command('cric', async (ctx) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// /cipl — IPL 2026 Mode: Team picker + custom XI roster builder
+// ─────────────────────────────────────────────────────────────────────────────
+const IPL_SQUADS_POOL = require('./data/ipl_2026_squads_pool.json');
+
+const IPL_TEAM_NAMES = {
+  CSK: 'Chennai Super Kings',
+  MI:  'Mumbai Indians',
+  RCB: 'Royal Challengers Bengaluru',
+  KKR: 'Kolkata Knight Riders',
+  SRH: 'Sunrisers Hyderabad',
+  DC:  'Delhi Capitals',
+  GT:  'Gujarat Titans',
+  LSG: 'Lucknow Super Giants',
+  PBKS:'Punjab Kings',
+  RR:  'Rajasthan Royals'
+};
+
+// In-memory pending team picks before match starts
+const iplTeamPicks = {}; // userId → { teamCode, lobbyId }
+
+bot.command('cipl', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const username   = ctx.from.username || ctx.from.first_name || 'Host';
+
+  if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
+    return ctx.reply('⚠️ You already have an active match or lobby running!');
+  }
+  if (activeLobbies[ctx.chat.id]) {
+    return ctx.reply('⚠️ There is already a match lobby in this chat. Cancel it first!');
+  }
+
+  const args  = ctx.match ? ctx.match.trim().split(/\s+/) : [];
+  let   overs = 10;
+  for (const arg of args) {
+    const p = parseInt(arg);
+    if (!isNaN(p) && p >= 1 && p <= 20) { overs = p; break; }
+  }
+
+  if (sb.supabase) await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
+
+  // Build team selection keyboard (2 teams per row)
+  const teams = Object.keys(IPL_SQUADS_POOL);
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < teams.length; i += 2) {
+    const row = [teams[i], teams[i + 1]].filter(Boolean);
+    kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${overs}:${ctx.chat.id}` })));
+  }
+
+  await ctx.reply(
+    `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
+    `═══════════════════════════════\n` +
+    `<b>@${escapeHTML(username)}</b> is creating a lobby!\n\n` +
+    `👇 Pick <b>your team</b> to proceed:`,
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
+// Handle host team pick
+bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
+  const parts    = ctx.callbackQuery.data.split(':');
+  const teamCode = parts[1];
+  const overs    = parseInt(parts[2]) || 10;
+  const chatId   = ctx.chat.id;
+  const user     = ctx.from;
+
+  if (activeLobbies[chatId]) {
+    return ctx.answerCallbackQuery({ text: '⚠️ Lobby already exists!', show_alert: true });
+  }
+
+  const pool = IPL_SQUADS_POOL[teamCode];
+  if (!pool) return ctx.answerCallbackQuery({ text: '❌ Invalid team.', show_alert: true });
+
+  await ctx.answerCallbackQuery();
+
+  const username = user.username || user.first_name || 'Host';
+  const teamName = IPL_TEAM_NAMES[teamCode] || teamCode;
+
+  // Create the lobby in IPL mode — XI is empty, pool is the full squad
+  activeLobbies[chatId] = {
+    chatId,
+    host: {
+      telegramId: user.id,
+      username,
+      teamName,
+      teamCode,
+      squad: pool,
+      xi:    []       // will be picked via web app roster builder
+    },
+    guest:     null,
+    status:    'waiting_join',
+    overs,
+    iplMode:   true,
+    createdAt: Date.now()
+  };
+
+  const kb = new InlineKeyboard()
+    .text('🤝 Join', 'cipl_join')
+    .text('❌ Cancel', 'cric_cancel_lobby');
+
+  try { await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }); } catch (_) {}
+
+  await ctx.reply(
+    `🏆 <b>IPL 2026 LOBBY CREATED!</b> 🏆\n` +
+    `═══════════════════════════════\n` +
+    `• <b>Host:</b> @${escapeHTML(username)}\n` +
+    `• <b>Team:</b> ${teamCode} — ${escapeHTML(teamName)}\n` +
+    `• <b>Overs:</b> ${overs}\n\n` +
+    `👇 Opponent — tap <b>Join</b> and pick your team!`,
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
+// Handle guest join for IPL mode
+bot.callbackQuery('cipl_join', async (ctx) => {
+  const chatId = ctx.chat.id;
+  const user   = ctx.from;
+  const lobby  = activeLobbies[chatId];
+
+  if (!lobby || !lobby.iplMode) {
+    return ctx.answerCallbackQuery({ text: '❌ No IPL lobby to join.', show_alert: true });
+  }
+  if (user.id === lobby.host.telegramId) {
+    return ctx.answerCallbackQuery({ text: '⚠️ You cannot join your own lobby!', show_alert: true });
+  }
+  if (lobby.guest) {
+    return ctx.answerCallbackQuery({ text: '⚠️ Lobby is already full!', show_alert: true });
+  }
+  if (matchManager.getActiveMatch(user.id) || getUserActiveLobby(user.id)) {
+    return ctx.answerCallbackQuery({ text: '⚠️ You already have an active match!', show_alert: true });
+  }
+
+  await ctx.answerCallbackQuery();
+
+  // Show team picker to guest (exclude host's team to force unique teams)
+  const takenTeam = lobby.host.teamCode;
+  const teams = Object.keys(IPL_SQUADS_POOL).filter(t => t !== takenTeam);
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < teams.length; i += 2) {
+    const row = [teams[i], teams[i + 1]].filter(Boolean);
+    kb.row(...row.map(t => ({ text: t, callback_data: `cipl_guest_team:${t}` })));
+  }
+
+  const username = user.username || user.first_name || 'Guest';
+  await ctx.reply(
+    `🏆 @${escapeHTML(username)} is joining the IPL lobby!\n\n` +
+    `👇 Pick <b>your team:</b>`,
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
+// Handle guest team pick — finalise lobby and do toss
+bot.callbackQuery(/^cipl_guest_team:/, async (ctx) => {
+  const teamCode = ctx.callbackQuery.data.split(':')[1];
+  const chatId   = ctx.chat.id;
+  const user     = ctx.from;
+  const lobby    = activeLobbies[chatId];
+
+  if (!lobby || !lobby.iplMode) {
+    return ctx.answerCallbackQuery({ text: '❌ No active IPL lobby.', show_alert: true });
+  }
+  if (user.id === lobby.host.telegramId) {
+    return ctx.answerCallbackQuery({ text: '⚠️ You are the host!', show_alert: true });
+  }
+
+  const pool = IPL_SQUADS_POOL[teamCode];
+  if (!pool) return ctx.answerCallbackQuery({ text: '❌ Invalid team.', show_alert: true });
+
+  await ctx.answerCallbackQuery();
+
+  const username = user.username || user.first_name || 'Guest';
+  const teamName = IPL_TEAM_NAMES[teamCode] || teamCode;
+
+  if (sb.supabase) await sb.ensureUser(user.id, user.first_name).catch(() => {});
+
+  lobby.guest = {
+    telegramId: user.id,
+    username,
+    teamName,
+    teamCode,
+    squad: pool,
+    xi:    []
+  };
+  lobby.status = 'toss';
+
+  try { await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }); } catch (_) {}
+
+  const kb = new InlineKeyboard()
+    .text('🪙 Heads', `cric_toss_guess:heads`)
+    .text('🪙 Tails', `cric_toss_guess:tails`);
+
+  await ctx.reply(
+    `🏆 <b>IPL 2026 MATCH LOBBY READY!</b> 🏆\n` +
+    `═══════════════════════════════\n` +
+    `• <b>${lobby.host.teamCode}</b> (${escapeHTML(lobby.host.teamName)}) → @${escapeHTML(lobby.host.username)}\n` +
+    `• <b>${teamCode}</b> (${escapeHTML(teamName)}) → @${escapeHTML(username)}\n` +
+    `• <b>Overs:</b> ${lobby.overs}\n\n` +
+    `🪙 <b>@${escapeHTML(username)}</b> — call the toss!`,
+    { parse_mode: 'HTML', reply_markup: kb }
+  );
+});
+
 async function resolveCricketPlayer(ctx, query) {
   if (!sb.supabase) {
     await ctx.reply("❌ Database stats are currently disabled.", { parse_mode: 'HTML' });
@@ -4572,12 +4774,23 @@ bot.on('callback_query:data', async (ctx) => {
       });
       match.status = 'xi_selection';
 
+      // IPL Mode — attach pool and flag
+      if (lobby.iplMode) {
+        match.iplMode    = true;
+        match.hostPool   = lobby.host.squad  || [];
+        match.guestPool  = lobby.guest.squad || [];
+      }
+
       try {
         await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
       } catch (e) {}
 
       const keyboard = new InlineKeyboard();
       addMatchPlayButton(keyboard, match, ctx);
+
+      const iplNotice = lobby.iplMode
+        ? `\n\n🏆 <b>IPL Mode:</b> Both players must select their Playing XI from their squad in the web app!`
+        : '';
 
       const sentMsg = await ctx.reply(
         `🏏 <b>MATCH IS READY!</b>\n` +
@@ -4586,12 +4799,13 @@ bot.on('callback_query:data', async (ctx) => {
         `• Guest: <b>${escapeHTML(match.guest.username)}</b>\n` +
         `• Pitch: <b>${match.pitch.toUpperCase()}</b>\n` +
         `• Length: <b>${match.totalOvers} Over(s)</b>\n\n` +
-        `🪙 <b>Toss:</b> @${escapeHTML(lobby.tossWinner.username)} elected to <b>${decision.toUpperCase()} first</b>.\n\n` +
+        `🪙 <b>Toss:</b> @${escapeHTML(lobby.tossWinner.username)} elected to <b>${decision.toUpperCase()} first</b>.${iplNotice}\n\n` +
         `👉 Tap <b>Play Match</b> to start!`,
         { parse_mode: 'HTML', reply_markup: keyboard }
       );
 
       match.activeScorecardMessageId = sentMsg.message_id;
+      matchManager.saveToDb(match);
       delete activeLobbies[chatId];
     } catch (err) {
       console.error("Match creation error:", err);
@@ -6685,6 +6899,106 @@ app.post('/api/match/select-players', async (req, res) => {
   res.json({ success: true });
 });
 
+// --- IPL Mode: Submit Selected XI ---
+app.post('/api/match/select-ipl-xi', async (req, res) => {
+  const clean = (val) => {
+    if (!val || val === 'null' || val === 'undefined') return null;
+    return val.toString().trim();
+  };
+
+  const { userId, matchId, selectedXi } = req.body;
+  const sanitizedUserId = clean(userId);
+  const sanitizedMatchId = clean(matchId);
+
+  if (!sanitizedUserId) return res.status(400).json({ error: 'userId is required' });
+  if (!selectedXi || !Array.isArray(selectedXi) || selectedXi.length !== 11) {
+    return res.status(400).json({ error: 'Exactly 11 players must be selected.' });
+  }
+
+  // Validate role counts
+  const batsmen = selectedXi.filter(p => p.role === 'batsman').length;
+  const keepers = selectedXi.filter(p => p.role === 'wicket_keeper').length;
+  const allRounders = selectedXi.filter(p => p.role === 'all_rounder').length;
+  const bowlers = selectedXi.filter(p => p.role === 'bowler').length;
+
+  if (batsmen < 3 || batsmen > 5) return res.status(400).json({ error: `Need 3–5 batsmen, got ${batsmen}.` });
+  if (keepers < 1 || keepers > 2) return res.status(400).json({ error: `Need 1–2 wicket-keepers, got ${keepers}.` });
+  if (allRounders < 1 || allRounders > 3) return res.status(400).json({ error: `Need 1–3 all-rounders, got ${allRounders}.` });
+  if (bowlers < 3 || bowlers > 5) return res.status(400).json({ error: `Need 3–5 bowlers, got ${bowlers}.` });
+
+  // Find match
+  let match = null;
+  if (sanitizedMatchId) match = matchManager.getMatch(sanitizedMatchId);
+  if (!match) match = matchManager.getActiveMatch(sanitizedUserId);
+
+  // Try restore from DB
+  if (!match && sanitizedMatchId && sb.supabase) {
+    try {
+      const row = await sb.getCricketMatchById(sanitizedMatchId);
+      if (row && row.state_json) {
+        match = matchManager.deserializeMatch(row.state_json);
+        matchManager.activeMatches[match.id] = match;
+        matchManager.activeMatches[match.host.telegramId] = match;
+        if (match.guest && match.guest.telegramId !== 'ai') {
+          matchManager.activeMatches[match.guest.telegramId] = match;
+        }
+      }
+    } catch (e) {
+      console.error('[API/select-ipl-xi] Failed to restore match:', e);
+    }
+  }
+
+  if (!match) return res.status(404).json({ error: 'No active match found.' });
+  if (!match.iplMode) return res.status(400).json({ error: 'Match is not in IPL mode.' });
+  if (match.status !== 'xi_selection') return res.status(400).json({ error: 'Match is not in XI selection phase.' });
+
+  const isHost = match.host.telegramId.toString() === sanitizedUserId;
+  const isGuest = match.guest && match.guest.telegramId.toString() === sanitizedUserId;
+
+  if (!isHost && !isGuest) return res.status(403).json({ error: 'You are not a participant in this match.' });
+
+  // Prefix IDs to avoid cross-team stat conflicts
+  const processedXi = selectedXi.map(p => ({
+    ...p,
+    id: `${isHost ? 'host' : 'guest'}_${p.id}`
+  }));
+
+  if (isHost) {
+    match.host.xi = processedXi;
+  } else {
+    match.guest.xi = processedXi;
+  }
+
+  // Check if both players have now submitted their XI
+  const hostDone = match.host.xi && match.host.xi.length === 11;
+  const guestDone = match.guest && match.guest.xi && match.guest.xi.length === 11;
+
+  if (hostDone && guestDone) {
+    // Both ready — notify in Telegram
+    try {
+      await bot.api.sendMessage(match.chatId,
+        `✅ <b>Both teams have confirmed their playing XI!</b>\n\n` +
+        `🏏 <b>${escapeHTML(match.host.teamName)}</b> vs <b>${escapeHTML(match.guest.teamName)}</b>\n\n` +
+        `Open the web app to select your batting/bowling lineup!`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {}
+  } else {
+    // Notify waiting
+    try {
+      const waitingFor = isHost ? match.guest.username : match.host.username;
+      await bot.api.sendMessage(match.chatId,
+        `✅ <b>@${escapeHTML(isHost ? match.host.username : match.guest.username)}</b> has confirmed their XI!\n` +
+        `⏳ Waiting for <b>@${escapeHTML(waitingFor)}</b>...`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {}
+  }
+
+  matchManager.saveToDb(match);
+  res.json({ success: true });
+});
+
 app.post('/api/match/action', async (req, res) => {
   const clean = (val) => {
     if (!val || val === 'null' || val === 'undefined') return null;
@@ -7054,7 +7368,10 @@ function serializeMatchState(match, userId) {
     draftRound: match.draftRound || 1,
     draftTurn: match.draftTurn,
     draftOptions: match.draftOptions || [],
-    draftPool: match.draftPool || []
+    draftPool: match.draftPool || [],
+    iplMode: match.iplMode || false,
+    hostPool: match.hostPool || [],
+    guestPool: match.guestPool || []
   };
 }
 
