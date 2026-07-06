@@ -576,7 +576,7 @@ function renderSetupScreen() {
 // Setup Submit handler
 async function submitSetup() {
   const isBatting = matchState.myRole === 'batting';
-  const body = { userId };
+  const body = { userId, matchId };
   
   if (isBatting) {
     const strikerEl = document.querySelector('#striker-list .selection-item.selected');
@@ -1009,6 +1009,7 @@ function renderBattingShots() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
+            matchId,
             type: 'shot',
             action: { shot }
           })
@@ -1041,6 +1042,7 @@ async function submitDelivery() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
+        matchId,
         type: 'delivery',
         action: {
           delivery: selectedDelivery,
@@ -1147,6 +1149,7 @@ async function selectNextBatsman(index) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
+        matchId,
         type: 'wicket_batsman',
         action: { index }
       })
@@ -1274,6 +1277,7 @@ async function selectNextBowler(index) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,
+        matchId,
         type: 'over_bowler',
         action: { index }
       })

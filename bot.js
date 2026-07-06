@@ -4244,22 +4244,18 @@ bot.on('callback_query:data', async (ctx) => {
         xi
       };
 
-      lobby.status = 'toss_decision';
+      lobby.status = 'toss_guess';
       
-      const tossWinner = Math.random() < 0.5 ? lobby.host : lobby.guest;
-      lobby.tossWinner = tossWinner;
-
       const text = 
-        `🪙 <b>TOSS COMPLETED!</b> 🪙\n` +
+        `🪙 <b>TOSS TIME!</b> 🪙\n` +
         `═════════════════════════════\n` +
         `• Host: @${escapeHTML(lobby.host.username)}\n` +
         `• Guest: @${escapeHTML(lobby.guest.username)}\n\n` +
-        `🎉 <b>@${escapeHTML(tossWinner.username)}</b> won the toss!\n` +
-        `Choose your decision:`;
+        `👉 @${escapeHTML(lobby.guest.username)}, call the toss:`;
 
       const keyboard = new InlineKeyboard()
-        .text('Bat First 🏏', 'cric_decision:bat')
-        .text('Bowl First 🎳', 'cric_decision:bowl');
+        .text('Heads 🪙', 'cric_toss_guess:heads')
+        .text('Tails 🪙', 'cric_toss_guess:tails');
       await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
     } catch (err) {
       console.error("Lobby join error:", err);
@@ -4269,6 +4265,40 @@ bot.on('callback_query:data', async (ctx) => {
       }
       ctx.reply("❌ Error joining lobby: " + err.message).catch(() => {});
     }
+    return;
+  }
+
+  if (data.startsWith('cric_toss_guess:')) {
+    const guess = data.split(':')[1];
+    const lobby = activeLobbies[chatId];
+    if (!lobby) return ctx.answerCallbackQuery({ text: "❌ No active lobby in this chat.", show_alert: true });
+
+    if (user.id !== lobby.guest.telegramId) {
+      return ctx.answerCallbackQuery({ text: "⚠️ Only the Guest (@" + lobby.guest.username + ") can call the toss!", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery();
+
+    const coinFlip = Math.random() < 0.5 ? 'heads' : 'tails';
+    const won = guess === coinFlip;
+    const tossWinner = won ? lobby.guest : lobby.host;
+    
+    lobby.tossWinner = tossWinner;
+    lobby.status = 'toss_decision';
+
+    const text = 
+      `🪙 <b>TOSS COMPLETED!</b> 🪙\n` +
+      `═════════════════════════════\n` +
+      `• Guest called: <b>${guess.toUpperCase()}</b>\n` +
+      `• Coin landed on: <b>${coinFlip.toUpperCase()}</b>\n\n` +
+      `🎉 <b>@${escapeHTML(tossWinner.username)}</b> won the toss!\n` +
+      `Choose your decision:`;
+
+    const keyboard = new InlineKeyboard()
+      .text('Bat First 🏏', 'cric_decision:bat')
+      .text('Bowl First 🎳', 'cric_decision:bowl');
+
+    await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     return;
   }
 
@@ -4333,15 +4363,8 @@ bot.on('callback_query:data', async (ctx) => {
 
       await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     } else {
-      // Draft complete! Setup toss
-      const tossWinnerId = Math.random() < 0.5 ? match.host.telegramId : match.guest.telegramId;
-      const tossWinnerUsername = tossWinnerId.toString() === match.host.telegramId.toString()
-        ? match.host.username
-        : match.guest.username;
-
-      match.tossWinnerId = tossWinnerId;
-      match.status = 'toss';
-
+      // Draft complete! Setup toss guess
+      match.status = 'toss_guess';
       matchManager.saveToDb(match);
 
       const hostList = match.host.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
@@ -4356,15 +4379,66 @@ bot.on('callback_query:data', async (ctx) => {
         `${escapeHTML(guestList)}\n` +
         `═════════════════════════════\n\n` +
         `🪙 <b>TOSS TIME!</b> 🪙\n` +
-        `🎉 <b>@${escapeHTML(tossWinnerUsername)}</b> won the toss!\n` +
-        `Choose your decision:`;
+        `👉 @${escapeHTML(match.guest.username)}, call the toss:`;
 
       const keyboard = new InlineKeyboard()
-        .text('Bat First 🏏', `cric_draft_toss:bat:${match.id}`)
-        .text('Bowl First 🎳', `cric_draft_toss:bowl:${match.id}`);
+        .text('Heads 🪙', `cric_draft_toss_guess:heads:${match.id}`)
+        .text('Tails 🪙', `cric_draft_toss_guess:tails:${match.id}`);
 
       await ctx.editMessageText(summaryText, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     }
+    return;
+  }
+
+  if (data.startsWith('cric_draft_toss_guess:')) {
+    const parts = data.split(':');
+    const guess = parts[1];
+    const matchId = parts[2];
+
+    const match = matchManager.getMatch(matchId);
+    if (!match || match.status !== 'toss_guess') {
+      return ctx.answerCallbackQuery({ text: "❌ Match is not in toss guess phase or has expired.", show_alert: true });
+    }
+
+    if (user.id.toString() !== match.guest.telegramId.toString()) {
+      return ctx.answerCallbackQuery({ text: "⚠️ Only the Guest (@" + match.guest.username + ") can call the toss!", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery();
+
+    const coinFlip = Math.random() < 0.5 ? 'heads' : 'tails';
+    const won = guess === coinFlip;
+    const tossWinnerId = won ? match.guest.telegramId : match.host.telegramId;
+    const tossWinnerUsername = tossWinnerId.toString() === match.host.telegramId.toString()
+      ? match.host.username
+      : match.guest.username;
+
+    match.tossWinnerId = tossWinnerId;
+    match.status = 'toss';
+    matchManager.saveToDb(match);
+
+    const hostList = match.host.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+    const guestList = match.guest.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+
+    const summaryText = 
+      `🎉 <b>DRAFT COMPLETE!</b> 🎉\n` +
+      `═════════════════════════════\n` +
+      `🟢 <b>@${escapeHTML(match.host.username)}'s XI:</b>\n` +
+      `${escapeHTML(hostList)}\n\n` +
+      `🔵 <b>@${escapeHTML(match.guest.username)}'s XI:</b>\n` +
+      `${escapeHTML(guestList)}\n` +
+      `═════════════════════════════\n\n` +
+      `🪙 <b>TOSS COMPLETED!</b> 🪙\n` +
+      `• Guest called: <b>${guess.toUpperCase()}</b>\n` +
+      `• Coin landed on: <b>${coinFlip.toUpperCase()}</b>\n\n` +
+      `🎉 <b>@${escapeHTML(tossWinnerUsername)}</b> won the toss!\n` +
+      `Choose your decision:`;
+
+    const keyboard = new InlineKeyboard()
+      .text('Bat First 🏏', `cric_draft_toss:bat:${match.id}`)
+      .text('Bowl First 🎳', `cric_draft_toss:bowl:${match.id}`);
+
+    await ctx.editMessageText(summaryText, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     return;
   }
 
@@ -6389,6 +6463,12 @@ app.get('/api/match', async (req, res) => {
         const row = await sb.getCricketMatchById(matchId);
         if (row && row.state_json) {
           const deserialized = matchManager.deserializeMatch(row.state_json);
+          // Restore to active cache
+          matchManager.activeMatches[deserialized.id] = deserialized;
+          matchManager.activeMatches[deserialized.host.telegramId] = deserialized;
+          if (deserialized.guest && deserialized.guest.telegramId !== 'ai') {
+            matchManager.activeMatches[deserialized.guest.telegramId] = deserialized;
+          }
           const serialized = serializeMatchState(deserialized, userId);
           return res.json(serialized);
         }
@@ -6409,14 +6489,41 @@ app.post('/api/match/select-players', async (req, res) => {
     return val.toString().trim();
   };
 
-  const { userId, strikerIdx, nonStrikerIdx, bowlerIdx } = req.body;
+  const { userId, matchId, strikerIdx, nonStrikerIdx, bowlerIdx } = req.body;
   const sanitizedUserId = clean(userId);
+  const sanitizedMatchId = clean(matchId);
+
   if (!sanitizedUserId) {
     return res.status(400).json({ error: 'userId is required' });
   }
 
-  const match = matchManager.getActiveMatch(sanitizedUserId);
+  let match = null;
+  if (sanitizedMatchId) {
+    match = matchManager.getMatch(sanitizedMatchId);
+  }
   if (!match) {
+    match = matchManager.getActiveMatch(sanitizedUserId);
+  }
+
+  // Restore if needed
+  if (!match && sanitizedMatchId && sb.supabase) {
+    try {
+      const row = await sb.getCricketMatchById(sanitizedMatchId);
+      if (row && row.state_json) {
+        match = matchManager.deserializeMatch(row.state_json);
+        matchManager.activeMatches[match.id] = match;
+        matchManager.activeMatches[match.host.telegramId] = match;
+        if (match.guest && match.guest.telegramId !== 'ai') {
+          matchManager.activeMatches[match.guest.telegramId] = match;
+        }
+      }
+    } catch (e) {
+      console.error("[API] Failed to restore match during player selection:", e);
+    }
+  }
+
+  if (!match) {
+    console.error(`[API/select-players] No active match found for userId=${sanitizedUserId}, matchId=${sanitizedMatchId}`);
     return res.status(404).json({ error: 'No active match found.' });
   }
 
@@ -6520,14 +6627,41 @@ app.post('/api/match/action', async (req, res) => {
     return val.toString().trim();
   };
 
-  const { userId, type, action } = req.body;
+  const { userId, matchId, type, action } = req.body;
   const sanitizedUserId = clean(userId);
+  const sanitizedMatchId = clean(matchId);
+
   if (!sanitizedUserId) {
     return res.status(400).json({ error: 'userId is required' });
   }
 
-  const match = matchManager.getActiveMatch(sanitizedUserId);
+  let match = null;
+  if (sanitizedMatchId) {
+    match = matchManager.getMatch(sanitizedMatchId);
+  }
   if (!match) {
+    match = matchManager.getActiveMatch(sanitizedUserId);
+  }
+
+  // Restore if needed
+  if (!match && sanitizedMatchId && sb.supabase) {
+    try {
+      const row = await sb.getCricketMatchById(sanitizedMatchId);
+      if (row && row.state_json) {
+        match = matchManager.deserializeMatch(row.state_json);
+        matchManager.activeMatches[match.id] = match;
+        matchManager.activeMatches[match.host.telegramId] = match;
+        if (match.guest && match.guest.telegramId !== 'ai') {
+          matchManager.activeMatches[match.guest.telegramId] = match;
+        }
+      }
+    } catch (e) {
+      console.error("[API] Failed to restore match during action:", e);
+    }
+  }
+
+  if (!match) {
+    console.error(`[API/action] No active match found for userId=${sanitizedUserId}, matchId=${sanitizedMatchId}`);
     return res.status(404).json({ error: 'No active match found.' });
   }
 
