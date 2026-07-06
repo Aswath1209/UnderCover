@@ -370,9 +370,13 @@ async function fetchState() {
       renderGameplayScreen();
       renderResultScreen();
       stopPolling();
-    } else if (matchState.status === 'toss' || matchState.status === 'bat_or_bowl') {
+        } else if (matchState.status === 'toss' || matchState.status === 'bat_or_bowl' || matchState.status === 'drafting') {
       showScreen('loading-screen');
-      document.querySelector('.loading-text').innerHTML = `Toss is in progress on Telegram...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Please complete the toss decision in your chat first.</span>`;
+      if (matchState.status === 'drafting') {
+        document.querySelector('.loading-text').innerHTML = `Drafting is in progress on Telegram...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Please select your players in the Telegram chat.</span>`;
+      } else {
+        document.querySelector('.loading-text').innerHTML = `Toss is in progress on Telegram...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Please complete the toss decision in your chat first.</span>`;
+      }
       const spinner = document.querySelector('.cricket-ball-spinner');
       if (spinner) {
         spinner.style.animationPlayState = 'running';

@@ -731,7 +731,12 @@ class Match {
       guestConfirmed: this.guestConfirmed,
       activeScorecardMessageId: this.activeScorecardMessageId,
       lastActivity: this.lastActivity,
-      isSuperOver: this.isSuperOver
+      isSuperOver: this.isSuperOver,
+      isDraft: this.isDraft,
+      draftRound: this.draftRound,
+      draftTurn: this.draftTurn,
+      draftOptions: this.draftOptions,
+      draftPool: this.draftPool
     };
   }
 }
@@ -773,6 +778,11 @@ function deserializeMatch(data) {
   match.activeScorecardMessageId = data.activeScorecardMessageId;
   match.lastActivity = data.lastActivity || Date.now();
   match.isSuperOver = data.isSuperOver || false;
+  match.isDraft = data.isDraft || false;
+  match.draftRound = data.draftRound || 1;
+  match.draftTurn = data.draftTurn;
+  match.draftOptions = data.draftOptions || [];
+  match.draftPool = data.draftPool || [];
   return match;
 }
 

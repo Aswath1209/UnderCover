@@ -317,6 +317,95 @@ function getMatchPlayUrl(match) {
   return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}`;
 }
 
+const DRAFT_ROLES = [
+  'wicket_keeper', // Round 1
+  'batsman',       // Round 2
+  'batsman',       // Round 3
+  'batsman',       // Round 4
+  'bowler',        // Round 5
+  'bowler',        // Round 6
+  'bowler',        // Round 7
+  'all_rounder',   // Round 8
+  'batsman',       // Round 9
+  'bowler',        // Round 10
+  'all_rounder'    // Round 11
+];
+
+const DRAFT_ROLE_ICONS = {
+  wicket_keeper: '🧤 WICKET KEEPER',
+  batsman: '🏏 BATSMAN',
+  bowler: '🥎 BOWLER',
+  all_rounder: '⚡ ALL-ROUNDER'
+};
+
+function generateDraftOptionsForRole(allPlayers, role, excludedIds) {
+  let pool = allPlayers.filter(p => p.role === role && p.ovr >= 92 && !excludedIds.includes(p.id));
+  
+  if (pool.length < 2) {
+    pool = allPlayers.filter(p => p.role === role && p.ovr >= 90 && !excludedIds.includes(p.id));
+  }
+  if (pool.length < 2) {
+    pool = allPlayers.filter(p => p.role === role && p.ovr >= 85 && !excludedIds.includes(p.id));
+  }
+  if (pool.length < 2) {
+    pool = allPlayers.filter(p => p.role === role && !excludedIds.includes(p.id));
+  }
+
+  if (pool.length < 2) return null;
+
+  const idx1 = Math.floor(Math.random() * pool.length);
+  const P1 = pool[idx1];
+
+  const remaining = pool.filter((_, idx) => idx !== idx1);
+  remaining.sort((a, b) => {
+    const diffA = Math.abs(a.ovr - P1.ovr);
+    const diffB = Math.abs(b.ovr - P1.ovr);
+    return diffA - diffB;
+  });
+
+  const bestDiff = Math.abs(remaining[0].ovr - P1.ovr);
+  const candidates = remaining.filter(p => Math.abs(p.ovr - P1.ovr) <= Math.max(1, bestDiff));
+  const P2 = candidates[Math.floor(Math.random() * candidates.length)];
+
+  return [P1, P2];
+}
+
+function renderDraftMessage(match) {
+  const currentRole = DRAFT_ROLES[match.draftRound - 1];
+  const roleName = DRAFT_ROLE_ICONS[currentRole] || currentRole.toUpperCase();
+  const P1 = match.draftOptions[0];
+  const P2 = match.draftOptions[1];
+
+  const chooserName = match.draftTurn.toString() === match.host.telegramId.toString()
+    ? match.host.username
+    : match.guest.username;
+
+  const hostAvgOvr = match.host.xi.length > 0 
+    ? (match.host.xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / match.host.xi.length).toFixed(1)
+    : '0.0';
+  const guestAvgOvr = match.guest.xi.length > 0
+    ? (match.guest.xi.reduce((sum, p) => sum + (p.ovr || 0), 0) / match.guest.xi.length).toFixed(1)
+    : '0.0';
+
+  const hostList = match.host.xi.map(p => `${p.name.split(' ').pop()} (${p.ovr})`).join(', ') || 'None';
+  const guestList = match.guest.xi.map(p => `${p.name.split(' ').pop()} (${p.ovr})`).join(', ') || 'None';
+
+  return `⚡ <b>DRAFT MODE: ROUND ${match.draftRound}/11</b> ⚡\n` +
+         `═════════════════════════════\n` +
+         `👤 <b>Chooser:</b> <a href="tg://user?id=${match.draftTurn}">@${escapeHTML(chooserName)}</a>\n` +
+         `🏷️ <b>Role:</b> ${roleName}\n\n` +
+         `<b>Options:</b>\n` +
+         `1️⃣ <b>${escapeHTML(P1.name)}</b> (OVR: <code>${P1.ovr}</code>) - ${escapeHTML(P1.country || 'N/A')}\n` +
+         `2️⃣ <b>${escapeHTML(P2.name)}</b> (OVR: <code>${P2.ovr}</code>) - ${escapeHTML(P2.country || 'N/A')}\n` +
+         `═════════════════════════════\n` +
+         `🟢 <b>@${escapeHTML(match.host.username)}</b> (${match.host.xi.length}/11, Avg: ${hostAvgOvr}):\n` +
+         `<i>${escapeHTML(hostList)}</i>\n\n` +
+         `🔵 <b>@${escapeHTML(match.guest.username)}</b> (${match.guest.xi.length}/11, Avg: ${guestAvgOvr}):\n` +
+         `<i>${escapeHTML(guestList)}</i>\n` +
+         `═════════════════════════════\n` +
+         `<i>Chooser gets the selected player, opponent gets the other!</i>`;
+}
+
 function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") {
   const isPrivate = ctx.chat?.type === 'private';
   const botUsername = ctx.me?.username || botInfo?.username || 'Imposter0_bot';
@@ -1655,7 +1744,7 @@ bot.command('spin', async (ctx) => {
     const kb = new InlineKeyboard().url("🎡 Spin the Lucky Wheel", directLink);
     
     await ctx.reply(
-        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Will Jacks</b> (85 OVR All-Rounder)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
+        "🎡 <b>Lucky Spin Wheel</b>\n\nTry your luck! Spin the wheel to win the Grand Prize: 👑 <b>Glenn Maxwell</b> (88 OVR All-Rounder)!\n\n<i>You get 1 free spin every 24 hours. Additional spins require watching a short ad.</i>",
         { parse_mode: 'HTML', reply_markup: kb }
     );
 });
@@ -2076,10 +2165,22 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
 
 bot.command('cric', async (ctx) => {
   const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
-  const overs = args[0] ? parseInt(args[0]) : 1;
+  const isDraft = args.map(a => a.toLowerCase()).includes('draft');
   
+  let overs = isDraft ? 5 : 1;
+  let hasOversArg = false;
+
+  for (const arg of args) {
+    const parsed = parseInt(arg);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
+      overs = parsed;
+      hasOversArg = true;
+      break;
+    }
+  }
+
   if (isNaN(overs) || overs < 1 || overs > 20) {
-    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt;</code> to start a match lobby.", { parse_mode: 'HTML' });
+    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt; [draft]</code> to start a match lobby.", { parse_mode: 'HTML' });
   }
 
   const telegramId = ctx.from.id;
@@ -2092,18 +2193,29 @@ bot.command('cric', async (ctx) => {
   try {
     let teamName = `${username}'s XI`;
     let squad = [];
-    if (sb.supabase) {
-      squad = await sb.getUserCricketTeam(telegramId);
-      const profile = await sb.getCricketProfile(telegramId);
-      if (profile && profile.team_name) {
-        teamName = profile.team_name;
+    let xi = [];
+
+    if (!isDraft) {
+      if (sb.supabase) {
+        squad = await sb.getUserCricketTeam(telegramId);
+        const profile = await sb.getCricketProfile(telegramId);
+        if (profile && profile.team_name) {
+          teamName = profile.team_name;
+        }
+      }
+      const xiResult = ai.selectValidPlayingXI(squad);
+      if (!xiResult.success) {
+        return ctx.reply(`❌ <b>Lobby Creation Failed!</b>\n\n${xiResult.error}`, { parse_mode: 'HTML' });
+      }
+      xi = xiResult.xi;
+    } else {
+      if (sb.supabase) {
+        const profile = await sb.getCricketProfile(telegramId).catch(() => null);
+        if (profile && profile.team_name) {
+          teamName = profile.team_name;
+        }
       }
     }
-    const xiResult = ai.selectValidPlayingXI(squad);
-    if (!xiResult.success) {
-      return ctx.reply(`❌ <b>Lobby Creation Failed!</b>\n\n${xiResult.error}`, { parse_mode: 'HTML' });
-    }
-    const xi = xiResult.xi;
 
     if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
       return ctx.reply("⚠️ You already have an active match or lobby running!");
@@ -2124,6 +2236,7 @@ bot.command('cric', async (ctx) => {
       guest: null,
       status: 'waiting_join',
       overs,
+      draftMode: isDraft,
       createdAt: Date.now()
     };
 
@@ -2131,8 +2244,9 @@ bot.command('cric', async (ctx) => {
       .text('🤝 Join', 'cric_join')
       .text('❌ Cancel', 'cric_cancel_lobby');
     
+    const modeLabel = isDraft ? " (Draft Mode ⚡)" : "";
     await ctx.reply(
-      `🏏 <b>CRICKET MATCH LOBBY CREATED!</b> 🏏\n` +
+      `🏏 <b>CRICKET MATCH LOBBY CREATED${modeLabel}!</b> 🏏\n` +
       `═════════════════════════════\n` +
       `• <b>Host:</b> @${escapeHTML(username)}\n` +
       `• <b>Length:</b> ${overs} Over(s)\n\n` +
@@ -4047,11 +4161,73 @@ bot.on('callback_query:data', async (ctx) => {
       let guestTeamName = `${guestUsername}'s XI`;
       let squad = [];
       if (sb.supabase) {
-        squad = await sb.getUserCricketTeam(guestId);
-        const profile = await sb.getCricketProfile(guestId);
+        const profile = await sb.getCricketProfile(guestId).catch(() => null);
         if (profile && profile.team_name) {
           guestTeamName = profile.team_name;
         }
+      }
+
+      if (lobby.draftMode) {
+        lobby.guest = {
+          telegramId: guestId,
+          username: guestUsername,
+          teamName: guestTeamName,
+          squad: [],
+          xi: []
+        };
+
+        const allPlayers = await sb.getCricketPlayers();
+        const options = generateDraftOptionsForRole(allPlayers, 'wicket_keeper', []);
+        if (!options || options.length < 2) {
+          await ctx.reply("❌ <b>Draft Match Failed:</b> Not enough Wicket Keepers in database (need at least 2).", { parse_mode: 'HTML' });
+          return;
+        }
+
+        const dbMatchId = `c_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+        const match = new matchManager.Match({
+          id: dbMatchId,
+          type: 'pvp',
+          chatId: lobby.chatId,
+          totalOvers: lobby.overs,
+          pitch: ['batting', 'bowling', 'balanced', 'spin', 'pace'][Math.floor(Math.random() * 5)],
+          host: {
+            telegramId: lobby.host.telegramId,
+            username: lobby.host.username,
+            teamName: lobby.host.teamName,
+            xi: []
+          },
+          guest: {
+            telegramId: lobby.guest.telegramId,
+            username: lobby.guest.username,
+            teamName: lobby.guest.teamName,
+            xi: []
+          }
+        });
+        match.isDraft = true;
+        match.draftRound = 1;
+        match.draftTurn = lobby.host.telegramId;
+        match.draftPool = [options[0].id, options[1].id];
+        match.draftOptions = options;
+        match.status = 'drafting';
+
+        matchManager.activeMatches[lobby.host.telegramId] = match;
+        matchManager.activeMatches[lobby.guest.telegramId] = match;
+        matchManager.activeMatches[match.id] = match;
+        matchManager.saveToDb(match);
+
+        delete activeLobbies[chatId];
+
+        const text = renderDraftMessage(match);
+        const keyboard = new InlineKeyboard()
+          .text(`1️⃣ ${options[0].name} (${options[0].ovr})`, `cric_draft_select:${match.id}:1`)
+          .text(`2️⃣ ${options[1].name} (${options[1].ovr})`, `cric_draft_select:${match.id}:2`);
+
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error("Edit lobby msg failed:", e));
+        return;
+      }
+
+      if (sb.supabase) {
+        squad = await sb.getUserCricketTeam(guestId);
       }
       const xiResult = ai.selectValidPlayingXI(squad);
       if (!xiResult.success) {
@@ -4093,6 +4269,140 @@ bot.on('callback_query:data', async (ctx) => {
       }
       ctx.reply("❌ Error joining lobby: " + err.message).catch(() => {});
     }
+    return;
+  }
+
+  if (data.startsWith('cric_draft_select:')) {
+    const parts = data.split(':');
+    const matchId = parts[1];
+    const optionIdx = parseInt(parts[2]); // 1 or 2
+
+    const match = matchManager.getMatch(matchId);
+    if (!match || match.status !== 'drafting') {
+      return ctx.answerCallbackQuery({ text: "❌ Match is not in drafting phase or has expired.", show_alert: true });
+    }
+
+    if (user.id.toString() !== match.draftTurn.toString()) {
+      return ctx.answerCallbackQuery({ text: "⚠️ It's not your turn to choose!", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery().catch(() => {});
+
+    const chosenIdx = optionIdx - 1;
+    const otherIdx = chosenIdx === 0 ? 1 : 0;
+
+    const chosenPlayer = match.draftOptions[chosenIdx];
+    const otherPlayer = match.draftOptions[otherIdx];
+
+    const isHostTurn = match.draftTurn.toString() === match.host.telegramId.toString();
+
+    // Add to teams with prefix
+    if (isHostTurn) {
+      match.host.xi.push({ ...chosenPlayer, id: `host_${chosenPlayer.id}` });
+      match.guest.xi.push({ ...otherPlayer, id: `guest_${otherPlayer.id}` });
+    } else {
+      match.guest.xi.push({ ...chosenPlayer, id: `guest_${chosenPlayer.id}` });
+      match.host.xi.push({ ...otherPlayer, id: `host_${otherPlayer.id}` });
+    }
+
+    // Advance round
+    match.draftRound += 1;
+    
+    // Toggle turn
+    match.draftTurn = isHostTurn ? match.guest.telegramId : match.host.telegramId;
+
+    if (match.draftRound <= 11) {
+      const allPlayers = await sb.getCricketPlayers();
+      const nextRole = DRAFT_ROLES[match.draftRound - 1];
+      const nextOptions = generateDraftOptionsForRole(allPlayers, nextRole, match.draftPool);
+      
+      if (!nextOptions) {
+        await ctx.reply("❌ <b>Draft Match Failed:</b> Failed to generate draft options for the next round.");
+        return;
+      }
+
+      match.draftOptions = nextOptions;
+      match.draftPool.push(nextOptions[0].id, nextOptions[1].id);
+
+      matchManager.saveToDb(match);
+
+      const text = renderDraftMessage(match);
+      const keyboard = new InlineKeyboard()
+        .text(`1️⃣ ${nextOptions[0].name} (${nextOptions[0].ovr})`, `cric_draft_select:${match.id}:1`)
+        .text(`2️⃣ ${nextOptions[1].name} (${nextOptions[1].ovr})`, `cric_draft_select:${match.id}:2`);
+
+      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
+    } else {
+      // Draft complete! Setup toss
+      const tossWinnerId = Math.random() < 0.5 ? match.host.telegramId : match.guest.telegramId;
+      const tossWinnerUsername = tossWinnerId.toString() === match.host.telegramId.toString()
+        ? match.host.username
+        : match.guest.username;
+
+      match.tossWinnerId = tossWinnerId;
+      match.status = 'toss';
+
+      matchManager.saveToDb(match);
+
+      const hostList = match.host.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+      const guestList = match.guest.xi.map((p, idx) => `${idx+1}. ${p.name} (${p.ovr}) [${p.role.toUpperCase().replace('_', ' ')}]`).join('\n');
+
+      const summaryText = 
+        `🎉 <b>DRAFT COMPLETE!</b> 🎉\n` +
+        `═════════════════════════════\n` +
+        `🟢 <b>@${escapeHTML(match.host.username)}'s XI:</b>\n` +
+        `${escapeHTML(hostList)}\n\n` +
+        `🔵 <b>@${escapeHTML(match.guest.username)}'s XI:</b>\n` +
+        `${escapeHTML(guestList)}\n` +
+        `═════════════════════════════\n\n` +
+        `🪙 <b>TOSS TIME!</b> 🪙\n` +
+        `🎉 <b>@${escapeHTML(tossWinnerUsername)}</b> won the toss!\n` +
+        `Choose your decision:`;
+
+      const keyboard = new InlineKeyboard()
+        .text('Bat First 🏏', `cric_draft_toss:bat:${match.id}`)
+        .text('Bowl First 🎳', `cric_draft_toss:bowl:${match.id}`);
+
+      await ctx.editMessageText(summaryText, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
+    }
+    return;
+  }
+
+  if (data.startsWith('cric_draft_toss:')) {
+    const parts = data.split(':');
+    const decision = parts[1]; // bat or bowl
+    const matchId = parts[2];
+
+    const match = matchManager.getMatch(matchId);
+    if (!match || match.status !== 'toss') {
+      return ctx.answerCallbackQuery({ text: "❌ Match is not in toss phase or has expired.", show_alert: true });
+    }
+
+    if (user.id.toString() !== match.tossWinnerId.toString()) {
+      return ctx.answerCallbackQuery({ text: "⚠️ Only the toss winner can make the decision!", show_alert: true });
+    }
+
+    await ctx.answerCallbackQuery().catch(() => {});
+
+    match.tossDecision = decision;
+    match.status = 'xi_selection';
+
+    matchManager.saveToDb(match);
+
+    const keyboard = new InlineKeyboard();
+    addMatchPlayButton(keyboard, match, ctx);
+
+    const text = 
+      `🏏 <b>DRAFT MATCH IS READY!</b>\n` +
+      `═══════════════════════════════\n` +
+      `• Host: <b>${escapeHTML(match.host.username)}</b>\n` +
+      `• Guest: <b>${escapeHTML(match.guest.username)}</b>\n` +
+      `• Pitch: <b>${match.pitch.toUpperCase()}</b>\n` +
+      `• Length: <b>${match.totalOvers} Over(s)</b>\n\n` +
+      `🪙 <b>Toss:</b> @${escapeHTML(user.username || user.first_name)} elected to <b>${decision.toUpperCase()} first</b>.\n\n` +
+      `👉 Tap <b>Play Match</b> to start!`;
+
+    await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard }).catch(e => console.error(e));
     return;
   }
 
@@ -5788,7 +6098,7 @@ app.get('/api/user-stats', async (req, res) => {
             spinCooldownRemaining = spinRemainingMs > 0 ? spinRemainingMs : 0;
         }
 
-        const jackpotPlayerId = '3e2b73b6-3c42-49d1-9905-c116f779a0cd';
+        const jackpotPlayerId = '70ab456c-55ca-4ef2-b01b-3228d46c9c39';
         const jackpotClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
 
         res.json({
@@ -5842,7 +6152,7 @@ app.get('/api/spin', async (req, res) => {
         let newBal = 0;
 
         if (isJackpot) {
-            const jackpotPlayerId = '3e2b73b6-3c42-49d1-9905-c116f779a0cd';
+            const jackpotPlayerId = '70ab456c-55ca-4ef2-b01b-3228d46c9c39';
             const hasClaimed = await sb.checkJackpotClaimed(userId, jackpotPlayerId);
             if (hasClaimed) {
                 alreadyOwned = true;
@@ -5874,7 +6184,7 @@ app.get('/api/spin', async (req, res) => {
                     (async () => {
                         try {
                             const message = `🎉 <b>LUCKY SPIN JACKPOT!</b> 🎉\n\n` +
-                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Will Jacks</b> (85 OVR All-Rounder) in the Lucky Spin! 🎡\n\n` +
+                                            `👤 <a href="tg://user?id=${userId}">${escapeHTML(userName)}</a> just won 👑 <b>Glenn Maxwell</b> (88 OVR All-Rounder) in the Lucky Spin! 🎡\n\n` +
                                             `Congratulations! 🥳`;
                             try {
                                 await bot.api.sendMessage(OFFICIAL_GC_ID, message, { parse_mode: 'HTML' });
@@ -6541,7 +6851,12 @@ function serializeMatchState(match, userId) {
       commentary: match.lastBallOutcome.commentary,
       delivery: match.lastBallOutcome.delivery || ''
     } : null,
-    partnership: match.partnership
+    partnership: match.partnership,
+    isDraft: match.isDraft || false,
+    draftRound: match.draftRound || 1,
+    draftTurn: match.draftTurn,
+    draftOptions: match.draftOptions || [],
+    draftPool: match.draftPool || []
   };
 }
 
@@ -7081,7 +7396,7 @@ if (require.main === module) {
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
     { command: "drop", description: "🎁 Mystery Coin Drop (300-5000)" },
-    { command: "spin", description: "🎡 Spin the wheel to win Will Jacks" },
+    { command: "spin", description: "🎡 Spin the wheel to win Glenn Maxwell" },
     { command: "hilo", description: "Play High-Low Cricket Stats" },
     { command: "fly", description: "Bet on the crashing plane" },
     { command: "dice", description: "🎲 Roll 2 dice (7 Up 7 Down)" },
