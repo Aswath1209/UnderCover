@@ -2184,20 +2184,6 @@ bot.command('cric', async (ctx) => {
   const isDraft = lArgs.includes('draft');
   const isIpl   = lArgs.includes('ipl');
   
-  let overs = (isDraft || isIpl) ? 10 : 1;
-
-  for (const arg of args) {
-    const parsed = parseInt(arg);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
-      overs = parsed;
-      break;
-    }
-  }
-
-  if (isNaN(overs) || overs < 1 || overs > 20) {
-    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt; [draft|ipl]</code> to start a match lobby.", { parse_mode: 'HTML' });
-  }
-
   const telegramId = ctx.from.id;
   const username   = ctx.from.username || ctx.from.first_name || 'Host';
 
@@ -2218,7 +2204,7 @@ bot.command('cric', async (ctx) => {
     const kb = new InlineKeyboard();
     for (let i = 0; i < teams.length; i += 2) {
       const row = [teams[i], teams[i + 1]].filter(Boolean);
-      kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${overs}:${ctx.chat.id}` })));
+      kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${ctx.chat.id}` })));
     }
 
     return ctx.reply(
@@ -2276,7 +2262,7 @@ bot.command('cric', async (ctx) => {
       },
       guest: null,
       status: 'waiting_join',
-      overs,
+      overs: null,
       draftMode: isDraft,
       createdAt: Date.now()
     };
@@ -2289,8 +2275,7 @@ bot.command('cric', async (ctx) => {
     await ctx.reply(
       `🏏 <b>CRICKET MATCH LOBBY CREATED${modeLabel}!</b> 🏏\n` +
       `═════════════════════════════\n` +
-      `• <b>Host:</b> @${escapeHTML(username)}\n` +
-      `• <b>Length:</b> ${overs} Over(s)\n\n` +
+      `• <b>Host:</b> @${escapeHTML(username)}\n\n` +
       `Click the button below to join the match!`,
       { parse_mode: 'HTML', reply_markup: keyboard }
     );
@@ -2308,7 +2293,6 @@ bot.command('cric', async (ctx) => {
 bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
   const parts    = ctx.callbackQuery.data.split(':');
   const teamCode = parts[1];
-  const overs    = parseInt(parts[2]) || 10;
   const chatId   = ctx.chat.id;
   const user     = ctx.from;
 
@@ -2337,7 +2321,7 @@ bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
     },
     guest:     null,
     status:    'waiting_join',
-    overs,
+    overs:     null,
     iplMode:   true,
     createdAt: Date.now()
   };
@@ -2352,8 +2336,7 @@ bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
     `🏆 <b>IPL 2026 LOBBY CREATED!</b> 🏆\n` +
     `═══════════════════════════════\n` +
     `• <b>Host:</b> @${escapeHTML(username)}\n` +
-    `• <b>Team:</b> ${teamCode} — ${escapeHTML(teamName)}\n` +
-    `• <b>Overs:</b> ${overs}\n\n` +
+    `• <b>Team:</b> ${teamCode} — ${escapeHTML(teamName)}\n\n` +
     `👇 Opponent — tap <b>Join</b> and pick your team!`,
     { parse_mode: 'HTML', reply_markup: kb }
   );
@@ -2429,22 +2412,17 @@ bot.callbackQuery(/^cipl_guest_team:/, async (ctx) => {
     squad: pool,
     xi:    []
   };
-  lobby.status = 'toss';
+  lobby.status = 'waiting_overs';
 
   try { await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }); } catch (_) {}
 
-  const kb = new InlineKeyboard()
-    .text('🪙 Heads', `cric_toss_guess:heads`)
-    .text('🪙 Tails', `cric_toss_guess:tails`);
-
   await ctx.reply(
-    `🏆 <b>IPL 2026 MATCH LOBBY READY!</b> 🏆\n` +
+    `🤝 <b>@${escapeHTML(username)} joined the IPL lobby!</b>\n` +
     `═══════════════════════════════\n` +
     `• <b>${lobby.host.teamCode}</b> (${escapeHTML(lobby.host.teamName)}) → @${escapeHTML(lobby.host.username)}\n` +
-    `• <b>${teamCode}</b> (${escapeHTML(teamName)}) → @${escapeHTML(username)}\n` +
-    `• <b>Overs:</b> ${lobby.overs}\n\n` +
-    `🪙 <b>@${escapeHTML(username)}</b> — call the toss!`,
-    { parse_mode: 'HTML', reply_markup: kb }
+    `• <b>${teamCode}</b> (${escapeHTML(teamName)}) → @${escapeHTML(username)}\n\n` +
+    `👉 @${escapeHTML(lobby.host.username)}, please reply to this chat with the number of overs for this match (e.g. 1, 5, 10):`,
+    { parse_mode: 'HTML' }
   );
 });
 
