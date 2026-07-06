@@ -4733,6 +4733,16 @@ bot.on('callback_query:data', async (ctx) => {
 
     try {
       const dbMatchId = `c_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+      
+      if (!lobby.draftMode && !lobby.iplMode) {
+        if (!lobby.host.xi || lobby.host.xi.length === 0) {
+          lobby.host.xi = [...DEFAULT_XI];
+        }
+        if (!lobby.guest.xi || lobby.guest.xi.length === 0) {
+          lobby.guest.xi = [...DEFAULT_XI];
+        }
+      }
+
       const match = matchManager.createMatchFromLobby({
         dbMatchId: dbMatchId,
         lobby: lobby
