@@ -50,6 +50,21 @@ const activeTransactions = new Map();
 const cardFileIdCache = new Map();
 let cardFilesCache = [];
 
+// IPL 2026 squad pools (keyed by team code e.g. 'CSK', 'MI', ...)
+const IPL_SQUADS_POOL = require('./data/ipl_2026_squads_pool.json');
+const IPL_TEAM_NAMES = {
+  CSK:  'Chennai Super Kings',
+  MI:   'Mumbai Indians',
+  RCB:  'Royal Challengers Bengaluru',
+  KKR:  'Kolkata Knight Riders',
+  SRH:  'Sunrisers Hyderabad',
+  DC:   'Delhi Capitals',
+  GT:   'Gujarat Titans',
+  LSG:  'Lucknow Super Giants',
+  PBKS: 'Punjab Kings',
+  RR:   'Rajasthan Royals'
+};
+
 function refreshCardFilesCache() {
   try {
     const dir = path.join(__dirname, 'assets', 'cards');
@@ -2165,31 +2180,57 @@ function sendHiloMsg(ctx, state, isEdit = false, chatId = null, msgId = null, ex
 
 bot.command('cric', async (ctx) => {
   const args = ctx.match ? ctx.match.trim().split(/\s+/) : [];
-  const isDraft = args.map(a => a.toLowerCase()).includes('draft');
+  const lArgs = args.map(a => a.toLowerCase());
+  const isDraft = lArgs.includes('draft');
+  const isIpl   = lArgs.includes('ipl');
   
-  let overs = isDraft ? 5 : 1;
-  let hasOversArg = false;
+  let overs = (isDraft || isIpl) ? 10 : 1;
 
   for (const arg of args) {
     const parsed = parseInt(arg);
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
       overs = parsed;
-      hasOversArg = true;
       break;
     }
   }
 
   if (isNaN(overs) || overs < 1 || overs > 20) {
-    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt; [draft]</code> to start a match lobby.", { parse_mode: 'HTML' });
+    return ctx.reply("ℹ️ <b>Usage:</b> <code>/cric &lt;overs (1-20)&gt; [draft|ipl]</code> to start a match lobby.", { parse_mode: 'HTML' });
   }
 
   const telegramId = ctx.from.id;
-  const username = ctx.from.username || ctx.from.first_name || 'Host';
+  const username   = ctx.from.username || ctx.from.first_name || 'Host';
 
   if (sb.supabase) {
     await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
   }
 
+  // ── IPL Mode: show team picker and return early ──────────────────────────
+  if (isIpl) {
+    if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
+      return ctx.reply('⚠️ You already have an active match or lobby running!');
+    }
+    if (activeLobbies[ctx.chat.id]) {
+      return ctx.reply('⚠️ There is already a match lobby in this chat. Cancel it first!');
+    }
+
+    const teams = Object.keys(IPL_SQUADS_POOL);
+    const kb = new InlineKeyboard();
+    for (let i = 0; i < teams.length; i += 2) {
+      const row = [teams[i], teams[i + 1]].filter(Boolean);
+      kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${overs}:${ctx.chat.id}` })));
+    }
+
+    return ctx.reply(
+      `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
+      `═══════════════════════════════\n` +
+      `<b>@${escapeHTML(username)}</b> is creating a lobby!\n\n` +
+      `👇 Pick <b>your team</b> to proceed:`,
+      { parse_mode: 'HTML', reply_markup: kb }
+    );
+  }
+
+  // ── Normal / Draft Mode ──────────────────────────────────────────────────
   try {
     let teamName = `${username}'s XI`;
     let squad = [];
@@ -2260,62 +2301,8 @@ bot.command('cric', async (ctx) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// /cipl — IPL 2026 Mode: Team picker + custom XI roster builder
+// IPL 2026 Mode: Team picker callbacks (triggered from /cric ipl)
 // ─────────────────────────────────────────────────────────────────────────────
-const IPL_SQUADS_POOL = require('./data/ipl_2026_squads_pool.json');
-
-const IPL_TEAM_NAMES = {
-  CSK: 'Chennai Super Kings',
-  MI:  'Mumbai Indians',
-  RCB: 'Royal Challengers Bengaluru',
-  KKR: 'Kolkata Knight Riders',
-  SRH: 'Sunrisers Hyderabad',
-  DC:  'Delhi Capitals',
-  GT:  'Gujarat Titans',
-  LSG: 'Lucknow Super Giants',
-  PBKS:'Punjab Kings',
-  RR:  'Rajasthan Royals'
-};
-
-// In-memory pending team picks before match starts
-const iplTeamPicks = {}; // userId → { teamCode, lobbyId }
-
-bot.command('cipl', async (ctx) => {
-  const telegramId = ctx.from.id;
-  const username   = ctx.from.username || ctx.from.first_name || 'Host';
-
-  if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
-    return ctx.reply('⚠️ You already have an active match or lobby running!');
-  }
-  if (activeLobbies[ctx.chat.id]) {
-    return ctx.reply('⚠️ There is already a match lobby in this chat. Cancel it first!');
-  }
-
-  const args  = ctx.match ? ctx.match.trim().split(/\s+/) : [];
-  let   overs = 10;
-  for (const arg of args) {
-    const p = parseInt(arg);
-    if (!isNaN(p) && p >= 1 && p <= 20) { overs = p; break; }
-  }
-
-  if (sb.supabase) await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
-
-  // Build team selection keyboard (2 teams per row)
-  const teams = Object.keys(IPL_SQUADS_POOL);
-  const kb = new InlineKeyboard();
-  for (let i = 0; i < teams.length; i += 2) {
-    const row = [teams[i], teams[i + 1]].filter(Boolean);
-    kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${overs}:${ctx.chat.id}` })));
-  }
-
-  await ctx.reply(
-    `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
-    `═══════════════════════════════\n` +
-    `<b>@${escapeHTML(username)}</b> is creating a lobby!\n\n` +
-    `👇 Pick <b>your team</b> to proceed:`,
-    { parse_mode: 'HTML', reply_markup: kb }
-  );
-});
 
 // Handle host team pick
 bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
