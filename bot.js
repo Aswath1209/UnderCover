@@ -6627,7 +6627,6 @@ app.post('/api/tournament/reset', async (req, res) => {
 // =============================================
 // CRICKET GAME REST API ENDPOINTS
 // =============================================
-const path = require('path');
 
 app.get('/cricket/app.js', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
