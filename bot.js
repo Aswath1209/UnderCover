@@ -802,6 +802,8 @@ bot.command('start', async (ctx) => {
     );
   }
   if (ctx.match === 'tournament') {
+    return ctx.reply("⚠️ The Tournament Campaign is currently disabled.", { parse_mode: 'HTML' });
+    /*
     const cleanHost = process.env.WEBAPP_URL ? process.env.WEBAPP_URL.replace(/^https?:\/\//, '') : 'undercover-fuxy.onrender.com';
     const webAppUrl = `https://${cleanHost}/cricket/tournament?userId=${ctx.from.id}`;
     const kb = new InlineKeyboard().webApp("🎮 Launch Campaign", webAppUrl);
@@ -809,6 +811,7 @@ bot.command('start', async (ctx) => {
       "🏆 <b>Cricket Tournament Campaign</b> 🏆\n\nLead your team through a full tournament like IPL or the World Cup, matching real-life rosters with your own card upgrades!\n\nClick the button below to launch the campaign interface:",
       { parse_mode: 'HTML', reply_markup: kb }
     );
+    */
   }
 
   if (ctx.chat.type === 'private') {
@@ -819,6 +822,8 @@ bot.command('start', async (ctx) => {
 });
 
 bot.command('tournament', async (ctx) => {
+  return ctx.reply("⚠️ The Tournament Campaign is currently disabled.", { parse_mode: 'HTML' });
+  /*
   const telegramId = ctx.from.id;
   if (sb.supabase) {
     await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
@@ -846,7 +851,7 @@ bot.command('tournament', async (ctx) => {
     const kb = new InlineKeyboard().webApp("🎮 Launch Campaign", webAppUrl);
     return ctx.reply(
       "🏆 <b>Cricket Tournament Campaign</b> 🏆\n\n" +
-      "Lead your team through a full tournament like IPL or the World Cup, matching real-life rosters with your own card upgrades!\n\n" +
+      "Lead your team through a team match or the World Cup, matching real-life rosters with your own card upgrades!\n\n" +
       "Click the button below to launch the campaign interface:",
       {
         parse_mode: 'HTML',
@@ -854,6 +859,7 @@ bot.command('tournament', async (ctx) => {
       }
     );
   }
+  */
 });
 
 bot.command('ping', async (ctx) => {
