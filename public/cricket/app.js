@@ -375,31 +375,49 @@ async function fetchState() {
     // Update Header info
     document.getElementById('header-host-name').innerText = getShortTeamName(matchState.host.teamName || matchState.host.username || 'HOST').toUpperCase();
     document.getElementById('header-guest-name').innerText = getShortTeamName(matchState.guest ? (matchState.guest.teamName || matchState.guest.username) : 'AI XI').toUpperCase();
-    document.getElementById('header-match-uuid').innerText = `MATCH ID: ${matchState.id.substring(0, 6).toUpperCase()}`;
+
+    console.log("[DEBUG] renderMatch received state:", JSON.stringify(matchState));
+    console.log(`[DEBUG] userId=${userId}, hostId=${matchState.host?.telegramId}, iplMode=${matchState.iplMode}`);
+
+    if (document.getElementById('header-match-uuid')) {
+      document.getElementById('header-match-uuid').innerText = `MATCH ID: ${matchState.id.substring(0, 6).toUpperCase()}`;
+    }
 
     // Route to appropriate screen
+    console.log(`[DEBUG] ROUTING: status=${matchState.status}`);
     if (matchState.status === 'xi_selection') {
-      const isHost = userId && (matchState.host.telegramId.toString() === userId.toString());
-      const isGuest = userId && matchState.guest && (matchState.guest.telegramId.toString() === userId.toString());
+      const isHost = userId && matchState.host && matchState.host.telegramId && (matchState.host.telegramId.toString() === userId.toString());
+      const isGuest = userId && matchState.guest && matchState.guest.telegramId && (matchState.guest.telegramId.toString() === userId.toString());
+      
+      console.log(`[DEBUG] ROUTING: isHost=${isHost}, isGuest=${isGuest}, myRole=${matchState.myRole}`);
 
       let needsRoster = false;
+      console.log(`[DEBUG] ROUTING: iplMode eval: ${matchState.iplMode}`);
       if (matchState.iplMode) {
         if (isHost && (!matchState.host.xi || matchState.host.xi.length === 0)) {
           needsRoster = true;
+          console.log(`[DEBUG] ROUTING: Host needs roster!`);
         } else if (isGuest && (!matchState.guest.xi || matchState.guest.xi.length === 0)) {
           needsRoster = true;
+          console.log(`[DEBUG] ROUTING: Guest needs roster!`);
+        } else {
+          console.log(`[DEBUG] ROUTING: No roster needed, xi length is valid or not host/guest`);
         }
       }
 
       if (needsRoster) {
+        console.log(`[DEBUG] ROUTING: Going to renderRosterScreen`);
         renderRosterScreen();
       } else {
         const hostEmpty = !matchState.host.xi || matchState.host.xi.length === 0;
         const guestEmpty = matchState.guest && (!matchState.guest.xi || matchState.guest.xi.length === 0);
+        console.log(`[DEBUG] ROUTING: Needs roster false. hostEmpty=${hostEmpty}, guestEmpty=${guestEmpty}`);
         if (matchState.iplMode && (hostEmpty || guestEmpty)) {
+          console.log(`[DEBUG] ROUTING: Going to loading screen (waiting for squads)`);
           showScreen('loading-screen');
           document.querySelector('.loading-text').innerHTML = `Waiting for players to build their 11-player squads...<br><span style="font-size:0.85em;opacity:0.8;display:block;margin-top:8px">Host XI: ${hostEmpty ? '⏳ Pending' : '✅ Ready'}<br>Guest XI: ${guestEmpty ? '⏳ Pending' : '✅ Ready'}</span>`;
         } else {
+          console.log(`[DEBUG] ROUTING: Going to renderSetupScreen`);
           renderSetupScreen();
         }
       }
