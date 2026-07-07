@@ -54,20 +54,32 @@ async function init() {
   userId = cleanParam(urlParams.get('userId') || urlParams.get('user_id'));
 
   // 2. Parse from Telegram WebApp SDK (Deep Link start_param)
-  if (tg && tg.initDataUnsafe) {
-    if (tg.initDataUnsafe.start_param && tg.initDataUnsafe.start_param.startsWith('cricket_')) {
-      let startParam = tg.initDataUnsafe.start_param.substring(8);
-      const lastUnderscore = startParam.lastIndexOf('_');
-      if (lastUnderscore !== -1) {
-        matchId = cleanParam(startParam.substring(0, lastUnderscore));
-        chatId = cleanParam(startParam.substring(lastUnderscore + 1));
-      } else {
-        matchId = cleanParam(startParam);
-      }
+  let rawStartParam = null;
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+    rawStartParam = tg.initDataUnsafe.start_param;
+  }
+  // Fallback: manually parse from URL if SDK fails
+  if (!rawStartParam) {
+    rawStartParam = urlParams.get('tgWebAppStartParam');
+  }
+  if (!rawStartParam && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    rawStartParam = hashParams.get('tgWebAppStartParam');
+  }
+
+  if (rawStartParam && rawStartParam.startsWith('cricket_')) {
+    let startParam = rawStartParam.substring(8);
+    const lastUnderscore = startParam.lastIndexOf('_');
+    if (lastUnderscore !== -1) {
+      matchId = cleanParam(startParam.substring(0, lastUnderscore));
+      chatId = cleanParam(startParam.substring(lastUnderscore + 1));
+    } else {
+      matchId = cleanParam(startParam);
     }
-    if (tg.initDataUnsafe.user) {
-      userId = cleanParam(tg.initDataUnsafe.user.id);
-    }
+  }
+
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    userId = cleanParam(tg.initDataUnsafe.user.id);
   }
 
   // 3. Fallback to spectator if userId is still unresolved
