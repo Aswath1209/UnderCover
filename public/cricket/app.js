@@ -55,11 +55,8 @@ async function init() {
 
   // 2. Parse from Telegram WebApp SDK (Deep Link start_param)
   if (tg && tg.initDataUnsafe) {
-    if (tg.initDataUnsafe.start_param) {
-      let startParam = tg.initDataUnsafe.start_param;
-      if (startParam.startsWith('cricket_')) {
-        startParam = startParam.substring(8);
-      }
+    if (tg.initDataUnsafe.start_param && tg.initDataUnsafe.start_param.startsWith('cricket_')) {
+      let startParam = tg.initDataUnsafe.start_param.substring(8);
       const lastUnderscore = startParam.lastIndexOf('_');
       if (lastUnderscore !== -1) {
         matchId = cleanParam(startParam.substring(0, lastUnderscore));
