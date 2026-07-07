@@ -2191,38 +2191,13 @@ bot.command('cric', async (ctx) => {
     await sb.ensureUser(telegramId, ctx.from.first_name).catch(() => {});
   }
 
-  // ── IPL Mode: show team picker and return early ──────────────────────────
-  if (isIpl) {
-    if (matchManager.getActiveMatch(telegramId) || getUserActiveLobby(telegramId)) {
-      return ctx.reply('⚠️ You already have an active match or lobby running!');
-    }
-    if (activeLobbies[ctx.chat.id]) {
-      return ctx.reply('⚠️ There is already a match lobby in this chat. Cancel it first!');
-    }
-
-    const teams = Object.keys(IPL_SQUADS_POOL);
-    const kb = new InlineKeyboard();
-    for (let i = 0; i < teams.length; i += 2) {
-      const row = [teams[i], teams[i + 1]].filter(Boolean);
-      kb.row(...row.map(t => ({ text: t, callback_data: `cipl_host_team:${t}:${ctx.chat.id}` })));
-    }
-
-    return ctx.reply(
-      `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
-      `═══════════════════════════════\n` +
-      `<b>@${escapeHTML(username)}</b> is creating a lobby!\n\n` +
-      `👇 Pick <b>your team</b> to proceed:`,
-      { parse_mode: 'HTML', reply_markup: kb }
-    );
-  }
-
-  // ── Normal / Draft Mode ──────────────────────────────────────────────────
+  // ── Normal / Draft / IPL Mode ──────────────────────────────────────────
   try {
     let teamName = `${username}'s XI`;
     let squad = [];
     let xi = [];
 
-    if (!isDraft) {
+    if (!isDraft && !isIpl) {
       if (sb.supabase) {
         squad = await sb.getUserCricketTeam(telegramId);
         const profile = await sb.getCricketProfile(telegramId);
@@ -2264,6 +2239,7 @@ bot.command('cric', async (ctx) => {
       status: 'waiting_join',
       overs: null,
       draftMode: isDraft,
+      iplMode: isIpl,
       createdAt: Date.now()
     };
 
@@ -2271,7 +2247,7 @@ bot.command('cric', async (ctx) => {
       .text('🤝 Join', 'cric_join')
       .text('❌ Cancel', 'cric_cancel_lobby');
     
-    const modeLabel = isDraft ? " (Draft Mode ⚡)" : "";
+    const modeLabel = isIpl ? " (IPL Mode 🏆)" : (isDraft ? " (Draft Mode ⚡)" : "");
     await ctx.reply(
       `🏏 <b>CRICKET MATCH LOBBY CREATED${modeLabel}!</b> 🏏\n` +
       `═════════════════════════════\n` +
@@ -4019,22 +3995,43 @@ bot.on('message:text', async (ctx) => {
         const parsedOvers = parseInt(text);
         if (!isNaN(parsedOvers) && parsedOvers >= 1 && parsedOvers <= 20) {
           cricLobby.overs = parsedOvers;
-          cricLobby.status = 'toss_guess';
           
-          const tossText = 
-            `🪙 <b>TOSS TIME!</b> 🪙\n` +
-            `═════════════════════════════\n` +
-            `• <b>Length:</b> ${parsedOvers} Over(s)\n` +
-            `• Host: @${escapeHTML(cricLobby.host.username)}\n` +
-            `• Guest: @${escapeHTML(cricLobby.guest.username)}\n\n` +
-            `👉 @${escapeHTML(cricLobby.guest.username)}, call the toss:`;
-
-          const keyboard = new InlineKeyboard()
-            .text('Heads 🪙', 'cric_toss_guess:heads')
-            .text('Tails 🪙', 'cric_toss_guess:tails');
+          if (cricLobby.iplMode) {
+            cricLobby.status = 'ipl_team_picker';
             
-          await ctx.reply(tossText, { parse_mode: 'HTML', reply_markup: keyboard });
-          return;
+            const teams = Object.keys(IPL_SQUADS_POOL);
+            const kb = new InlineKeyboard();
+            for (let i = 0; i < teams.length; i += 2) {
+              const row = [teams[i], teams[i + 1]].filter(Boolean);
+              kb.row(...row.map(t => ({ text: t, callback_data: `cipl_pick_team:${t}:${cricLobby.chatId}` })));
+            }
+            
+            await ctx.reply(
+              `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
+              `═══════════════════════════════\n` +
+              `• Length: ${parsedOvers} Over(s)\n\n` +
+              `👇 @${escapeHTML(cricLobby.host.username)} (Host), pick <b>your team</b>:`,
+              { parse_mode: 'HTML', reply_markup: kb }
+            );
+            return;
+          } else {
+            cricLobby.status = 'toss_guess';
+            
+            const tossText = 
+              `🪙 <b>TOSS TIME!</b> 🪙\n` +
+              `═════════════════════════════\n` +
+              `• <b>Length:</b> ${parsedOvers} Over(s)\n` +
+              `• Host: @${escapeHTML(cricLobby.host.username)}\n` +
+              `• Guest: @${escapeHTML(cricLobby.guest.username)}\n\n` +
+              `👉 @${escapeHTML(cricLobby.guest.username)}, call the toss:`;
+
+            const keyboard = new InlineKeyboard()
+              .text('Heads 🪙', 'cric_toss_guess:heads')
+              .text('Tails 🪙', 'cric_toss_guess:tails');
+              
+            await ctx.reply(tossText, { parse_mode: 'HTML', reply_markup: keyboard });
+            return;
+          }
         } else {
           await ctx.reply(`⚠️ Invalid input. @${escapeHTML(cricLobby.host.username)}, please enter a valid number of overs (1-20):`);
           return;
