@@ -7928,7 +7928,7 @@ if (require.main === module) {
     matchManager.loadActiveMatchesFromDb().catch(e => console.error("Match recovery failed:", e));
     loadAdmins().catch(e => console.error("Admin loading failed:", e));
   });
-  bot.start(); 
+  bot.start({ drop_pending_updates: true }); 
 
   // --- Stale Game Cleanup (1 Hour) ---
   setInterval(async () => {
