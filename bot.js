@@ -6627,6 +6627,15 @@ app.post('/api/tournament/reset', async (req, res) => {
 // =============================================
 // CRICKET GAME REST API ENDPOINTS
 // =============================================
+const path = require('path');
+
+app.get('/cricket/app.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public/cricket/app.js'));
+});
 
 app.get('/api/match', async (req, res) => {
   const clean = (val) => {
