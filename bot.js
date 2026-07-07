@@ -7817,7 +7817,15 @@ app.listen(PORT, () => {
 
 module.exports = { bot };
 if (require.main === module) { 
-  bot.api.setMyCommands([
+// ----------------------------------------------------
+// Ghost Server Kill-Switch
+// ----------------------------------------------------
+if (process.env.RENDER_EXTERNAL_HOSTNAME && process.env.RENDER_EXTERNAL_HOSTNAME.includes('fuxy')) {
+  console.log("CRITICAL: Detected ghost server (fuxy). Shutting down immediately to prevent Telegram conflicts...");
+  process.exit(0);
+}
+
+bot.api.setMyCommands([
     { command: "play", description: "Start an Undercover lobby" },
     { command: "mafia", description: "Start a Mafia lobby" },
     { command: "lies", description: "Challenge someone to Game of Lies" },
