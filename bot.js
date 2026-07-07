@@ -2262,144 +2262,86 @@ bot.command('cric', async (ctx) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IPL 2026 Mode: Team picker callbacks (triggered from /cric ipl)
+// IPL 2026 Mode: Team picker callback
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Handle host team pick
-bot.callbackQuery(/^cipl_host_team:/, async (ctx) => {
+bot.callbackQuery(/^cipl_pick_team:/, async (ctx) => {
   const parts    = ctx.callbackQuery.data.split(':');
   const teamCode = parts[1];
-  const chatId   = ctx.chat.id;
+  const chatId   = parts[2];
   const user     = ctx.from;
 
-  if (activeLobbies[chatId]) {
-    return ctx.answerCallbackQuery({ text: '⚠️ Lobby already exists!', show_alert: true });
+  const lobby = activeLobbies[chatId];
+  if (!lobby || lobby.status !== 'ipl_team_picker') {
+    return ctx.answerCallbackQuery({ text: '❌ Match is no longer in team picking phase.', show_alert: true });
   }
+
+  const isHost = lobby.host.telegramId === user.id;
+  const isGuest = lobby.guest && lobby.guest.telegramId === user.id;
+
+  if (!isHost && !isGuest) return ctx.answerCallbackQuery({ text: '❌ You are not part of this match.', show_alert: true });
+
+  if (isHost && lobby.host.teamCode) return ctx.answerCallbackQuery({ text: '❌ You already picked your team.', show_alert: true });
+  if (isGuest && lobby.guest.teamCode) return ctx.answerCallbackQuery({ text: '❌ You already picked your team.', show_alert: true });
+  if (isGuest && !lobby.host.teamCode) return ctx.answerCallbackQuery({ text: '⏳ Wait for the Host to pick their team first!', show_alert: true });
 
   const pool = IPL_SQUADS_POOL[teamCode];
   if (!pool) return ctx.answerCallbackQuery({ text: '❌ Invalid team.', show_alert: true });
-
-  await ctx.answerCallbackQuery();
-
-  const username = user.username || user.first_name || 'Host';
+  
   const teamName = IPL_TEAM_NAMES[teamCode] || teamCode;
 
-  // Create the lobby in IPL mode — XI is empty, pool is the full squad
-  activeLobbies[chatId] = {
-    chatId,
-    host: {
-      telegramId: user.id,
-      username,
-      teamName,
-      teamCode,
-      squad: pool,
-      xi:    []       // will be picked via web app roster builder
-    },
-    guest:     null,
-    status:    'waiting_join',
-    overs:     null,
-    iplMode:   true,
-    createdAt: Date.now()
-  };
+  if (isHost) {
+    lobby.host.teamCode = teamCode;
+    lobby.host.teamName = teamName;
+    lobby.host.squad = pool;
+    lobby.host.xi = [];
+    
+    await ctx.answerCallbackQuery({ text: `✅ You picked ${teamCode}!` });
+    
+    const teams = Object.keys(IPL_SQUADS_POOL);
+    const kb = new InlineKeyboard();
+    for (let i = 0; i < teams.length; i += 2) {
+      const row = [teams[i], teams[i + 1]].filter(Boolean);
+      const availableRow = row.filter(t => t !== teamCode);
+      if (availableRow.length > 0) {
+        kb.row(...availableRow.map(t => ({ text: t, callback_data: `cipl_pick_team:${t}:${chatId}` })));
+      }
+    }
+    
+    await ctx.editMessageText(
+      `🏆 <b>IPL 2026 MODE</b> 🏆\n` +
+      `═══════════════════════════════\n` +
+      `• Length: ${lobby.overs} Over(s)\n` +
+      `• Host picked: <b>${teamCode}</b>\n\n` +
+      `👇 @${escapeHTML(lobby.guest.username)} (Guest), pick <b>your team</b>:`,
+      { parse_mode: 'HTML', reply_markup: kb }
+    ).catch(()=>{});
+    
+  } else if (isGuest) {
+    lobby.guest.teamCode = teamCode;
+    lobby.guest.teamName = teamName;
+    lobby.guest.squad = pool;
+    lobby.guest.xi = [];
+    
+    await ctx.answerCallbackQuery({ text: `✅ You picked ${teamCode}!` });
+    
+    lobby.status = 'toss_guess';
+    
+    const tossText = 
+      `🏆 <b>TEAMS SELECTED!</b> 🏆\n` +
+      `═════════════════════════════\n` +
+      `• Host (@${escapeHTML(lobby.host.username)}): <b>${lobby.host.teamCode}</b>\n` +
+      `• Guest (@${escapeHTML(lobby.guest.username)}): <b>${lobby.guest.teamCode}</b>\n` +
+      `═════════════════════════════\n\n` +
+      `🪙 <b>TOSS TIME!</b> 🪙\n` +
+      `👉 @${escapeHTML(lobby.guest.username)}, call the toss:`;
 
-  const kb = new InlineKeyboard()
-    .text('🤝 Join', 'cipl_join')
-    .text('❌ Cancel', 'cric_cancel_lobby');
-
-  try { await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }); } catch (_) {}
-
-  await ctx.reply(
-    `🏆 <b>IPL 2026 LOBBY CREATED!</b> 🏆\n` +
-    `═══════════════════════════════\n` +
-    `• <b>Host:</b> @${escapeHTML(username)}\n` +
-    `• <b>Team:</b> ${teamCode} — ${escapeHTML(teamName)}\n\n` +
-    `👇 Opponent — tap <b>Join</b> and pick your team!`,
-    { parse_mode: 'HTML', reply_markup: kb }
-  );
-});
-
-// Handle guest join for IPL mode
-bot.callbackQuery('cipl_join', async (ctx) => {
-  const chatId = ctx.chat.id;
-  const user   = ctx.from;
-  const lobby  = activeLobbies[chatId];
-
-  if (!lobby || !lobby.iplMode) {
-    return ctx.answerCallbackQuery({ text: '❌ No IPL lobby to join.', show_alert: true });
+    const keyboard = new InlineKeyboard()
+      .text('Heads 🪙', 'cric_toss_guess:heads')
+      .text('Tails 🪙', 'cric_toss_guess:tails');
+      
+    await ctx.editMessageText(tossText, { parse_mode: 'HTML', reply_markup: keyboard }).catch(()=>{});
   }
-  if (user.id === lobby.host.telegramId) {
-    return ctx.answerCallbackQuery({ text: '⚠️ You cannot join your own lobby!', show_alert: true });
-  }
-  if (lobby.guest) {
-    return ctx.answerCallbackQuery({ text: '⚠️ Lobby is already full!', show_alert: true });
-  }
-  if (matchManager.getActiveMatch(user.id) || getUserActiveLobby(user.id)) {
-    return ctx.answerCallbackQuery({ text: '⚠️ You already have an active match!', show_alert: true });
-  }
-
-  await ctx.answerCallbackQuery();
-
-  // Show team picker to guest (exclude host's team to force unique teams)
-  const takenTeam = lobby.host.teamCode;
-  const teams = Object.keys(IPL_SQUADS_POOL).filter(t => t !== takenTeam);
-  const kb = new InlineKeyboard();
-  for (let i = 0; i < teams.length; i += 2) {
-    const row = [teams[i], teams[i + 1]].filter(Boolean);
-    kb.row(...row.map(t => ({ text: t, callback_data: `cipl_guest_team:${t}` })));
-  }
-
-  const username = user.username || user.first_name || 'Guest';
-  await ctx.reply(
-    `🏆 @${escapeHTML(username)} is joining the IPL lobby!\n\n` +
-    `👇 Pick <b>your team:</b>`,
-    { parse_mode: 'HTML', reply_markup: kb }
-  );
-});
-
-// Handle guest team pick — finalise lobby and do toss
-bot.callbackQuery(/^cipl_guest_team:/, async (ctx) => {
-  const teamCode = ctx.callbackQuery.data.split(':')[1];
-  const chatId   = ctx.chat.id;
-  const user     = ctx.from;
-  const lobby    = activeLobbies[chatId];
-
-  if (!lobby || !lobby.iplMode) {
-    return ctx.answerCallbackQuery({ text: '❌ No active IPL lobby.', show_alert: true });
-  }
-  if (user.id === lobby.host.telegramId) {
-    return ctx.answerCallbackQuery({ text: '⚠️ You are the host!', show_alert: true });
-  }
-
-  const pool = IPL_SQUADS_POOL[teamCode];
-  if (!pool) return ctx.answerCallbackQuery({ text: '❌ Invalid team.', show_alert: true });
-
-  await ctx.answerCallbackQuery();
-
-  const username = user.username || user.first_name || 'Guest';
-  const teamName = IPL_TEAM_NAMES[teamCode] || teamCode;
-
-  if (sb.supabase) await sb.ensureUser(user.id, user.first_name).catch(() => {});
-
-  lobby.guest = {
-    telegramId: user.id,
-    username,
-    teamName,
-    teamCode,
-    squad: pool,
-    xi:    []
-  };
-  lobby.status = 'waiting_overs';
-
-  try { await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }); } catch (_) {}
-
-  await ctx.reply(
-    `🤝 <b>@${escapeHTML(username)} joined the IPL lobby!</b>\n` +
-    `═══════════════════════════════\n` +
-    `• <b>${lobby.host.teamCode}</b> (${escapeHTML(lobby.host.teamName)}) → @${escapeHTML(lobby.host.username)}\n` +
-    `• <b>${teamCode}</b> (${escapeHTML(teamName)}) → @${escapeHTML(username)}\n\n` +
-    `👉 @${escapeHTML(lobby.host.username)}, please reply to this chat with the number of overs for this match (e.g. 1, 5, 10):`,
-    { parse_mode: 'HTML' }
-  );
 });
 
 async function resolveCricketPlayer(ctx, query) {
