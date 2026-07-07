@@ -85,6 +85,9 @@ async function init() {
   // 3. Fallback to spectator if userId is still unresolved
   if (!userId) {
     userId = 'spectator';
+    if (tg && tg.initDataUnsafe) {
+      alert("Telegram initData is missing user: " + JSON.stringify(tg.initDataUnsafe));
+    }
   }
 
   // Bind exit handlers
