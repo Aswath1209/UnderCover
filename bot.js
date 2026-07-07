@@ -329,7 +329,7 @@ function getMatchPlayUrl(match) {
     host = 'undercover-fuxy.onrender.com';
   }
   const cleanHost = host.replace(/^https?:\/\//, '');
-  return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}`;
+  return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}&v=${Date.now()}`;
 }
 
 const DRAFT_ROLES = [
@@ -6665,6 +6665,7 @@ app.get('/api/match', async (req, res) => {
   }
 
   const serialized = serializeMatchState(match, userId);
+  console.log(`[API /api/match] Responding for matchId=${match.id}, iplMode=${serialized.iplMode}`);
   res.json(serialized);
 });
 
