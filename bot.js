@@ -4688,13 +4688,6 @@ bot.on('callback_query:data', async (ctx) => {
       });
       match.status = 'xi_selection';
 
-      // IPL Mode — attach pool and flag
-      if (lobby.iplMode) {
-        match.iplMode    = true;
-        match.hostPool   = lobby.host.squad  || [];
-        match.guestPool  = lobby.guest.squad || [];
-      }
-
       try {
         await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
       } catch (e) {}

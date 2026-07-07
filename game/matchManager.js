@@ -852,6 +852,12 @@ function createMatchFromLobby({ dbMatchId, lobby }) {
   match.tossDecision = lobby.tossDecision;
   match.status = 'xi_selection';
 
+  if (lobby.iplMode) {
+    match.iplMode = true;
+    match.hostPool = lobby.host.squad || [];
+    match.guestPool = lobby.guest.squad || [];
+  }
+
   // Add to activeMatches maps
   activeMatches[lobby.host.telegramId] = match;
   activeMatches[lobby.guest.telegramId] = match;
