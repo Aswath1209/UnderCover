@@ -2273,3 +2273,40 @@ body {
   transform: scale(1);
 }
 
+/* Roster Tabs Styles */
+.roster-tabs-container {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+
+.roster-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 4px;
+  cursor: pointer;
+  border-radius: 8px;
+  text-align: center;
+  transition: all var(--transition-smooth);
+}
+
+.roster-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.roster-tab-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, #00d2ff, var(--primary-accent));
+  box-shadow: 0 4px 12px rgba(0, 184, 117, 0.3);
+}
+

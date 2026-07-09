@@ -20,6 +20,7 @@ let activeScorecardTab = 'innings1'; // 'innings1' or 'innings2'
 let lastBallUniqueId = null;
 let wasMyTurn = false;
 let selectedRosterPlayers = [];
+let currentRosterRoleFilter = 'all';
 
 function getShortTeamName(teamName) {
   if (!teamName) return '';
@@ -1933,6 +1934,25 @@ function renderRosterScreen() {
 
   document.getElementById('roster-team-subtitle').innerText = `Select exactly 11 players for ${teamCode}`;
 
+  // Add click listeners to tabs
+  const tabBtns = document.querySelectorAll('.roster-tabs-container .roster-tab-btn');
+  tabBtns.forEach(btn => {
+    // Clone node to avoid duplicate event listeners if renderRosterScreen is called multiple times
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    newBtn.addEventListener('click', (e) => {
+      document.querySelectorAll('.roster-tabs-container .roster-tab-btn').forEach(b => b.classList.remove('active'));
+      newBtn.classList.add('active');
+      currentRosterRoleFilter = newBtn.dataset.role;
+      renderRosterPool(pool);
+    });
+  });
+
+  renderRosterPool(pool);
+}
+
+function renderRosterPool(pool) {
   const listContainer = document.getElementById('roster-pool-list');
   listContainer.innerHTML = '';
 
@@ -1941,10 +1961,21 @@ function renderRosterScreen() {
     return;
   }
 
-  pool.forEach(player => {
+  const filteredPool = pool.filter(player => {
+    if (currentRosterRoleFilter === 'all') return true;
+    return player.role === currentRosterRoleFilter;
+  });
+
+  if (filteredPool.length === 0) {
+    listContainer.innerHTML = '<p class="loading-text" style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 20px;">No players found for this role.</p>';
+    return;
+  }
+
+  filteredPool.forEach(player => {
     const isSelected = selectedRosterPlayers.some(p => p.id === player.id);
     const card = document.createElement('div');
     card.className = `player-card ${isSelected ? 'selected' : ''}`;
+    card.dataset.id = player.id;
     
     const roleMap = { 'batsman': 'BAT', 'bowler': 'BOWL', 'all_rounder': 'AR', 'wicket_keeper': 'WK' };
     const formattedRole = roleMap[player.role] || player.role.toUpperCase().replace('_', '');
@@ -2028,9 +2059,9 @@ function updateRosterUI(pool) {
   updateRequirementUI('req-bowlers', `Bowlers: 3-5 (${bowlers})`, bowlValid);
 
   const cards = document.querySelectorAll('.roster-pool-grid .player-card');
-  cards.forEach((card, i) => {
-    const player = pool[i];
-    const isSelected = selectedRosterPlayers.some(p => p.id === player.id);
+  cards.forEach((card) => {
+    const pId = card.dataset.id;
+    const isSelected = selectedRosterPlayers.some(p => p.id === pId);
     if (count === 11 && !isSelected) {
       card.classList.add('disabled');
     } else {

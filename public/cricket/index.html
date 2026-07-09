@@ -100,6 +100,15 @@
         <div class="glass-card player-pool-card" style="margin-top: 16px;">
           <h3 class="section-title">Available Players Pool</h3>
           <p class="section-description">Tap to select/deselect players for your XI.</p>
+          
+          <div class="roster-tabs-container">
+            <button class="roster-tab-btn active" data-role="all">ALL</button>
+            <button class="roster-tab-btn" data-role="batsman">🏏 BAT</button>
+            <button class="roster-tab-btn" data-role="wicket_keeper">🧤 WK</button>
+            <button class="roster-tab-btn" data-role="all_rounder">⚡ AR</button>
+            <button class="roster-tab-btn" data-role="bowler">🎳 BOWL</button>
+          </div>
+
           <div id="roster-pool-list" class="roster-pool-grid">
             <!-- Populated dynamically with player cards -->
           </div>
