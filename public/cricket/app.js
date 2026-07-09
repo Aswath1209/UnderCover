@@ -1938,23 +1938,42 @@ function renderRosterScreen() {
     const card = document.createElement('div');
     card.className = `player-card ${isSelected ? 'selected' : ''}`;
     
-    let stat1Label = "BAT", stat1Val = player.batting_rating || 30;
-    let stat2Label = "BOWL", stat2Val = player.bowling_rating || 30;
+    const roleMap = { 'batsman': 'BAT', 'bowler': 'BOWL', 'all_rounder': 'AR', 'wicket_keeper': 'WK' };
+    const formattedRole = roleMap[player.role] || player.role.toUpperCase().replace('_', '');
 
-    const formattedRole = player.role.toUpperCase().replace('_', ' ');
+    let rarityColor = '#4facfe'; // bronze/default
+    if (player.ovr >= 85) rarityColor = '#ff007f'; // elite
+    else if (player.ovr >= 80) rarityColor = '#FFD700'; // gold
+    else if (player.ovr >= 70) rarityColor = '#94A3B8'; // silver
+
+    let avatarHtml;
+    if (player.image_url) {
+      avatarHtml = `<img src="${player.image_url}" class="roster-avatar-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <div class="roster-avatar-text" style="display:none;">${player.name.charAt(0)}</div>`;
+    } else {
+      avatarHtml = `<div class="roster-avatar-text">${player.name.charAt(0)}</div>`;
+    }
 
     card.innerHTML = `
-      <div class="player-card-header">
-        <span class="player-card-name" title="${player.name}">${player.name}</span>
-        <span class="player-card-ovr">${player.ovr} OVR</span>
-      </div>
-      <div class="player-card-details">
-        <span class="player-card-role">${formattedRole}</span>
-        <span class="player-card-archetype">${player.batting_archetype || player.bowling_archetype || ''}</span>
-      </div>
-      <div class="player-card-stats">
-        <span class="player-card-stat">${stat1Label}: ${stat1Val}</span>
-        <span class="player-card-stat">${stat2Label}: ${stat2Val}</span>
+      <div class="roster-card-inner" style="--rarity-color: ${rarityColor}">
+        <div class="roster-card-header">
+          <div class="roster-ovr">${player.ovr}</div>
+          <div class="roster-role">${formattedRole}</div>
+        </div>
+        <div class="roster-avatar-wrap">
+          ${avatarHtml}
+        </div>
+        <div class="roster-card-body">
+          <div class="roster-name" title="${player.name}">${player.name}</div>
+          <div class="roster-archetype">${player.batting_archetype || player.bowling_archetype || 'Classic'}</div>
+          <div class="roster-stats">
+             <div class="r-stat"><span>BAT</span> <b>${player.batting_rating || 30}</b></div>
+             <div class="r-stat"><span>BOWL</span> <b>${player.bowling_rating || 30}</b></div>
+          </div>
+        </div>
+        <div class="roster-select-indicator">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
       </div>
     `;
 
