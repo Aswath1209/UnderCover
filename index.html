@@ -1372,7 +1372,7 @@
             if (cricketMatchId && cricketChatId) {
                 const uid = tg.initDataUnsafe?.user?.id;
                 const userParam = uid ? `&userId=${uid}` : '';
-                window.location.replace(`/cricket?match_id=${cricketMatchId}&chat_id=${cricketChatId}${userParam}` + window.location.hash);
+                window.location.replace(`/cricket?match_id=${cricketMatchId}&chat_id=${cricketChatId}${userParam}&v=${Date.now()}` + window.location.hash);
                 throw new Error("Redirecting to cricket match...");
             }
         }

@@ -1,5 +1,5 @@
 // Crickidex Mini App - Client Logic
-const tg = window.Telegram?.WebApp;
+let tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
@@ -40,6 +40,14 @@ function getShortTeamName(teamName) {
 
 // Initial Setup
 async function init() {
+  if (!tg) {
+    tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+  }
+
   const cleanParam = (val) => {
     if (val === null || val === undefined || val === 'null' || val === 'undefined' || val === '') {
       return null;

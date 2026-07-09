@@ -6177,20 +6177,20 @@ app.use('/cricket', express.static(path.join(__dirname, 'public', 'cricket'), {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     setHeaders: (res, filepath) => {
         if (filepath.endsWith('index.html')) {
-            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour for HTML
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); // No cache for HTML
         } else {
             res.setHeader('Cache-Control', 'public, max-age=604800, immutable'); // 7 days for JS/CSS
         }
     }
 }));
 app.get('/cricket', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.sendFile(path.join(__dirname, 'public', 'cricket', 'index.html'));
 });
 
-// Serve Mini App (Adsgram) with short cache (1 hour)
+// Serve Mini App (Adsgram) with no cache for HTML
 app.get('/bonus-app', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 

@@ -1,0 +1,998 @@
+{
+  "CSK": [
+    {
+      "name": "Matthew Short",
+      "nationality": "Australia",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "MS Dhoni",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Gurjapneet Singh",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm fast-medium"
+    },
+    {
+      "name": "Kuldip Yadav",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm fast-medium"
+    },
+    {
+      "name": "Sanju Samson",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "None"
+    },
+    {
+      "name": "Dewald Brevis",
+      "nationality": "South Africa",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg spin"
+    },
+    {
+      "name": "Prashant Veer",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm slow orthodox"
+    },
+    {
+      "name": "Dian Forrester",
+      "nationality": "South Africa",
+      "batting": "Left-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Noor Ahmad",
+      "nationality": "Afghanistan",
+      "batting": "Right-handed",
+      "bowling": "Left-arm wrist-spin"
+    },
+    {
+      "name": "Akash Madhwal",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Rahul Chahar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg spin"
+    },
+    {
+      "name": "Shreyas Gopal",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg spin"
+    },
+    {
+      "name": "Akeal Hosein",
+      "nationality": "West Indies",
+      "batting": "Left-handed",
+      "bowling": "Left-arm slow orthodox"
+    },
+    {
+      "name": "Aman Hakim Khan",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Matt Henry",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Shivam Dube",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Kartik Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Macneil Noronha",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Ruturaj Gaikwad",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Zak Foulkes",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Urvil Patel",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Spencer Johnson",
+      "nationality": "Australia",
+      "batting": "Left-handed",
+      "bowling": "Left-arm fast"
+    },
+    {
+      "name": "Anshul Kamboj",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Mukesh Choudhary",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm fast-medium"
+    },
+    {
+      "name": "Sarfaraz Khan",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg spin"
+    },
+    {
+      "name": "Ramakrishna Ghosh",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Ayush Mhatre",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Khaleel Ahmed",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm fast-medium"
+    },
+    {
+      "name": "Nathan Ellis",
+      "nationality": "Australia",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Jamie Overton",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    }
+  ],
+  "RCB": [
+    {
+      "name": "Suyash Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg-break"
+    },
+    {
+      "name": "Krunal Pandya",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Tim David",
+      "nationality": "Australia",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Abhinandan Singh",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Bhuvneshwar Kumar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Virat Kohli",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Jordan Cox",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Swapnil Singh",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Venkatesh Iyer",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Jacob Duffy",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Phil Salt",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "None"
+    },
+    {
+      "name": "Devdutt Padikkal",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Josh Hazlewood",
+      "nationality": "Australia",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Rasikh Salam",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Romario Shepherd",
+      "nationality": "West Indies",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Jitesh Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Rajat Patidar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Kanishk Chouhan",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Satvik Deswal",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm orthodox spin"
+    },
+    {
+      "name": "Vihaan Malhotra",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Richard Gleeson",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Vicky Ostwal",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm orthodox spin"
+    },
+    {
+      "name": "Mangesh Yadav",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm fast"
+    },
+    {
+      "name": "Jacob Bethell",
+      "nationality": "England",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Yash Dayal",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm medium-fast"
+    },
+    {
+      "name": "Nuwan Thushara",
+      "nationality": "Sri Lanka",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    }
+  ],
+  "MI": [
+    {
+      "name": "Tilak Varma",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Sherfane Rutherford",
+      "nationality": "West Indies",
+      "batting": "Left-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Mayank Rawat",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Danish Malewar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Robin Minz",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "None"
+    },
+    {
+      "name": "Trent Boult",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Left-arm medium-fast"
+    },
+    {
+      "name": "Naman Dhir",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Mayank Markande",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Shardul Thakur",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Will Jacks",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Hardik Pandya",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Corbin Bosch",
+      "nationality": "South Africa",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Ashwani Kumar",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm medium-fast"
+    },
+    {
+      "name": "Ryan Rickelton",
+      "nationality": "South Africa",
+      "batting": "Left-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Rohit Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Deepak Chahar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Suryakumar Yadav",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Mohammad Izhar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm medium-fast"
+    },
+    {
+      "name": "Krish Bhagat",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Allah Ghazanfar",
+      "nationality": "Afghanistan",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Jasprit Bumrah",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Keshav Maharaj",
+      "nationality": "South Africa",
+      "batting": "Right-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Raghu Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Mahipal Lomror",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Ruchit Ahir",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Raj Angad Bawa",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Quinton de Kock",
+      "nationality": "South Africa",
+      "batting": "Left-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Mitchell Santner",
+      "nationality": "New Zealand",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Atharva Ankolekar",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    }
+  ],
+  "KKR": [
+    {
+      "name": "Ajinkya Rahane",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Rinku Singh",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Manish Pandey",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Rovman Powell",
+      "nationality": "West Indies",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Rahul Tripathi",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Finn Allen",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Tejasvi Singh Dahiya",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "None"
+    },
+    {
+      "name": "Tim Seifert",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Angkrish Raghuvanshi",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Sunil Narine",
+      "nationality": "West Indies",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off-break"
+    },
+    {
+      "name": "Anukul Roy",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Slow left-arm orthodox"
+    },
+    {
+      "name": "Ramandeep Singh",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Cameron Green",
+      "nationality": "Australia",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Sarthak Ranjan",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg-break"
+    },
+    {
+      "name": "Daksh Kamra",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg-break"
+    },
+    {
+      "name": "Rachin Ravindra",
+      "nationality": "New Zealand",
+      "batting": "Left-handed",
+      "bowling": "Slow left-arm orthodox"
+    },
+    {
+      "name": "Vaibhav Arora",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Umran Malik",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast"
+    },
+    {
+      "name": "Matheesha Pathirana",
+      "nationality": "Sri Lanka",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast"
+    },
+    {
+      "name": "Kartik Tyagi",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Blessing Muzarabani",
+      "nationality": "Zimbabwe",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Saurabh Dubey",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Left-arm fast-medium"
+    },
+    {
+      "name": "Navdeep Saini",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast"
+    },
+    {
+      "name": "Harshit Rana",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Akash Deep",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Mustafizur Rahman",
+      "nationality": "Bangladesh",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Varun Chakravarthy",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg-break"
+    },
+    {
+      "name": "Prashant Solanki",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg-break"
+    }
+  ],
+  "SRH": [
+    {
+      "name": "Travis Head",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Aniket Verma",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm medium-fast"
+    },
+    {
+      "name": "Smaran Ravichandran",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Right arm off-break"
+    },
+    {
+      "name": "Heinrich Klaasen",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off spin"
+    },
+    {
+      "name": "Ishan Kishan",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Salil Arora",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": ""
+    },
+    {
+      "name": "Abhishek Sharma",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Nitish Kumar Reddy",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Shivam Mavi",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm fast-medium"
+    },
+    {
+      "name": "Shivang Kumar",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Left-arm unorthodox"
+    },
+    {
+      "name": "Harsh Dubey",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Liam Livingstone",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Brydon Carse",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Kamindu Mendis",
+      "nationality": "",
+      "batting": "Left-handed",
+      "bowling": "Ambidextrous spin"
+    },
+    {
+      "name": "Jack Edwards",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Pat Cummins",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm fast"
+    },
+    {
+      "name": "Harshal Patel",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm fast-medium"
+    },
+    {
+      "name": "Jaydev Unadkat",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Left-arm medium"
+    },
+    {
+      "name": "Eshan Malinga",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium-fast"
+    },
+    {
+      "name": "Praful Hinge",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm fast-medium"
+    },
+    {
+      "name": "Onkar Tarmale",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm medium-fast"
+    },
+    {
+      "name": "Sakib Hussain",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right arm fast"
+    },
+    {
+      "name": "David Payne",
+      "nationality": "England",
+      "batting": "Right-handed",
+      "bowling": "Left-arm medium-fast"
+    },
+    {
+      "name": "Zeeshan Ansari",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Amit Kumar",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm leg break"
+    },
+    {
+      "name": "Krains Fuletra",
+      "nationality": "",
+      "batting": "Right-handed",
+      "bowling": "Right-arm unorthodox"
+    }
+  ],
+  "DC": [
+    {
+      "name": "KL Rahul",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "David Miller",
+      "nationality": "South Africa",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Sameer Rizvi",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right arm off-break"
+    },
+    {
+      "name": "Axar Patel",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm orthodox"
+    },
+    {
+      "name": "Kuldeep Yadav",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm wrist spin"
+    },
+    {
+      "name": "Abhishek Porel",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "None"
+    },
+    {
+      "name": "Vipraj Nigam",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm legbreak"
+    },
+    {
+      "name": "Tristan Stubbs",
+      "nationality": "South Africa",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Mukesh Kumar",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm medium"
+    },
+    {
+      "name": "Tripurana Vijay",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right arm off-break"
+    },
+    {
+      "name": "Mitchell Starc",
+      "nationality": "Australia",
+      "batting": "Left-handed",
+      "bowling": "Left-arm fast"
+    },
+    {
+      "name": "Dushmantha Chameera",
+      "nationality": "Sri Lanka",
+      "batting": "Right-handed",
+      "bowling": "Left-arm fast"
+    },
+    {
+      "name": "Ajay Mandal",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Slow left-arm orthodox"
+    },
+    {
+      "name": "Karun Nair",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "T. Natarajan",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Left-arm medium"
+    },
+    {
+      "name": "Ashutosh Sharma",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "—N/a"
+    },
+    {
+      "name": "Madhav Tiwari",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right arm Fast medium"
+    },
+    {
+      "name": "Nitish Rana",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Ben Duckett",
+      "nationality": "England",
+      "batting": "Left-handed",
+      "bowling": "Right-arm off break"
+    },
+    {
+      "name": "Kyle Jamieson",
+      "nationality": "New Zealand",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Lungi Ngidi",
+      "nationality": "South Africa",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Pathum Nissanka",
+      "nationality": "Sri Lanka",
+      "batting": "Right-handed",
+      "bowling": "Right-arm fast-medium"
+    },
+    {
+      "name": "Prithvi Shaw",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right-handed off-break"
+    },
+    {
+      "name": "Auqib Nabi",
+      "nationality": "India",
+      "batting": "Right-handed",
+      "bowling": "Right arm Medium"
+    },
+    {
+      "name": "Sahil Ulhas Parakh",
+      "nationality": "India",
+      "batting": "Left-handed",
+      "bowling": "Legbreak"
+    }
+  ]
+}

@@ -1,0 +1,813 @@
+{
+  "123456789": {
+    "userId": "123456789",
+    "username": "Player",
+    "type": "T20_WC",
+    "edition": "2026",
+    "playerTeam": "AUS",
+    "difficulty": "MEDIUM",
+    "status": "ACTIVE",
+    "currentRound": 1,
+    "schedule": [
+      {
+        "round": 1,
+        "matchId": "T20_WC_2026_R1",
+        "playerTeam": "AUS",
+        "opponentTeam": "IND",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "PAK",
+            "teamB": "ENG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "SA",
+            "teamB": "NZ",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "WI",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "matchId": "T20_WC_2026_R2",
+        "playerTeam": "AUS",
+        "opponentTeam": "PAK",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "ENG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "SA",
+            "teamB": "NZ",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "WI",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "matchId": "T20_WC_2026_R3",
+        "playerTeam": "AUS",
+        "opponentTeam": "ENG",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "SA",
+            "teamB": "NZ",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "WI",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 4,
+        "matchId": "T20_WC_2026_R4",
+        "playerTeam": "AUS",
+        "opponentTeam": "SA",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "NZ",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "WI",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "matchId": "T20_WC_2026_R5",
+        "playerTeam": "AUS",
+        "opponentTeam": "NZ",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "SA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "WI",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 6,
+        "matchId": "T20_WC_2026_R6",
+        "playerTeam": "AUS",
+        "opponentTeam": "WI",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "SA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "NZ",
+            "teamB": "AFG",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 7,
+        "matchId": "T20_WC_2026_R7",
+        "playerTeam": "AUS",
+        "opponentTeam": "AFG",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "SA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "NZ",
+            "teamB": "WI",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ZIM",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 8,
+        "matchId": "T20_WC_2026_R8",
+        "playerTeam": "AUS",
+        "opponentTeam": "ZIM",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "SA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "NZ",
+            "teamB": "WI",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "AFG",
+            "teamB": "USA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 9,
+        "matchId": "T20_WC_2026_R9",
+        "playerTeam": "AUS",
+        "opponentTeam": "USA",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "IND",
+            "teamB": "PAK",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "ENG",
+            "teamB": "SA",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "NZ",
+            "teamB": "WI",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          },
+          {
+            "teamA": "AFG",
+            "teamB": "ZIM",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      }
+    ],
+    "standings": {
+      "IND": {
+        "teamKey": "IND",
+        "name": "India",
+        "logo": "🇮🇳",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "AUS": {
+        "teamKey": "AUS",
+        "name": "Australia",
+        "logo": "🇦🇺",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "PAK": {
+        "teamKey": "PAK",
+        "name": "Pakistan",
+        "logo": "🇵🇰",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "ENG": {
+        "teamKey": "ENG",
+        "name": "England",
+        "logo": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "SA": {
+        "teamKey": "SA",
+        "name": "South Africa",
+        "logo": "🇿🇦",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "NZ": {
+        "teamKey": "NZ",
+        "name": "New Zealand",
+        "logo": "🇳🇿",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "WI": {
+        "teamKey": "WI",
+        "name": "West Indies",
+        "logo": "🌴",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "AFG": {
+        "teamKey": "AFG",
+        "name": "Afghanistan",
+        "logo": "🇦🇫",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "ZIM": {
+        "teamKey": "ZIM",
+        "name": "Zimbabwe",
+        "logo": "🇿🇼",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "USA": {
+        "teamKey": "USA",
+        "name": "United States",
+        "logo": "🇺🇸",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      }
+    },
+    "playerSquad": [
+      {
+        "id": "0176a4ec-1f19-4403-af34-1086358d17ff",
+        "name": "Travis Head",
+        "role": "batsman",
+        "ovr": 93,
+        "batting_rating": 95,
+        "bowling_rating": 30,
+        "batting_hand": "left",
+        "batting_archetype": "Brute",
+        "bowler_type": "off_spin",
+        "upgraded": false
+      },
+      {
+        "id": "d1178e8a-7030-4006-bee1-54e08c0e3cc9",
+        "name": "David Warner",
+        "role": "batsman",
+        "ovr": 86,
+        "batting_rating": 88,
+        "bowling_rating": 0,
+        "batting_hand": "left",
+        "batting_archetype": "Opener",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "c8eed114-6345-4622-9539-aee2bbe42f16",
+        "name": "Mitchell Marsh",
+        "role": "all_rounder",
+        "ovr": 85,
+        "batting_rating": 84,
+        "bowling_rating": 80,
+        "batting_hand": "right",
+        "batting_archetype": "Finisher",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "70ab456c-55ca-4ef2-b01b-3228d46c9c39",
+        "name": "Glenn Maxwell",
+        "role": "all_rounder",
+        "ovr": 88,
+        "batting_rating": 86,
+        "bowling_rating": 84,
+        "batting_hand": "right",
+        "batting_archetype": "Finisher",
+        "bowler_type": "off_spin",
+        "upgraded": false
+      },
+      {
+        "id": "4e04c961-a5a5-4f3e-a0d1-78f186d9db39",
+        "name": "Marcus Stoinis",
+        "role": "all_rounder",
+        "ovr": 86,
+        "batting_rating": 85,
+        "bowling_rating": 83,
+        "batting_hand": "right",
+        "batting_archetype": "Finisher",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "0b4a24ef-594d-4425-8425-7113fa81a804",
+        "name": "Tim David",
+        "role": "batsman",
+        "ovr": 81,
+        "batting_rating": 83,
+        "bowling_rating": 0,
+        "batting_hand": "right",
+        "batting_archetype": "Finisher",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "7ce52507-5cb9-4b87-bae7-6ffdd8a94040",
+        "name": "Matthew Wade",
+        "role": "wicket_keeper",
+        "ovr": 80,
+        "batting_rating": 81,
+        "bowling_rating": 0,
+        "batting_hand": "left",
+        "batting_archetype": "Classic",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "ac1a9c57-625d-4bdc-904d-cefc80fe3e9f",
+        "name": "Pat Cummins",
+        "role": "bowler",
+        "ovr": 91,
+        "batting_rating": 50,
+        "bowling_rating": 92,
+        "batting_hand": "right",
+        "batting_archetype": "Anchor",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "47481aba-ba11-4da6-a6ea-b42168a0c424",
+        "name": "Mitchell Starc",
+        "role": "bowler",
+        "ovr": 90,
+        "batting_rating": 25,
+        "bowling_rating": 92,
+        "batting_hand": "left",
+        "batting_archetype": "Anchor",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "25380f49-97dd-40ff-b7d2-5e998fed1d25",
+        "name": "Josh Hazlewood",
+        "role": "bowler",
+        "ovr": 88,
+        "batting_rating": 10,
+        "bowling_rating": 89,
+        "batting_hand": "right",
+        "batting_archetype": "Tailender",
+        "bowler_type": "fast",
+        "upgraded": false
+      },
+      {
+        "id": "f8b26bfc-3aec-4056-a4f3-0f59b6d4a7c4",
+        "name": "Adam Zampa",
+        "role": "bowler",
+        "ovr": 89,
+        "batting_rating": 5,
+        "bowling_rating": 91,
+        "batting_hand": "right",
+        "batting_archetype": "Tailender",
+        "bowler_type": "leg_spin",
+        "upgraded": false
+      }
+    ],
+    "activeMatchState": null,
+    "activeMatchId": null
+  },
+  "test_user_987": {
+    "userId": "test_user_987",
+    "username": "TestUser",
+    "type": "IPL",
+    "edition": "2026",
+    "playerTeam": "CSK",
+    "difficulty": "MEDIUM",
+    "status": "ACTIVE",
+    "currentRound": 1,
+    "schedule": [
+      {
+        "round": 1,
+        "matchId": "IPL_2026_R1",
+        "playerTeam": "CSK",
+        "opponentTeam": "RCB",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "MI",
+            "teamB": "PBKS",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "matchId": "IPL_2026_R2",
+        "playerTeam": "CSK",
+        "opponentTeam": "MI",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "RCB",
+            "teamB": "PBKS",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "matchId": "IPL_2026_R3",
+        "playerTeam": "CSK",
+        "opponentTeam": "PBKS",
+        "status": "PENDING",
+        "result": null,
+        "playerScore": null,
+        "opponentScore": null,
+        "otherFixtures": [
+          {
+            "teamA": "RCB",
+            "teamB": "MI",
+            "status": "PENDING",
+            "winner": null,
+            "scoreA": null,
+            "scoreB": null
+          }
+        ]
+      }
+    ],
+    "standings": {
+      "CSK": {
+        "teamKey": "CSK",
+        "name": "Chennai Super Kings",
+        "logo": "🦁",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "RCB": {
+        "teamKey": "RCB",
+        "name": "Royal Challengers Bengaluru",
+        "logo": "👑",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "MI": {
+        "teamKey": "MI",
+        "name": "Mumbai Indians",
+        "logo": "🛡️",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      },
+      "PBKS": {
+        "teamKey": "PBKS",
+        "name": "Punjab Kings",
+        "logo": "🦁",
+        "played": 0,
+        "won": 0,
+        "lost": 0,
+        "pts": 0,
+        "nrr": 0
+      }
+    },
+    "playerSquad": [
+      {
+        "id": "b541cfeb-a895-4e75-ae7e-0bb88a112f3f",
+        "name": "Ruturaj Gaikwad",
+        "role": "Batsman",
+        "ovr": 83,
+        "bat": 83,
+        "bowl": 34
+      },
+      {
+        "id": "4986849b-7059-4a65-89bf-66f5a4993647",
+        "name": "Shivam Dube",
+        "role": "Batsman",
+        "ovr": 85,
+        "bat": 85,
+        "bowl": 65
+      },
+      {
+        "id": "ebc95306-4c8d-49d3-bc2e-9c846c9f2ffb",
+        "name": "Ravindra Jadeja",
+        "role": "All-Rounder",
+        "ovr": 92,
+        "bat": 86,
+        "bowl": 90
+      },
+      {
+        "id": "b1add0e8-2070-449b-8b37-b820063250be",
+        "name": "MS Dhoni",
+        "role": "Wicketkeeper",
+        "ovr": 96,
+        "bat": 95,
+        "bowl": 30
+      },
+      {
+        "id": "7786c05d-a8fa-4473-9d7d-f1bc500181be",
+        "name": "Matheesha Pathirana",
+        "role": "Bowler",
+        "ovr": 85,
+        "bat": 10,
+        "bowl": 85
+      },
+      {
+        "id": "fe713650-763e-45b6-a7f1-114e7a152855",
+        "name": "Tushar Deshpande",
+        "role": "Bowler",
+        "ovr": 79,
+        "bat": 39,
+        "bowl": 79
+      }
+    ],
+    "activeMatchState": null
+  }
+}
