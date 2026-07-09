@@ -84,11 +84,9 @@ async function init() {
 
   // 3. Fallback to spectator if userId is still unresolved
   if (!userId) {
-    const stored = localStorage.getItem('crickidex_user_id');
-    if (stored) {
-      userId = stored;
-    } else {
-      userId = 'spectator';
+    userId = 'spectator';
+    if (tg && tg.initDataUnsafe) {
+      alert("Telegram initData is missing user: " + JSON.stringify(tg.initDataUnsafe));
     }
   }
 
@@ -398,11 +396,6 @@ async function fetchState() {
 
     if (document.getElementById('header-match-uuid')) {
       document.getElementById('header-match-uuid').innerText = `MATCH ID: ${matchState.id.substring(0, 6).toUpperCase()}`;
-    }
-
-    if (userId === 'spectator' && !localStorage.getItem('crickidex_user_id')) {
-      showIdentitySelection(matchState);
-      return;
     }
 
     // Route to appropriate screen
