@@ -65,58 +65,53 @@
         <p class="setup-subtitle" id="roster-team-subtitle">Build your 11-player squad</p>
       </div>
 
-      <div class="setup-container">
-        <div class="glass-card">
-          <div class="roster-progress-container">
-            <div class="roster-progress-header">
-              <span class="progress-label">Selected Players</span>
-              <span id="roster-count" class="progress-count">0 / 11</span>
-            </div>
-            <div class="progress-bar-bg">
-              <div id="roster-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
-            </div>
+      <div class="roster-status-card glass-card">
+        <div class="roster-progress-container">
+          <div class="roster-progress-header">
+            <span class="progress-label">Selected XI</span>
+            <span id="roster-count" class="progress-count">0 / 11</span>
           </div>
-
-          <div class="role-requirements-grid">
-            <div class="req-item" id="req-batsmen">
-              <span class="req-status">❌</span>
-              <span class="req-text">Batsmen: 3-5 (0)</span>
-            </div>
-            <div class="req-item" id="req-keepers">
-              <span class="req-status">❌</span>
-              <span class="req-text">Keepers: 1-3 (0)</span>
-            </div>
-            <div class="req-item" id="req-allrounders">
-              <span class="req-status">❌</span>
-              <span class="req-text">All-Rounders: 1-3 (0)</span>
-            </div>
-            <div class="req-item" id="req-bowlers">
-              <span class="req-status">❌</span>
-              <span class="req-text">Bowlers: 3-5 (0)</span>
-            </div>
+          <div class="progress-bar-bg">
+            <div id="roster-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
           </div>
         </div>
 
-        <div class="glass-card player-pool-card" style="margin-top: 16px;">
-          <h3 class="section-title">Available Players Pool</h3>
-          <p class="section-description">Tap to select/deselect players for your XI.</p>
-          
-          <div class="roster-tabs-container">
-            <button class="roster-tab-btn active" data-role="all">ALL</button>
-            <button class="roster-tab-btn" data-role="batsman">🏏 BAT</button>
-            <button class="roster-tab-btn" data-role="wicket_keeper">🧤 WK</button>
-            <button class="roster-tab-btn" data-role="all_rounder">⚡ AR</button>
-            <button class="roster-tab-btn" data-role="bowler">🎳 BOWL</button>
+        <div class="role-requirements-grid">
+          <div class="req-item" id="req-batsmen">
+            <span class="req-status">❌</span>
+            <span class="req-text">BAT: 3-5 (0)</span>
           </div>
-
-          <div id="roster-pool-list" class="roster-pool-grid">
-            <!-- Populated dynamically with player cards -->
+          <div class="req-item" id="req-keepers">
+            <span class="req-status">❌</span>
+            <span class="req-text">WK: 1-3 (0)</span>
+          </div>
+          <div class="req-item" id="req-allrounders">
+            <span class="req-status">❌</span>
+            <span class="req-text">AR: 1-3 (0)</span>
+          </div>
+          <div class="req-item" id="req-bowlers">
+            <span class="req-status">❌</span>
+            <span class="req-text">BOWL: 3-5 (0)</span>
           </div>
         </div>
+      </div>
 
-        <div class="setup-actions" style="margin-top: 20px;">
-          <button id="submit-roster-btn" class="btn btn-primary btn-block btn-green" disabled>Confirm 11-Player Squad</button>
+      <div class="glass-card player-pool-card">
+        <div class="roster-tabs-container">
+          <button class="roster-tab-btn active" data-role="all">ALL</button>
+          <button class="roster-tab-btn" data-role="batsman">🏏 BAT</button>
+          <button class="roster-tab-btn" data-role="wicket_keeper">🧤 WK</button>
+          <button class="roster-tab-btn" data-role="all_rounder">⚡ AR</button>
+          <button class="roster-tab-btn" data-role="bowler">🎳 BOWL</button>
         </div>
+
+        <div id="roster-pool-list" class="roster-pool-grid">
+          <!-- Populated dynamically with player cards -->
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button id="submit-roster-btn" class="btn btn-primary btn-block btn-green" disabled>Confirm 11-Player Squad</button>
       </div>
     </section>
 

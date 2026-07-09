@@ -2052,23 +2052,59 @@ body {
   transition: width 0.3s ease;
 }
 
+#roster-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+#roster-screen .header-card {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+}
+
+#roster-screen .header-card .card-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+#roster-screen .header-card .setup-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 10px;
+}
+
+.roster-status-card {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+}
+
 .role-requirements-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  justify-content: space-between;
 }
 
 .req-item {
+  flex: 1;
+  min-width: 75px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 4px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--card-border);
-  padding: 8px 12px;
-  border-radius: var(--border-radius-sm);
-  font-size: 11px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 9px;
   font-weight: 700;
+  text-align: center;
 }
 
 .req-item.valid {
@@ -2082,7 +2118,7 @@ body {
 }
 
 .req-status {
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .req-text {
@@ -2096,6 +2132,10 @@ body {
 .player-pool-card {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 8px;
+  padding: 12px;
 }
 
 .roster-pool-grid {
@@ -2285,15 +2325,6 @@ body {
 }
 
 /* Roster Tabs Styles */
-.roster-tabs-container {
-  display: flex;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 16px;
-  gap: 4px;
-}
 
 .roster-tab-btn {
   flex: 1;
@@ -2321,3 +2352,18 @@ body {
   box-shadow: 0 4px 12px rgba(0, 184, 117, 0.3);
 }
 
+.roster-tabs-container {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 10px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#roster-screen .setup-actions {
+  flex-shrink: 0;
+  margin-top: 8px;
+}
