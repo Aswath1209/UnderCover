@@ -6694,11 +6694,13 @@ app.get('/api/match', async (req, res) => {
         const row = await sb.getCricketMatchById(matchId);
         if (row && row.state_json) {
           const deserialized = matchManager.deserializeMatch(row.state_json);
-          // Restore to active cache
-          matchManager.activeMatches[deserialized.id] = deserialized;
-          matchManager.activeMatches[deserialized.host.telegramId] = deserialized;
-          if (deserialized.guest && deserialized.guest.telegramId !== 'ai') {
-            matchManager.activeMatches[deserialized.guest.telegramId] = deserialized;
+          // Restore to active cache only if not completed
+          if (deserialized.status !== 'completed') {
+            matchManager.activeMatches[deserialized.id] = deserialized;
+            matchManager.activeMatches[deserialized.host.telegramId] = deserialized;
+            if (deserialized.guest && deserialized.guest.telegramId !== 'ai') {
+              matchManager.activeMatches[deserialized.guest.telegramId] = deserialized;
+            }
           }
           const serialized = serializeMatchState(deserialized, userId);
           return res.json(serialized);
@@ -7695,7 +7697,7 @@ async function processBallAndProgress(ctx, match) {
 
 async function handleMatchTermination(match, quittingUserId = null, reason = "quit") {
   try {
-    const ballsBowled = (match.innings[0]?.balls || 0) + (match.innings[1]?.balls || 0);
+    const ballsBowled = (match.innings && match.innings[0]?.balls || 0) + (match.innings && match.innings[1]?.balls || 0);
     const hostId = match.host?.telegramId ? match.host.telegramId.toString() : '';
     const guestId = match.guest?.telegramId ? match.guest.telegramId.toString() : '';
 
@@ -7708,7 +7710,7 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
     } else {
       // Inactivity timeout: determine whose turn it was
       if (match.status === 'xi_selection') {
-        const isHostBatting = match.innings[0]?.battingId && match.host?.telegramId && (match.innings[0].battingId.toString() === match.host.telegramId.toString());
+        const isHostBatting = match.innings && match.innings[0]?.battingId && match.host?.telegramId && (match.innings[0].battingId.toString() === match.host.telegramId.toString());
         const battingConfirmed = match.strikerIdx !== null && match.nonStrikerIdx !== null;
         const bowlingConfirmed = match.currentBowlerIdx !== null;
         const hostConfirmed = isHostBatting ? battingConfirmed : bowlingConfirmed;
@@ -7727,8 +7729,9 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
         }
       } else {
         // Active play phase (innings1, innings2)
-        const battingId = match.currentInnings.battingId?.toString();
-        const bowlingId = match.currentInnings.bowlingId?.toString();
+        const currentInnings = match.currentInnings;
+        const battingId = currentInnings?.battingId?.toString();
+        const bowlingId = currentInnings?.bowlingId?.toString();
         if (match.turnState === 'bowling_delivery' || match.turnState === 'selecting_over_bowler') {
           inactiveId = bowlingId;
           activeId = battingId;
@@ -7739,7 +7742,7 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
       }
     }
 
-    const hostName = match.host.username || "Host";
+    const hostName = match.host ? (match.host.username || "Host") : "Host";
     const guestName = match.guest ? (match.guest.username || "Guest") : "Guest";
     const inactiveName = inactiveId === hostId ? hostName : guestName;
     const activeName = activeId === hostId ? hostName : guestName;
@@ -7775,9 +7778,9 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
     }
 
     // Balls bowled > 0: calculate penalty and compensation
-    const totalBalls = match.totalOvers * 12;
+    const totalBalls = (match.totalOvers || 2) * 12;
     const ratio = Math.min(1, ballsBowled / totalBalls);
-    const rewardCap = match.totalOvers * 1000;
+    const rewardCap = (match.totalOvers || 2) * 1000;
     const compensation = Math.round(ratio * rewardCap);
     const penalty = compensation;
 
@@ -7810,15 +7813,30 @@ async function handleMatchTermination(match, quittingUserId = null, reason = "qu
     cleanupActiveMatch(match);
 
   } catch (err) {
-    console.error("Error inside handleMatchTermination:", err);
+    console.error("Error inside handleMatchTermination, running emergency cleanup:", err);
+    try {
+      match.status = 'completed';
+      matchManager.saveToDb(match);
+      cleanupActiveMatch(match);
+    } catch (cleanupErr) {
+      console.error("Emergency cleanup failed:", cleanupErr);
+    }
   }
 }
 
 function cleanupActiveMatch(match) {
-  delete matchManager.activeMatches[match.host.telegramId];
-  delete matchManager.activeMatches[match.id];
-  if (match.guest && match.guest.telegramId !== 'ai') {
+  if (!match) return;
+  if (match.id) {
+    delete matchManager.activeMatches[match.id];
+    delete matchManager.activeMatches[match.id.toString()];
+  }
+  if (match.host && match.host.telegramId) {
+    delete matchManager.activeMatches[match.host.telegramId];
+    delete matchManager.activeMatches[match.host.telegramId.toString()];
+  }
+  if (match.guest && match.guest.telegramId) {
     delete matchManager.activeMatches[match.guest.telegramId];
+    delete matchManager.activeMatches[match.guest.telegramId.toString()];
   }
 }
 

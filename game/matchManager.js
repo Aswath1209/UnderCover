@@ -813,6 +813,10 @@ async function loadActiveMatchesFromDb() {
         const state = row.state_json;
         if (state) {
           const match = deserializeMatch(state);
+          if (match.status === 'completed') {
+            console.log(`[DB] Skipping completed match ${match.id} from active recovery.`);
+            continue;
+          }
           activeMatches[match.id] = match;
           activeMatches[match.host.telegramId] = match;
           if (match.guest && match.guest.telegramId !== 'ai') {
@@ -912,11 +916,26 @@ function createCampaignMatch({ dbMatchId, userId, username, playerTeam, opponent
 }
 
 function getActiveMatch(userIdOrChatId) {
-  return activeMatches[userIdOrChatId] || null;
+  const match = activeMatches[userIdOrChatId] || null;
+  if (match && match.status === 'completed') {
+    delete activeMatches[match.id];
+    if (match.host && match.host.telegramId) {
+      delete activeMatches[match.host.telegramId];
+      delete activeMatches[match.host.telegramId.toString()];
+    }
+    if (match.guest && match.guest.telegramId) {
+      delete activeMatches[match.guest.telegramId];
+      delete activeMatches[match.guest.telegramId.toString()];
+    }
+    return null;
+  }
+  return match;
 }
 
 function getMatch(userIdOrChatId) {
-  return activeMatches[userIdOrChatId] || completedMatches[userIdOrChatId] || null;
+  const active = getActiveMatch(userIdOrChatId);
+  if (active) return active;
+  return completedMatches[userIdOrChatId] || null;
 }
 
 module.exports = {
