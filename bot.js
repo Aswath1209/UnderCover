@@ -52,6 +52,36 @@ let cardFilesCache = [];
 
 // IPL 2026 squad pools (keyed by team code e.g. 'CSK', 'MI', ...)
 const IPL_SQUADS_POOL = require('./data/ipl_2026_squads_pool.json');
+
+const WK_NAMES = new Set([
+  'sanju samson', 'jitesh sharma', 'phil salt', 'philip salt', 'prabhsimran singh',
+  'kl rahul', 'lokesh rahul', 'rishabh pant', 'ishan kishan', 'quinton de kock',
+  'nicholas pooran', 'ms dhoni', 'mahendra singh dhoni', 'heinrich klaasen',
+  'jos buttler', 'abishek porel', 'rahmanullah gurbaz', 'kumar kushagra',
+  'dhruv jurel', 'jonny bairstow', 'wriddhiman saha', 'shai hope', 'matthew wade',
+  'devon conway', 'robin minz', 'urvil patel', 'donovan ferreira', 'ks bharat',
+  'kona srikar bharat', 'anuj rawat', 'upendra yadav', 'harvik desai',
+  'aravally avanish', 'sheldon jackson', 'bhanuka rajapaksa', 'sam billings',
+  'glenn phillips', 'tristan stubbs', 'josh inglis', 'tom latham', 'tim seifert'
+]);
+
+for (const teamCode in IPL_SQUADS_POOL) {
+  IPL_SQUADS_POOL[teamCode].forEach(player => {
+    // 1. Normalize based on name override
+    const nameLower = player.name ? player.name.toLowerCase().trim() : '';
+    if (WK_NAMES.has(nameLower)) {
+      player.role = 'wicket_keeper';
+    }
+    // 2. Normalize hyphens and ensure consistency
+    if (player.role) {
+      const normalized = player.role.toLowerCase().replace('-', '_');
+      if (normalized === 'wicket_keeper') player.role = 'wicket_keeper';
+      else if (normalized === 'all_rounder' || normalized === 'allrounder') player.role = 'all_rounder';
+      else if (normalized === 'batsman' || normalized === 'batter') player.role = 'batsman';
+      else if (normalized === 'bowler') player.role = 'bowler';
+    }
+  });
+}
 const IPL_TEAM_NAMES = {
   CSK:  'Chennai Super Kings',
   MI:   'Mumbai Indians',
@@ -6846,7 +6876,7 @@ app.post('/api/match/select-ipl-xi', async (req, res) => {
   const bowlers = selectedXi.filter(p => p.role === 'bowler').length;
 
   if (batsmen < 3 || batsmen > 5) return res.status(400).json({ error: `Need 3–5 batsmen, got ${batsmen}.` });
-  if (keepers < 1 || keepers > 2) return res.status(400).json({ error: `Need 1–2 wicket-keepers, got ${keepers}.` });
+  if (keepers < 1 || keepers > 3) return res.status(400).json({ error: `Need 1–3 wicket-keepers, got ${keepers}.` });
   if (allRounders < 1 || allRounders > 3) return res.status(400).json({ error: `Need 1–3 all-rounders, got ${allRounders}.` });
   if (bowlers < 3 || bowlers > 5) return res.status(400).json({ error: `Need 3–5 bowlers, got ${bowlers}.` });
 

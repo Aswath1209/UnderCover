@@ -1974,44 +1974,41 @@ function renderRosterPool(pool) {
   filteredPool.forEach(player => {
     const isSelected = selectedRosterPlayers.some(p => p.id === player.id);
     const card = document.createElement('div');
-    card.className = `player-card ${isSelected ? 'selected' : ''}`;
+    card.className = `player-row-item ${isSelected ? 'selected' : ''}`;
     card.dataset.id = player.id;
     
     const roleMap = { 'batsman': 'BAT', 'bowler': 'BOWL', 'all_rounder': 'AR', 'wicket_keeper': 'WK' };
     const formattedRole = roleMap[player.role] || player.role.toUpperCase().replace('_', '');
 
-    let rarityColor = '#4facfe'; // bronze/default
+    let rarityColor = '#3b82f6'; // bronze/default
     if (player.ovr >= 85) rarityColor = '#ff007f'; // elite
     else if (player.ovr >= 80) rarityColor = '#FFD700'; // gold
     else if (player.ovr >= 70) rarityColor = '#94A3B8'; // silver
 
-    let avatarHtml;
-    if (player.image_url) {
-      avatarHtml = `<img src="${player.image_url}" class="roster-avatar-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                    <div class="roster-avatar-text" style="display:none;">${player.name.charAt(0)}</div>`;
-    } else {
-      avatarHtml = `<div class="roster-avatar-text">${player.name.charAt(0)}</div>`;
-    }
-
     card.innerHTML = `
-      <div class="roster-card-inner" style="--rarity-color: ${rarityColor}">
-        <div class="roster-card-header">
-          <div class="roster-ovr">${player.ovr}</div>
-          <div class="roster-role">${formattedRole}</div>
+      <div class="player-row-left">
+        <div class="player-row-ovr" style="--rarity-color: ${rarityColor}">${player.ovr}</div>
+        <div class="player-row-details">
+          <div class="player-row-name">${player.name}</div>
+          <div class="player-row-subtext">${player.batting_archetype || player.bowling_archetype || 'Classic'}</div>
         </div>
-        <div class="roster-avatar-wrap">
-          ${avatarHtml}
+      </div>
+      <div class="player-row-center">
+        <div class="player-row-stat">
+          <span class="stat-lbl">BAT</span>
+          <span class="stat-val">${player.batting_rating || 30}</span>
         </div>
-        <div class="roster-card-body">
-          <div class="roster-name" title="${player.name}">${player.name}</div>
-          <div class="roster-archetype">${player.batting_archetype || player.bowling_archetype || 'Classic'}</div>
-          <div class="roster-stats">
-             <div class="r-stat"><span>BAT</span> <b>${player.batting_rating || 30}</b></div>
-             <div class="r-stat"><span>BOWL</span> <b>${player.bowling_rating || 30}</b></div>
-          </div>
+        <div class="player-row-stat">
+          <span class="stat-lbl">BOWL</span>
+          <span class="stat-val">${player.bowling_rating || 30}</span>
         </div>
-        <div class="roster-select-indicator">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div class="player-row-right">
+        <span class="player-row-role role-${player.role}">${formattedRole}</span>
+        <div class="player-row-checkbox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
         </div>
       </div>
     `;
@@ -2049,16 +2046,16 @@ function updateRosterUI(pool) {
   const bowlers = selectedRosterPlayers.filter(p => p.role === 'bowler').length;
 
   const batValid = batsmen >= 3 && batsmen <= 5;
-  const keeperValid = keepers >= 1 && keepers <= 2;
+  const keeperValid = keepers >= 1 && keepers <= 3;
   const arValid = allRounders >= 1 && allRounders <= 3;
   const bowlValid = bowlers >= 3 && bowlers <= 5;
 
   updateRequirementUI('req-batsmen', `Batsmen: 3-5 (${batsmen})`, batValid);
-  updateRequirementUI('req-keepers', `Keepers: 1-2 (${keepers})`, keeperValid);
+  updateRequirementUI('req-keepers', `Keepers: 1-3 (${keepers})`, keeperValid);
   updateRequirementUI('req-allrounders', `All-Rounders: 1-3 (${allRounders})`, arValid);
   updateRequirementUI('req-bowlers', `Bowlers: 3-5 (${bowlers})`, bowlValid);
 
-  const cards = document.querySelectorAll('.roster-pool-grid .player-card');
+  const cards = document.querySelectorAll('.roster-pool-grid .player-row-item');
   cards.forEach((card) => {
     const pId = card.dataset.id;
     const isSelected = selectedRosterPlayers.some(p => p.id === pId);

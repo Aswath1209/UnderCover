@@ -2099,178 +2099,189 @@ body {
 }
 
 .roster-pool-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  max-height: 380px;
+  max-height: 400px;
   padding-right: 4px;
   margin-top: 10px;
 }
 
-.player-card {
-  position: relative;
-  background: rgba(22, 28, 49, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.player-row-item {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(22, 28, 49, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
   overflow: hidden;
-  height: auto;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-.player-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.2);
+.player-row-item:hover {
+  background: rgba(22, 28, 49, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.player-card.selected {
-  background: rgba(0, 184, 117, 0.1);
+.player-row-item.selected {
+  background: rgba(0, 184, 117, 0.08);
   border-color: var(--primary-accent);
-  box-shadow: 0 0 15px rgba(0, 184, 117, 0.3);
+  box-shadow: 0 0 10px rgba(0, 184, 117, 0.15);
 }
 
-.player-card.disabled {
-  opacity: 0.4;
+.player-row-item.disabled {
+  opacity: 0.35;
   cursor: not-allowed;
   filter: grayscale(1);
 }
 
-.roster-card-inner {
+.player-row-left {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 10px 8px;
-  position: relative;
-  border-top: 3px solid var(--rarity-color);
+  gap: 12px;
+  flex: 1.5;
+  min-width: 0;
 }
 
-.roster-card-header {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  margin-bottom: 6px;
-}
-
-.roster-ovr {
-  font-size: 14px;
-  font-weight: 900;
+.player-row-ovr {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1.5px solid var(--rarity-color);
   color: var(--rarity-color);
-}
-
-.roster-role {
-  font-size: 10px;
-  font-weight: 800;
-  background: rgba(255,255,255,0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #fff;
-}
-
-.roster-avatar-wrap {
-  position: relative;
-  width: 50px;
-  height: 50px;
-  margin-bottom: 8px;
-}
-
-.roster-avatar-img, .roster-avatar-text {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid var(--rarity-color);
-}
-
-.roster-avatar-img {
-  object-fit: cover;
-}
-
-.roster-avatar-text {
+  font-size: 13px;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 800;
-  background: rgba(255,255,255,0.05);
-  color: #fff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
 }
 
-.roster-card-body {
-  text-align: center;
-  width: 100%;
+.player-row-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.roster-name {
+.player-row-name {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
 }
 
-.roster-archetype {
-  font-size: 9px;
+.player-row-subtext {
+  font-size: 10px;
   color: var(--hint);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-top: 1px;
 }
 
-.roster-stats {
+.player-row-center {
   display: flex;
-  justify-content: space-around;
-  width: 100%;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  padding-top: 6px;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: center;
 }
 
-.r-stat {
+.player-row-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 3px 6px;
+  min-width: 38px;
 }
 
-.r-stat span {
+.player-row-stat .stat-lbl {
   font-size: 8px;
   color: var(--text-secondary);
   font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
-.r-stat b {
+.player-row-stat .stat-val {
   font-size: 11px;
   color: #fff;
+  font-weight: 800;
 }
 
-.roster-select-indicator {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: var(--primary-accent);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+.player-row-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0.8;
+  justify-content: flex-end;
+}
+
+.player-row-role {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: #fff;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.player-row-role.role-batsman {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.player-row-role.role-bowler {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.player-row-role.role-all_rounder {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.player-row-role.role-wicket_keeper {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.player-row-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: transparent;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.player-row-checkbox svg {
+  width: 11px;
+  height: 11px;
+}
+
+.player-row-item.selected .player-row-checkbox {
+  background: var(--primary-accent);
+  border-color: var(--primary-accent);
   color: #051d10;
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.roster-select-indicator svg {
-  width: 14px;
-  height: 14px;
-}
-
-.player-card.selected .roster-select-indicator {
-  opacity: 1;
-  transform: scale(1);
+  box-shadow: 0 0 8px rgba(0, 184, 117, 0.4);
 }
 
 /* Roster Tabs Styles */
