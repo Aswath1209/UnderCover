@@ -323,13 +323,14 @@ function getWebAppUrl(chatId, tab = '') {
   return `https://${cleanHost}/bonus-app?msg_id=0&chat_id=${chatId}${tab ? `&tab=${tab}` : ''}`;
 }
 
-function getMatchPlayUrl(match) {
+function getMatchPlayUrl(match, userId = null) {
   let host = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_HOSTNAME || 'undercover-fuxy.onrender.com';
   if (host === 'undefined' || !host) {
     host = 'undercover-fuxy.onrender.com';
   }
   const cleanHost = host.replace(/^https?:\/\//, '');
-  return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}&v=${Date.now()}`;
+  const userParam = userId ? `&userId=${userId}` : '';
+  return `https://${cleanHost}/cricket?match_id=${match.id}&chat_id=${match.chatId}${userParam}&v=${Date.now()}`;
 }
 
 const DRAFT_ROLES = [
@@ -438,9 +439,10 @@ function addShopButton(kb, ctx, label = "🛒 Visit Player Shop", tab = "shop") 
 function addMatchPlayButton(kb, match, ctx = null) {
   const isPrivate = ctx ? (ctx.chat?.type === 'private') : (match.chatId > 0);
   const botUsername = ctx?.me?.username || botInfo?.username || 'Imposter0_bot';
-  const playUrl = getMatchPlayUrl(match);
 
   if (isPrivate) {
+    const uid = ctx?.from?.id || (match.chatId > 0 ? match.chatId : null);
+    const playUrl = getMatchPlayUrl(match, uid);
     kb.webApp("🎮 Play Match", playUrl);
   } else {
     const directLink = `https://t.me/${botUsername}/bonus?startapp=cricket_${match.id}_${match.chatId}`;
@@ -2845,7 +2847,7 @@ bot.command('history', async (ctx) => {
       const scoreSummary = `Host: ${hostScore} | Guest: ${guestScore}`;
       text += `👉 <b>${matchSummary}</b>\n   <code>${scoreSummary}</code>\n\n`;
 
-      const playUrl = `https://${cleanHost}/cricket?match_id=${m.id}&chat_id=${m.chatId}`;
+      const playUrl = `https://${cleanHost}/cricket?match_id=${m.id}&chat_id=${m.chatId}&userId=${telegramId}`;
       const isPrivate = ctx.chat?.type === 'private';
       if (isPrivate) {
         inlineKeyboard.webApp(`↗️ View Match ${idx + 1}`, playUrl);
@@ -7596,7 +7598,8 @@ async function processBallAndProgress(ctx, match) {
           }
 
           const botUsername = botInfo?.username || 'Imposter0_bot';
-          const playUrl = getMatchPlayUrl(match);
+          const uid = match.chatId > 0 ? match.chatId : null;
+          const playUrl = getMatchPlayUrl(match, uid);
           const isPrivate = match.chatId > 0;
           
           let buttonObj;
